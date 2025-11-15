@@ -1,0 +1,41 @@
+{
+  "name": "@better-potree/rendering-three",
+  "version": "0.1.0",
+  "description": "Three.js rendering implementation for better-potree",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "potree",
+    "rendering",
+    "three.js"
+  ],
+  "author": "better-potree contributors",
+  "license": "BSD-2-Clause",
+  "dependencies": {
+    "@better-potree/types": "workspace:*",
+    "@better-potree/core": "workspace:*"
+  },
+  "peerDependencies": {
+    "three": "~0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "~0.180.0"
+  }
+}

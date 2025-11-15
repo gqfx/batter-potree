@@ -1,0 +1,61 @@
+{
+  "compilerOptions": {
+    // Language and Environment
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+
+    // Type Checking
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Emit
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "removeComments": false,
+    "importHelpers": true,
+    "downlevelIteration": true,
+
+    // Interop Constraints
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+
+    // Skip Checking
+    "skipLibCheck": true,
+
+    // Path Aliases
+    "baseUrl": ".",
+    "paths": {
+      "@better-potree/types": ["./packages/types/src"],
+      "@better-potree/types/*": ["./packages/types/src/*"],
+      "@better-potree/utils": ["./packages/utils/src"],
+      "@better-potree/utils/*": ["./packages/utils/src/*"],
+      "@better-potree/core": ["./packages/core/src"],
+      "@better-potree/core/*": ["./packages/core/src/*"],
+      "@better-potree/rendering-three": ["./packages/rendering-three/src"],
+      "@better-potree/rendering-three/*": ["./packages/rendering-three/src/*"],
+      "@better-potree/loaders": ["./packages/loaders/src"],
+      "@better-potree/loaders/*": ["./packages/loaders/src/*"],
+      "@better-potree/loader-potree": ["./packages/loader-potree/src"],
+      "@better-potree/loader-potree/*": ["./packages/loader-potree/src/*"],
+      "@better-potree/controls": ["./packages/controls/src"],
+      "@better-potree/controls/*": ["./packages/controls/src/*"],
+      "@better-potree/tools": ["./packages/tools/src"],
+      "@better-potree/tools/*": ["./packages/tools/src/*"],
+      "@better-potree/viewer": ["./packages/viewer/src"],
+      "@better-potree/viewer/*": ["./packages/viewer/src/*"]
+    }
+  },
+  "include": ["packages/*/src"],
+  "exclude": ["node_modules", "dist", "build"]
+}

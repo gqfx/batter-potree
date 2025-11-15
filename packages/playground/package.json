@@ -1,0 +1,21 @@
+{
+  "name": "@better-potree/playground",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Development playground for better-potree",
+  "type": "module",
+  "scripts": {
+    "dev": "rsbuild dev",
+    "build": "rsbuild build",
+    "preview": "rsbuild preview"
+  },
+  "dependencies": {
+    "@better-potree/viewer": "workspace:*",
+    "three": "~0.180.0"
+  },
+  "devDependencies": {
+    "@rsbuild/core": "^1.5.17",
+    "@rsbuild/plugin-type-check": "^1.2.4",
+    "@types/three": "~0.180.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["packages/*/src/index.ts"],
+  "entryPointStrategy": "packages",
+  "out": "docs/api",
+  "plugin": [],
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "readme": "README.md",
+  "name": "better-potree",
+  "navigationLinks": {
+    "GitHub": "https://github.com/yourusername/better-potree"
+  }
+}
