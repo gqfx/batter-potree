@@ -1,225 +1,160 @@
-## **`better-potree` - LLM 驱动的实施计划 (基于架构 v8.0)**
+## **`better-potree` - LLM 辅助开发计划 (To-Do List)**
 
-### **核心原则**
+### **方法论**
 
-1.  **原子化任务**: 每个任务都是一个独立的、可由 LLM 完成的工作单元。
-2.  **上下文驱动**: 每个任务明确引用 `architecture-v8.md` 的相关章节作为其核心输入。
-3.  **产物明确**: 每个任务的输出是具体的文件、代码或测试结果。
-4.  **可衡量验收**: 每个任务都有清晰的、可自动验证的验收标准。
+本计划将严格遵循 `architecture-v8.md` 中定义的四个实施阶段。每个任务项 (Task) 都设计为一个独立的、可由 LLM 完成的工作单元。
+
+**执行流程**:
+1.  **选择任务**: 从 To-Do List 中选择一个 `[ ]` 状态的任务。
+2.  **提供上下文**: 将【上下文输入】部分的内容喂给 LLM，确保它理解背景和依赖。
+3.  **下达指令**: 将【LLM Prompt 指令】作为核心指令，要求 LLM 生成代码。
+4.  **验证输出**: 对比 LLM 生成的代码与【输出验收标准】，确保质量达标并运行相关测试。
+5.  **合并代码**: 将验证通过的代码合并到项目中。
+6.  **更新状态**: 将任务标记为 `[x]`。
 
 ---
 
-### **To-Do List: 详细开发计划**
+### **Phase 0: POC 验证 (3 天)**
 
-#### **Phase 0: POC 验证 (预计 3 天)**
+**目标**: 验证核心架构假设——分层状态管理的可行性和性能优势。
 
-**目标**: 快速验证“分层状态管理”核心架构的可行性与性能优势，为后续大规模开发奠定信心。
+-   **[ ] P0-T1: 搭建最小化项目结构与配置**
+    -   **上下文输入**: 项目需要 TypeScript 和 Vitest。
+    -   **LLM Prompt 指令**: "请为我的新项目生成以下配置文件：1. `package.json`，包含 `typescript`, `vitest`, `zustand` 依赖；2. `tsconfig.json`，使用严格模式；3. `vitest.config.ts`，配置基本的测试环境。"
+    -   **输出验收标准**:
+        -   ✅ `pnpm install` 或 `npm install` 可以成功执行。
+        -   ✅ `pnpm test` 或 `npm test` 可以成功运行。
 
--   [ ] **任务 0.1: 创建最小化 POC 项目结构**
-    *   **`[输入]`**: `architecture-v8.md` 第 14 节 (Phase 0)。
-    *   **`[输出]`**:
-        *   根目录 `poc/`
-        *   `poc/package.json` (包含 `vitest`, `typescript`, `zustand`)
-        *   `poc/tsconfig.json`
-        *   `poc/vitest.config.ts`
-    *   **`[验收标准]`**: 运行 `pnpm test` 命令成功，但无测试用例。
+-   **[ ] P0-T2: 实现最简 `ConfigStore`**
+    -   **上下文输入**: `architecture-v8.md` 的 **章节 4.1 (Config Store 实现)** 提供了完整的类型定义和实现代码。
+    -   **LLM Prompt 指令**: "根据 `architecture-v8.md` 章节 4.1 的代码，生成 `src/config/store.ts` 文件。文件应导出 `createConfigStore` 函数及所有相关的 TypeScript 类型。"
+    -   **输出验收标准**:
+        -   ✅ 文件 `src/config/store.ts` 创建成功。
+        -   ✅ 导出的 `createConfigStore` 函数和类型与文档一致。
+        -   ✅ 代码通过 TypeScript 编译，无类型错误。
 
--   [ ] **任务 0.2: 实现最简 `ConfigStore`**
-    *   **`[输入]`**: `architecture-v8.md` 第 4.1 节的代码片段。
-    *   **`[输出]`**:
-        *   `poc/config.ts` 文件，包含 `createConfigStore` 函数。
-    *   **`[验收标准]`**: 代码符合输入规范，无 TypeScript 错误。
+-   **[ ] P0-T3: 实现最简 `Runtime` 类**
+    -   **上下文输入**: `architecture-v8.md` 的 **章节 2.1 (运行时状态)** 和 **章节 4.2 (Runtime State 实现)** 描述了 `Runtime` 类的核心属性和职责。
+    -   **LLM Prompt 指令**: "根据 `architecture-v8.md` 章节 4.2 的代码，生成 `src/runtime/Runtime.ts` 文件。实现一个 `Runtime` 类，包含 `visibleNodes` (Set) 和 `loadedNodes` (Map) 两个核心属性。"
+    -   **输出验收标准**:
+        -   ✅ 文件 `src/runtime/Runtime.ts` 创建成功。
+        -   ✅ 导出的 `Runtime` 类包含指定的可变属性。
+        -   ✅ 代码通过 TypeScript 编译。
 
--   [ ] **任务 0.3: 实现最简 `Runtime` 类**
-    *   **`[输入]`**: `architecture-v8.md` 第 2.1 节 `Runtime State` 的核心定义。
-    *   **`[输出]`**:
-        *   `poc/runtime.ts` 文件，包含一个 `Runtime` 类，至少有 `visibleNodes` 和 `sources` 两个属性。
-    *   **`[验收标准]`**: 代码符合输入规范，无 TypeScript 错误。
+-   **[ ] P0-T4: 实现最简 `StateCoordinator`**
+    -   **上下文输入**: `architecture-v8.md` 的 **章节 4.3 (StateCoordinator 完整实现)** 提供了 `StateCoordinator` 的骨架。POC 阶段只需实现 `initialSync` 和对 `sources` 变化的订阅。
+    -   **LLM Prompt 指令**: "根据 `architecture-v8.md` 章节 4.3，生成 `src/coordinator/StateCoordinator.ts` 文件。实现 `StateCoordinator` 类，包含构造函数、`initialSync` 方法，并设置对 `configStore.subscribe` 的调用来同步 `sources` 状态到 `runtime.sources`。"
+    -   **输出验收标准**:
+        -   ✅ 文件 `src/coordinator/StateCoordinator.ts` 创建成功。
+        -   ✅ `StateCoordinator` 类能够订阅 Zustand store 的变更并更新 `Runtime` 实例。
+        -   ✅ 代码通过 TypeScript 编译。
 
--   [ ] **任务 0.4: 实现最简 `StateCoordinator`**
-    *   **`[输入]`**: `architecture-v8.md` 第 4.3 节，重点关注构造函数、`initialSync` 和 `syncSources` 的基本逻辑。
-    *   **`[输出]`**:
-        *   `poc/coordinator.ts` 文件，包含 `StateCoordinator` 类，实现 Config 到 Runtime 的单向同步。
-    *   **`[验收标准]`**: 代码符合输入规范，无 TypeScript 错误。
+-   **[ ] P0-T5: 编写并执行 POC 验证测试**
+    -   **上下文输入**: `architecture-v8.md` 的 **章节 15.1 (POC 测试)** 和 **章节 15.2 (性能基准测试)** 提供了完整的测试用例代码。
+    -   **LLM Prompt 指令**: "根据 `architecture-v8.md` 章节 15.1 和 15.2，为我生成 Vitest 测试文件 `poc.test.ts`。该文件应包含'分层状态管理'和'性能验证'两个测试套件。"
+    -   **输出验收标准**:
+        -   ✅ 测试文件 `poc.test.ts` 创建成功。
+        -   ✅ `pnpm test` 执行通过所有测试。
+        -   ✅ 性能测试输出显示：可变更新的耗时远小于不可变更新（至少快 10 倍）。
+        -   ✅ **Phase 0 退出标准达成。**
 
--   [ ] **任务 0.5: 编写并执行 POC 单元测试**
-    *   **`[输入]`**: `architecture-v8.md` 第 15.1 节的测试代码。
-    *   **`[输出]`**:
-        *   `poc/poc.test.ts` 文件。
-    *   **`[验收标准]`**: `pnpm test poc.test.ts` 命令通过所有断言。
+---
 
--   [ ] **任务 0.6: 编写并执行 POC 性能基准测试**
-    *   **`[输入]`**: `architecture-v8.md` 第 15.2 节的测试代码。
-    *   **`[输出]`**:
-        *   `poc/poc-perf.test.ts` 文件。
-    *   **`[验收标准]`**: `pnpm test poc-perf.test.ts` 命令通过，并在控制台打印出可变更新与不可变更新的耗时对比，结果符合预期（可变更新快 10 倍以上）。
+### **Phase 1: 核心框架 (2 周)**
 
-#### **Phase 1: 核心框架 (预计 2 周)**
+**目标**: 搭建完整的 Monorepo 结构和所有核心基础设施模块。
 
-**目标**: 搭建完整的 Monorepo 项目结构，并实现所有与渲染无关的核心基础设施模块。
+-   **[ ] P1-T1: 搭建 Monorepo 结构**
+    -   **上下文输入**: `architecture-v8.md` 的 **章节 13.1 (包结构概览)** 描述了 pnpm workspace 结构和四个核心包。
+    -   **LLM Prompt 指令**: "请为我生成 Monorepo 的配置文件：1. 根目录的 `package.json`，声明 `private: true`；2. `pnpm-workspace.yaml`，定义 `packages/*`；3. 在 `packages/` 目录下为 `core`, `rendering`, `rendering-three`, `viewer` 四个包分别生成初始的 `package.json` 和 `tsconfig.json` 文件，并设置好它们之间的依赖关系（如 `viewer` 依赖 `core`）。"
+    -   **输出验收标准**:
+        -   ✅ 四个包的目录结构已创建。
+        -   ✅ `pnpm install` 能够正确安装所有依赖并建立符号链接。
+        -   ✅ 在根目录运行构建命令可以成功构建所有包。
 
-**Week 1: 项目搭建与核心类型**
+-   **[ ] P1-T2: 实现完整的 `@better-potree/core` 模块**
+    -   **上下文输入**: `architecture-v8.md` 中所有位于 `packages/core` 下的模块定义，包括 **章节 5, 6, 7, 9, 10**。
+    -   **LLM Prompt 指令**: "为 `@better-potree/core` 包生成以下模块的完整代码和对应的 Vitest 单元测试，测试覆盖率需达到 80% 以上：
+        1.  `OctreeManager` 和 `OctreeNode` (章节 5.2, 5.3)
+        2.  `SystemScheduler` (章节 6.1)
+        3.  `ECSWorld` 和所有组件 (章节 7.1, 7.2)
+        4.  `MessageQueue` (章节 9.1)
+        5.  `WorkerPool` (章节 9.2)
+        6.  `ResourceManager` (章节 10.1)
+        7.  `ObjectPools` (章节 10.2)"
+    -   **输出验收标准**:
+        -   ✅ 所有模块的代码和测试文件均已生成。
+        -   ✅ `@better-potree/core` 包的所有单元测试通过。
+        -   ✅ **Phase 1 退出标准达成。**
 
--   [ ] **任务 1.1: 初始化 Monorepo 工作空间**
-    *   **`[输入]`**: `architecture-v8.md` 第 13.1 节的包结构。
-    *   **`[输出]`**:
-        *   根 `package.json`
-        *   `pnpm-workspace.yaml` 文件
-        *   创建 `packages/core`, `packages/rendering`, `packages/rendering-three`, `packages/viewer`, `apps/playground` 目录结构。
-        *   为每个 `packages/*` 和 `apps/playground` 创建一个基础的 `package.json`。
-    *   **`[验收标准]`**: `pnpm install` 成功，所有工作空间被正确识别。
+---
 
--   [ ] **任务 1.2: 配置工程化工具链**
-    *   **`[输入]`**: `architecture-v8.md` 第 14 节 (Phase 1, Week 1)。
-    *   **`[输出]`**:
-        *   根目录 `tsconfig.base.json`
-        *   根目录 `biome.json`
-        *   `apps/playground/rsbuild.config.ts`
-        *   根目录 `vitest.config.ts`
-    *   **`[验收标准]`**: `pnpm lint` 和 `pnpm type-check` 命令能成功执行。`pnpm -F playground dev` 能启动开发服务器。
+### **Phase 2: 最小可视化产品 (3 周)**
 
--   [ ] **任务 1.3: 实现 `@better-potree/core` - 完整 `ConfigStore`**
-    *   **`[输入]`**: `architecture-v8.md` 第 4.1 节 `store.ts` 的完整代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/config/store.ts`
-        *   `packages/core/src/config/types.ts`
-        *   `packages/core/src/config/store.test.ts` (单元测试)
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，单元测试覆盖率 > 80%。
+**目标**: 实现核心渲染管线，加载并成功渲染第一个点云。
 
-**Week 2: 核心基础设施**
+-   **[ ] P2-T1: 实现 `TraversalSystem`**
+    -   **上下文输入**: `architecture-v8.md` **章节 8.1** 提供了 `TraversalSystem` 的类结构。`gemini_guide.md` **章节 1** 指出，核心的屏幕空间误差(SSE)算法需要参考 Potree 源码的 `src/PotreeRenderer.js` 中的 `updateVisibility` 方法。
+    -   **LLM Prompt 指令**: "生成 `@better-potree/core/src/systems/TraversalSystem.ts` 文件。请严格按照 `architecture-v8.md` 章节 8.1 实现其结构。对于 `calculateScreenSize` 方法，请翻译并实现 Potree 源码 `src/PotreeRenderer.js` `updateVisibility` 函数中的屏幕空间误差(SSE)计算逻辑。"
+    -   **输出验收标准**:
+        -   ✅ `TraversalSystem.ts` 文件创建成功。
+        -   ✅ 包含视锥剔除和基于 SSE 的 LOD 选择逻辑。
+        -   ✅ 单元测试通过（使用 mock 的相机和八叉树节点）。
 
--   [ ] **任务 1.4: 实现 `@better-potree/core` - 完整 `Runtime` 类**
-    *   **`[输入]`**: `architecture-v8.md` 第 4.2 节 `Runtime.ts` 的完整代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/runtime/Runtime.ts`
-        *   `packages/core/src/runtime/Runtime.test.ts`
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试覆盖 `checkGPUMemoryBudget` 等辅助方法。
+-   **[ ] P2-T2: 实现 `decoder.worker.ts`**
+    -   **上下文输入**: `gemini_guide.md` **章节 2** 是核心参考。它指明了解码逻辑的关键在于 Potree 源码的 `src/workers/BinaryDecoderWorker.js` 和 `src/loader/PointAttributes.js`。
+    -   **LLM Prompt 指令**: "生成 `@better-potree/viewer/src/loaders/decoder.worker.ts` 文件。这个 Worker 接收一个 URL，下载二进制点云数据 (`.bin` 文件)，并根据点属性定义解码 `ArrayBuffer`。请严格参考 Potree 源码 `src/workers/BinaryDecoderWorker.js` 的解码循环逻辑，并使用 `src/loader/PointAttributes.js` 中的信息来确定每个点的属性、类型和字节偏移。将解码后的数据（如 positions, colors）通过 `postMessage` 返回。"
+    -   **输出验收标准**:
+        -   ✅ `decoder.worker.ts` 文件创建成功。
+        -   ✅ 能够正确解码 Potree 格式的 `.bin` 文件。
+        -   ✅ 在 `playground` 中测试，可以接收并打印出解码后的点云数据。
 
--   [ ] **任务 1.5: 实现 `@better-potree/core` - 完整 `StateCoordinator`**
-    *   **`[输入]`**: `architecture-v8.md` 第 4.3 节 `StateCoordinator.ts` 的完整代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/coordinator/StateCoordinator.ts`
-        *   `packages/core/src/coordinator/StateCoordinator.test.ts` (详尽的单元测试)
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试覆盖所有状态转换场景（增、删、改 source），单元测试覆盖率 > 90%。
+-   **[ ] P2-T3: 实现 `StreamingSystem`**
+    -   **上下文输入**: `architecture-v8.md` **章节 8.2** 提供了 `StreamingSystem` 的完整实现代码。它依赖于 `WorkerPool` 和 `MessageQueue`。
+    -   **LLM Prompt 指令**: "根据 `architecture-v8.md` 章节 8.2 的代码，生成 `@better-potree/core/src/systems/StreamingSystem.ts` 文件。这个系统负责调度可见但未加载的节点，并通过 `WorkerPool` 将任务分发给 `decoder.worker.ts`。"
+    -   **输出验收标准**:
+        -   ✅ `StreamingSystem.ts` 文件创建成功。
+        -   ✅ 能够根据 `runtime.visibleNodes` 调度加载任务。
+        -   ✅ 单元测试通过，能正确处理成功和失败的消息。
 
--   [ ] **任务 1.6: 实现 `@better-potree/core` - `SystemScheduler`**
-    *   **`[输入]`**: `architecture-v8.md` 第 6.1 节 `SystemScheduler.ts` 的完整代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/scheduler/SystemScheduler.ts`
-        *   `packages/core/src/types/system.ts`
-        *   `packages/core/src/scheduler/SystemScheduler.test.ts`
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试验证系统能按 `Stage` 和 `priority` 正确排序和执行。
+-   **[ ] P2-T4: 实现渲染抽象层与 Three.js 实现**
+    -   **上下文输入**: `architecture-v8.md` **章节 13.2** 定义了 `@better-potree/rendering` 和 `@better-potree/rendering-three` 的职责。`gemini_guide.md` **章节 1** 指出着色器逻辑应参考 `pointcloud.vs` 和 `pointcloud.fs`。
+    -   **LLM Prompt 指令**: "请分步执行：
+        1.  在 `@better-potree/rendering` 包中，生成渲染接口 `IRenderer.ts`, `IMaterial.ts`。
+        2.  在 `@better-potree/rendering-three` 包中，生成 `ThreeRenderer.ts` 实现 `IRenderer`。
+        3.  创建 `PointCloudMaterial.ts`，其 uniforms 和着色器代码请严格参考 Potree 源码 `src/materials/PointCloudMaterial.js`、`pointcloud.vs` 和 `pointcloud.fs`。特别注意在顶点着色器中实现点大小的 SSE 计算逻辑。"
+    -   **输出验收标准**:
+        -   ✅ 渲染抽象层和 Three.js 实现层代码生成完毕。
+        -   ✅ `PointCloudMaterial` 能够根据相机距离动态调整点的大小。
+        -   ✅ 代码通过 TypeScript 编译。
 
--   [ ] **任务 1.7: 实现 `@better-potree/core` - 轻量级 `ECSWorld` 及组件**
-    *   **`[输入]`**: `architecture-v8.md` 第 7.1 节 `ECSWorld.ts` 和 第 7.2 节 `components.ts` 的代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/ecs/ECSWorld.ts`
-        *   `packages/core/src/ecs/components.ts`
-        *   `packages/core/src/ecs/ECSWorld.test.ts`
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试覆盖实体和组件的增删改查及 `query` 功能。
+-   **[ ] P2-T5: 搭建 `playground` 并完成首次渲染**
+    -   **上下文输入**: `architecture-v8.md` **章节 12.1** 提供了 `Engine` 的初始化示例。
+    -   **LLM Prompt 指令**: "在 `apps/playground` 目录下，创建一个简单的 web 应用。使用 `@better-potree/viewer` 中的 `Engine` 类，初始化引擎，加载一个公开的 Potree 点云数据集，并启动渲染循环。请参考 `architecture-v8.md` 章节 12.1 的示例代码。"
+    -   **输出验收标准**:
+        -   ✅ `playground` 应用能够成功运行。
+        -   ✅ 浏览器中能够看到并交互式地浏览一个点云。
+        -   ✅ 视锥剔除和 LOD 切换肉眼可见且工作正常。
+        -   ✅ **Phase 2 退出标准达成。**
 
--   [ ] **任务 1.8: 实现 `@better-potree/core` - `OctreeManager` 基础**
-    *   **`[输入]`**: `architecture-v8.md` 第 5.2 节 `OctreeNode.ts` 和 第 5.3 节 `OctreeManager.ts` 的代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/octree/OctreeNode.ts`
-        *   `packages/core/src/octree/OctreeManager.ts`
-        *   `packages/core/src/octree/OctreeManager.test.ts`
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试能够加载并解析 `meta.json` (使用 mock fetch)。
+---
 
--   [ ] **任务 1.9: 实现 `@better-potree/core` - 资源管理基础设施**
-    *   **`[输入]`**: `architecture-v8.md` 第 9 和 10 节的设计。
-    *   **`[输出]`**:
-        *   `packages/core/src/resources/MessageQueue.ts` + 测试
-        *   `packages/core/src/resources/ObjectPools.ts` + 测试
-        *   `packages/core/src/resources/WorkerPool.ts` (基础框架) + 测试
-        *   `packages/core/src/resources/ResourceManager.ts` (含 LRU 逻辑) + 测试
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，每个模块的单元测试覆盖其核心功能。
+### **Phase 3: 性能优化 (2 周)**
 
-#### **Phase 2: 最小可视化产品 (预计 3 周)**
+**目标**: 分析性能瓶颈，优化核心模块，达到生产级性能标准。
 
-**目标**: 渲染出第一个点云，打通从配置到渲染的完整数据流。
+-   **[ ] P3-T1: 编写并执行性能基准测试**
+    -   **上下文输入**: `architecture-v8.md` **章节 15.5 (性能测试)** 提供了 `vitest` `bench` 的使用示例。性能目标见 **章节 16.1**。
+    -   **LLM Prompt 指令**: "在 `benchmarks/` 目录下，创建性能基准测试文件。使用 `vitest` 的 `bench` 函数，针对以下场景编写测试：1. 渲染 100 万、500 万、1000 万点；2. TraversalSystem 在不同节点数量下的遍历耗时。将测试结果与 `architecture-v8.md` 章节 16.1 的性能目标进行对比。"
+    -   **输出验收标准**:
+        -   ✅ 性能基准测试脚本创建成功。
+        -   ✅ 能够量化当前版本的性能数据，并生成报告。
 
--   [ ] **任务 2.1: 实现 `@better-potree/core` - `TraversalSystem`**
-    *   **`[输入]`**: `architecture-v8.md` 第 8.1 节 `TraversalSystem.ts` 的完整代码。
-    *   **`[输出]`**:
-        *   `packages/core/src/systems/TraversalSystem.ts`
-        *   `packages/core/src/systems/TraversalSystem.test.ts` (使用 mock 的 `OctreeManager` 和 `Runtime`)
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试验证视锥剔除和 LOD 选择逻辑。
-
--   [ ] **任务 2.2: 实现 `@better-potree/core` - `StreamingSystem`**
-    *   **`[输入]`**: `architecture-v8.md` 第 8.2 节的设计原则和第 11.5 节的状态机。
-    *   **`[输出]`**:
-        *   `packages/core/src/systems/StreamingSystem.ts` (包含加载任务管理、优先级计算、与 `WorkerPool` 和 `MessageQueue` 的交互逻辑)
-        *   `packages/core/src/systems/StreamingSystem.test.ts`
-    *   **`[验收标准]`**: `pnpm test -F @better-potree/core` 通过，测试验证节点加载状态转换的正确性。
-
--   [ ] **任务 2.3: 实现 `@better-potree/viewer` - `decoder.worker.ts`**
-    *   **`[输入]`**: Potree 2.0 二进制格式规范。
-    *   **`[输出]`**:
-        *   `packages/viewer/src/loaders/decoder.worker.ts`
-    *   **`[验收标准]`**: 能够正确解码一个给定的 Potree `.bin` 文件（提供一个 fixture 文件用于测试）。
-
--   [ ] **任务 2.4: 定义 `@better-potree/rendering` - 渲染抽象接口**
-    *   **`[输入]`**: `architecture-v8.md` 第 13.2.2 节的职责定义。
-    *   **`[输出]`**:
-        *   `packages/rendering/src/interfaces/IRenderer.ts`
-        *   `packages/rendering/src/interfaces/IMaterial.ts`
-        *   `packages/rendering/src/interfaces/IBuffer.ts`
-    *   **`[验收标准]`**: 接口定义清晰，符合架构设计，无实现代码。
-
--   [ ] **任务 2.5: 实现 `@better-potree/rendering-three` - Three.js 渲染后端**
-    *   **`[输入]`**: `@better-potree/rendering` 的接口和 Three.js API。
-    *   **`[输出]`**:
-        *   `packages/rendering-three/src/ThreeRenderer.ts` (实现 `IRenderer`)
-        *   `packages/rendering-three/src/materials/PointCloudMaterial.ts`
-        *   `packages/rendering-three/src/shaders/pointcloud.vert.glsl` 和 `pointcloud.frag.glsl`
-    *   **`[验收标准]`**: 代码结构完成，无 TypeScript 错误。
-
--   [ ] **任务 2.6: 实现 `@better-potree/viewer` - `Engine` API 类**
-    *   **`[输入]`**: `architecture-v8.md` 第 12 节的 API 设计示例。
-    *   **`[输出]`**:
-        *   `packages/viewer/src/Engine.ts` (组装 `core`, `rendering-three` 等模块)
-    *   **`[验收标准]`**: `Engine` 类能够被实例化，并正确初始化所有内部模块。
-
--   [ ] **任务 2.7: 集成与调试 - 在 `playground` 中渲染点云**
-    *   **`[输入]`**: 所有已完成的模块。
-    *   **`[输出]`**:
-        *   `apps/playground/src/main.ts` 中完整的引擎初始化和启动代码。
-    *   **`[验收标准]`**: 在浏览器中打开 `playground` 页面，能够成功加载并渲染一个 Potree 点云数据集。LOD 和视锥剔除工作正常。
-
-#### **Phase 3: 性能优化 (预计 2 周)**
-
-**目标**: 达到生产级性能标准，并建立性能监控和回归测试机制。
-
--   [ ] **任务 3.1: 建立性能基准测试套件**
-    *   **`[输入]`**: `architecture-v8.md` 第 15.5 节的测试示例，以及 Phase 2 的成果。
-    *   **`[输出]`**:
-        *   `tests/benchmarks/rendering.bench.ts`
-        *   `tests/benchmarks/traversal.bench.ts`
-    *   **`[验收标准]`**: `pnpm test:bench` 命令可以执行，并输出渲染和遍历的性能指标。
-
--   [ ] **任务 3.2: 性能分析与瓶颈定位**
-    *   **`[输入]`**: Chrome DevTools Performance/Memory Profiler。
-    *   **`[输出]`**:
-        *   一份 Markdown 文档 `docs/performance-report-phase3.md`，记录 CPU、内存热点和 GC 压力点。
-    *   **`[验收标准]`**: 报告清晰地指出了 Top 3 性能瓶颈。
-
--   [ ] **任务 3.3: 优化热点代码 - 全面应用对象池**
-    *   **`[输入]`**: `docs/performance-report-phase3.md` 和 `architecture-v8.md` 第 10.2 节。
-    *   **`[输出]`**:
-        *   修改 `TraversalSystem` 和 `RenderSystem` 等高频更新的系统，将所有临时的 `Vector3`, `Matrix4` 等对象的创建替换为从 `ObjectPools` 中获取和释放。
-    *   **`[验收标准]`**: 再次运行性能分析，确认临时对象创建显著减少，GC 压力降低。
-
--   [ ] **任务 3.4: 关键决策 - 评估并决定是否迁移到 `bitecs`**
-    *   **`[输入]`**: `architecture-v8.md` 第 14 节 (ADR-004)。
-    *   **`[输出]`**:
-        *   一个测试脚本 `tests/benchmarks/ecs.bench.ts`，对比 `ECSWorld` 和 `bitecs` 的性能。
-        *   更新 `ADR-004.md`，记录决策结果和数据支撑。
-    *   **`[验收标准]`**: 基于性能数据做出明确决策。如果需要迁移，则创建新的任务。
-
--   [ ] **任务 3.5: 实现性能监控面板**
-    *   **`[输入]`**: `architecture-v8.md` 第 10.3.4 节。
-    *   **`[输出]`**:
-        *   一个 UI 组件 `apps/playground/src/components/PerfPanel.tsx` (或等效实现)。
-    *   **`[验收标准]`**: `playground` 页面上实时显示 FPS、系统耗时、内存使用和渲染统计信息。
-
+-   **[ ] P3-T2: 优化代码热点 (人机协作)**
+    -   **上下文输入**: **P3-T1** 的性能报告，以及 Chrome DevTools 的性能分析结果。`architecture-v8.md` **章节 10.3** 提供了优化策略（如对象池、增量更新）。
+    -   **LLM Prompt 指令 (示例)**: "Chrome Profiler 显示，`TraversalSystem` 的 `traverseNode` 方法中创建了大量临时的 `Vector3` 对象，导致 GC 压力。请重构此方法，使用 `@better-potree/core` 中定义的 `ObjectPools.vector3Pool` 来管理 `Vector3` 对象的分配和释放。"
+    -   **输出验收标准**:
+        -   ✅ 代码热点被重构。
+        -   ✅ 再次运行性能基准测试，相关指标有明显提升。
+        -   ✅ 内存使用曲线更加平滑，GC 暂停时间减少。
+        -   ✅ **Phase 3 退出标准达成。**

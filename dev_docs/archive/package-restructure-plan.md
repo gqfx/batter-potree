@@ -446,7 +446,7 @@ export class ThreeRenderer implements IRenderer {
 **Engine 实现示例**:
 ```typescript
 // packages/viewer/src/Engine.ts
-import { Runtime, StateCoordinator, SystemScheduler } from '@better-potree/core';
+import { Runtime, StateCoordinator, SystemScheduler, OctreeManager, ResourceManager, ECSWorld } from '@better-potree/core';
 import { ThreeRenderer, ThreeRenderSystem } from '@better-potree/rendering-three';
 import { createConfigStore } from '@better-potree/core/config';
 
@@ -456,20 +456,26 @@ export class Engine {
   private coordinator: StateCoordinator;
   private scheduler: SystemScheduler;
   private renderer: ThreeRenderer;
+  private octreeManager: OctreeManager;
+  private resourceManager: ResourceManager;
+  private ecs: ECSWorld;
 
   constructor(config: EngineConfig) {
     // 初始化所有组件
     this.configStore = createConfigStore(config);
     this.runtime = new Runtime();
     this.renderer = new ThreeRenderer();
+    this.octreeManager = new OctreeManager();
+    this.resourceManager = new ResourceManager(this.runtime.budgets.gpuMemory);
+    this.ecs = new ECSWorld();
 
-    // 组装引擎
+    // 组装引擎 - StateCoordinator 需要 5 个参数
     this.coordinator = new StateCoordinator(
       this.configStore,
       this.runtime,
-      octreeManager,
-      resourceManager,
-      ecs
+      this.octreeManager,
+      this.resourceManager,
+      this.ecs
     );
 
     this.scheduler = new SystemScheduler(this.runtime);
@@ -477,8 +483,8 @@ export class Engine {
   }
 
   private registerSystems(): void {
-    this.scheduler.register(new TraversalSystem(this.runtime, octreeManager));
-    this.scheduler.register(new StreamingSystem(this.runtime, workerPool));
+    this.scheduler.register(new TraversalSystem(this.runtime, this.octreeManager));
+    this.scheduler.register(new StreamingSystem(this.runtime, workerPool, messageQueue));
     this.scheduler.register(new ThreeRenderSystem(this.runtime, this.renderer));
   }
 
@@ -488,6 +494,7 @@ export class Engine {
   }
 
   start(): void {
+    this.coordinator.initialSync(); // 初始同步 sources, rendering, camera
     this.scheduler.start();
     this.startRenderLoop();
   }
@@ -947,6 +954,17 @@ export default defineWorkspace([
 
 ---
 
-**文档版本**: v1.0
+**文档版本**: v1.1
 **批准状态**: ✅ 已批准实施
-**最后更新**: 2025-11-16
+**最后更新**: 2025-11-16 (架构修复后同步更新)
+
+## 更新日志
+
+### v1.1 (2025-11-16)
+- 更新 Engine 实现示例: StateCoordinator 构造需要 5 个参数
+- 新增 OctreeManager, ResourceManager, ECSWorld 的显式初始化
+- 明确 initialSync() 调用时机
+- 补充 StreamingSystem 构造参数 (workerPool, messageQueue)
+
+### v1.0 (2025-11-16)
+- 初始版本

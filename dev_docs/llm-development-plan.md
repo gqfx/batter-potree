@@ -1,9 +1,11 @@
 # Better-Potree LLM 驱动开发计划
 
-**版本**: v1.0
+**版本**: v2.0 (完整合并版)
 **基于架构**: architecture-v8.md
 **目标**: 通过 LLM 辅助完成整个项目开发
 **特点**: 每个任务都是独立的、可执行的、可验证的
+**总任务数**: 52 个任务
+**预计完成时间**: 约 25 个工作日
 
 ---
 
@@ -51,7 +53,44 @@
 
 ---
 
-## 🎯 Phase 0: POC 验证 (3天 / 8个任务)
+## 📊 项目阶段概览
+
+### 阶段划分
+
+| 阶段 | 名称 | 任务数 | 预计时间 | 状态 |
+|------|------|--------|----------|------|
+| **Phase 0** | POC 验证 | 6 | 3天 | ⏳ 待开始 |
+| **Phase R** | 包结构重组 | 8 | 1天 | ⏳ 待开始 |
+| **Phase 1 Week 1** | Monorepo 基础设施 | 5 | 2天 | ⏳ 待开始 |
+| **Phase 1 Week 2** | 核心基础设施 | 8 | 4天 | ⏳ 待开始 |
+| **Phase 2** | 核心系统实现 | 15 | 10天 | ⏳ 待开始 |
+| **Phase 3** | 性能优化与完善 | 10 | 5天 | ⏳ 待开始 |
+| **总计** | | **52** | **25天** | |
+
+### 完成统计
+- Phase 0: 0/6 任务完成
+- Phase R: 0/8 任务完成
+- Phase 1 Week 1: 0/5 任务完成
+- Phase 1 Week 2: 0/8 任务完成
+- Phase 2: 0/15 任务完成
+- Phase 3: 0/10 任务完成
+- **总计**: 0/52 任务完成 (0%)
+
+### 下一个任务
+**当前应执行**: TASK-001 (搭建最小化项目结构)
+
+---
+
+## 🎯 Phase 0: POC 验证 (3天 / 6个任务)
+
+**目标**: 验证分层状态管理架构的可行性
+
+**退出标准**:
+- ✅ 所有 POC 测试通过
+- ✅ 性能测试: 可变更新比不可变更新快 10 倍以上
+- ✅ 团队 Code Review 通过
+
+---
 
 ### TASK-001: 搭建最小化项目结构
 
@@ -624,30 +663,460 @@ cat poc/POC-REPORT.md
 
 ---
 
-## 🏗️ Phase 1 Week 1: Monorepo 基础设施 (5天 / 10个任务)
+## 🔧 Phase R: 包结构重组 (1天 / 8个任务)
+
+**目标**: 将现有 8 包结构重组为架构规定的 4 包结构
+
+**前置条件**: Phase 0 POC 验证通过
+
+**退出标准**:
+- ✅ 包数量: 4 个核心包（core, rendering, rendering-three, viewer）
+- ✅ apps 目录: 1 个应用（playground）
+- ✅ 所有测试通过
+- ✅ 依赖关系正确
+
+---
+
+### TASK-R01: 创建 @better-potree/rendering 抽象层
+
+**任务 ID**: TASK-R01
+**依赖**: TASK-006 (POC 完成)
+**预计时间**: 2 小时
+**优先级**: P0
+
+#### 目标
+从 `rendering-three` 中提取渲染接口，创建独立的抽象层包
+
+#### 操作步骤
+
+1. **创建新包结构**:
+```bash
+mkdir -p packages/rendering/src/interfaces
+mkdir -p packages/rendering/src/systems
+```
+
+2. **创建 package.json**:
+```json
+{
+  "name": "@better-potree/rendering",
+  "version": "0.1.0",
+  "description": "Rendering abstraction layer for better-potree",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "test": "vitest",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@better-potree/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/three": "~0.180.0"
+  }
+}
+```
+
+3. **创建接口文件**:
+   - `src/interfaces/IRenderer.ts` - 渲染器接口
+   - `src/interfaces/IMaterial.ts` - 材质接口
+   - `src/interfaces/IBuffer.ts` - 缓冲区接口
+   - `src/interfaces/IShader.ts` - 着色器接口
+
+4. **创建抽象系统**:
+   - `src/systems/RenderSystem.ts` - 抽象的 RenderSystem 基类
+
+5. **创建导出文件**:
+   - `src/index.ts` - 导出所有接口和抽象类
+
+#### 验证方法
+```bash
+# 1. 构建
+pnpm --filter @better-potree/rendering run build
+
+# 2. 类型检查
+pnpm --filter @better-potree/rendering run typecheck
+
+# 3. 测试
+pnpm --filter @better-potree/rendering run test
+```
+
+---
+
+### TASK-R02: 合并 @better-potree/types 到 core
+
+**任务 ID**: TASK-R02
+**依赖**: TASK-R01
+**预计时间**: 1 小时
+**优先级**: P0
+
+#### 目标
+将独立的 types 包合并到 core 包中
+
+#### 操作步骤
+
+1. **移动类型文件**:
+```bash
+# 将 types/src/* 移动到 core/src/types/
+mv packages/types/src/* packages/core/src/types/
+```
+
+2. **更新 core/src/index.ts**:
+```typescript
+// 导出所有类型
+export * from './types';
+export * from './config';
+export * from './runtime';
+// ... 其他导出
+```
+
+3. **更新所有引用**:
+```bash
+# 将所有 @better-potree/types 的引用替换为 @better-potree/core
+# 使用全局搜索替换
+```
+
+4. **删除 types 包**:
+```bash
+rm -rf packages/types
+```
+
+5. **更新根 tsconfig.json 的 paths**:
+```json
+{
+  "paths": {
+    "@better-potree/core": ["./packages/core/src"],
+    "@better-potree/core/*": ["./packages/core/src/*"],
+    // 删除 @better-potree/types 相关 paths
+  }
+}
+```
+
+#### 验证方法
+```bash
+# 1. 构建所有包
+pnpm run build
+
+# 2. 运行所有测试
+pnpm run test
+
+# 3. 类型检查
+pnpm run typecheck
+```
+
+---
+
+### TASK-R03: 合并 @better-potree/loader-potree 到 viewer
+
+**任务 ID**: TASK-R03
+**依赖**: TASK-R02
+**预计时间**: 1 小时
+**优先级**: P0
+
+#### 目标
+将 loader-potree 包合并到 viewer/loaders/
+
+#### 操作步骤
+
+1. **创建目标目录**:
+```bash
+mkdir -p packages/viewer/src/loaders
+```
+
+2. **移动加载器文件**:
+```bash
+mv packages/loader-potree/src/* packages/viewer/src/loaders/
+```
+
+3. **更新 viewer/src/index.ts**:
+```typescript
+export * from './loaders';
+```
+
+4. **删除 loader-potree 包**:
+```bash
+rm -rf packages/loader-potree
+```
+
+5. **更新所有引用**:
+```bash
+# 将 @better-potree/loader-potree 替换为 @better-potree/viewer
+```
+
+#### 验证方法
+```bash
+pnpm --filter @better-potree/viewer run build
+pnpm --filter @better-potree/viewer run test
+```
+
+---
+
+### TASK-R04: 合并 @better-potree/controls 到 viewer
+
+**任务 ID**: TASK-R04
+**依赖**: TASK-R03
+**预计时间**: 1 小时
+**优先级**: P0
+
+#### 目标
+将 controls 包合并到 viewer/controls/
+
+#### 操作步骤
+
+1. **创建目标目录**:
+```bash
+mkdir -p packages/viewer/src/controls
+```
+
+2. **移动控制器文件**:
+```bash
+mv packages/controls/src/* packages/viewer/src/controls/
+```
+
+3. **更新 viewer/src/index.ts**:
+```typescript
+export * from './controls';
+```
+
+4. **删除 controls 包**:
+```bash
+rm -rf packages/controls
+```
+
+5. **更新所有引用**:
+```bash
+# 将 @better-potree/controls 替换为 @better-potree/viewer
+```
+
+#### 验证方法
+```bash
+pnpm --filter @better-potree/viewer run build
+pnpm --filter @better-potree/viewer run test
+```
+
+---
+
+### TASK-R05: 处理 @better-potree/tools 包
+
+**任务 ID**: TASK-R05
+**依赖**: TASK-R04
+**预计时间**: 1 小时
+**优先级**: P1
+
+#### 目标
+评估 tools 包内容，决定合并到 viewer 或删除
+
+#### 操作步骤
+
+1. **分析 tools 包内容**:
+```bash
+ls -R packages/tools/src
+```
+
+2. **根据内容决定**:
+   - 如果是测量、裁剪等用户工具 → 合并到 `viewer/src/tools/`
+   - 如果是内部工具 → 合并到 `core/src/utils/`
+   - 如果是废弃代码 → 删除
+
+3. **执行合并或删除**
+
+#### 验证方法
+```bash
+pnpm run build
+pnpm run test
+```
+
+---
+
+### TASK-R06: 移动 playground 到 apps/
+
+**任务 ID**: TASK-R06
+**依赖**: TASK-R05
+**预计时间**: 30 分钟
+**优先级**: P1
+
+#### 目标
+将 playground 从 packages/ 移动到 apps/
+
+#### 操作步骤
+
+1. **创建 apps 目录**:
+```bash
+mkdir -p apps
+```
+
+2. **移动 playground**:
+```bash
+mv packages/playground apps/
+```
+
+3. **更新 pnpm-workspace.yaml**:
+```yaml
+packages:
+  - 'packages/*'
+  - 'apps/*'
+```
+
+4. **更新根 package.json 的 scripts**:
+```json
+{
+  "scripts": {
+    "dev": "pnpm --filter playground dev"
+  }
+}
+```
+
+#### 验证方法
+```bash
+pnpm --filter playground run dev
+```
+
+---
+
+### TASK-R07: 更新 rendering-three 的依赖
+
+**任务 ID**: TASK-R07
+**依赖**: TASK-R01
+**预计时间**: 30 分钟
+**优先级**: P0
+
+#### 目标
+让 rendering-three 依赖新的 rendering 抽象层
+
+#### 操作步骤
+
+1. **更新 rendering-three/package.json**:
+```json
+{
+  "dependencies": {
+    "@better-potree/core": "workspace:*",
+    "@better-potree/rendering": "workspace:*",
+    "three": "~0.180.0"
+  }
+}
+```
+
+2. **更新 rendering-three/tsconfig.json**:
+```json
+{
+  "references": [
+    { "path": "../core" },
+    { "path": "../rendering" }
+  ]
+}
+```
+
+3. **更新实现文件**:
+   - 让 ThreeRenderSystem 继承 rendering 包的抽象 RenderSystem
+   - 实现 rendering 包定义的所有接口
+
+#### 验证方法
+```bash
+pnpm --filter @better-potree/rendering-three run build
+pnpm --filter @better-potree/rendering-three run test
+```
+
+---
+
+### TASK-R08: 完整验证和测试
+
+**任务 ID**: TASK-R08
+**依赖**: TASK-R01 ~ TASK-R07
+**预计时间**: 1 小时
+**优先级**: P0
+
+#### 目标
+验证重组后的包结构正确无误
+
+#### 验证清单
+
+- [ ] 包数量：4 个核心包（core, rendering, rendering-three, viewer）
+- [ ] apps 目录：1 个应用（playground）
+- [ ] 依赖关系正确：
+  - rendering → core
+  - rendering-three → rendering + core
+  - viewer → rendering-three + rendering + core
+  - playground → viewer
+
+#### 验证命令
+
+```bash
+# 1. 清理所有构建产物
+pnpm run clean
+
+# 2. 重新安装依赖
+pnpm install
+
+# 3. 构建所有包
+pnpm run build
+
+# 4. 运行所有测试
+pnpm run test
+
+# 5. 类型检查
+pnpm run typecheck
+
+# 6. Lint 检查
+pnpm run lint
+
+# 7. 启动 playground
+pnpm --filter playground run dev
+
+# 8. 检查包结构
+ls packages/
+# 期望输出: core rendering rendering-three viewer
+
+ls apps/
+# 期望输出: playground
+```
+
+---
+
+## 🏗️ Phase 1 Week 1: Monorepo 基础设施 (2天 / 5个任务)
+
+**目标**: 创建完整的 Monorepo 结构和工具链
+
+**前置条件**: Phase R 包结构重组完成
+
+**退出标准**:
+- ✅ 所有包构建成功
+- ✅ 所有测试通过
+- ✅ 无 TypeScript 错误
+- ✅ 无 lint 错误
+
+---
 
 ### TASK-101: 创建完整的 Monorepo 结构
 
 **任务 ID**: TASK-101
-**依赖**: TASK-006 (POC 通过)
+**依赖**: TASK-R08 (包重组完成)
 **预计时间**: 3 小时
 **优先级**: P0
 
 #### 上下文
 - 阅读文件: `architecture-v8.md` 第 13.1 节（完整包结构）
-- 基于 POC 验证成功，创建完整的 4 包结构
+- 基于 POC 和包重组，创建完整的 4 包结构
 
 #### 输入
 ```
 需要创建的包:
-- @better-potree/core (已有 POC 基础)
-- @better-potree/rendering (新建)
-- @better-potree/rendering-three (新建)
-- @better-potree/viewer (新建)
+- @better-potree/core (已有基础)
+- @better-potree/rendering (已创建)
+- @better-potree/rendering-three (已有)
+- @better-potree/viewer (已有)
 ```
 
 #### 输出
-- [ ] 创建 4 个包的完整目录结构
+- [ ] 完善 4 个包的完整目录结构
 - [ ] 配置包之间的依赖关系
 - [ ] 每个包的 package.json 正确配置
 - [ ] 每个包的 tsconfig.json 继承根配置
@@ -655,22 +1124,23 @@ cat poc/POC-REPORT.md
 
 #### LLM Prompt 模板
 ```
-我正在开发 better-potree 项目，Phase 0 POC 已验证通过。
+我正在开发 better-potree 项目，Phase 0 POC 和 Phase R 包重组已完成。
 
 参考文档: architecture-v8.md 第 13 节
 
-任务: 创建完整的 Monorepo 结构（4 个包）
+任务: 完善 Monorepo 结构（4 个包）
 
 背景:
 - POC 阶段已创建 packages/core 基础
-- 现在需要创建完整的 4 包结构
+- Phase R 已创建 rendering 包并完成包合并
+- 现在需要完善所有包的目录结构
 
 要求:
 1. 扩展现有的 monorepo 结构:
 ```
 better-potree/
 ├── packages/
-│   ├── core/                   # 已存在，需要补充目录
+│   ├── core/                   # 需要补充目录
 │   │   ├── src/
 │   │   │   ├── config/        # 已存在
 │   │   │   ├── runtime/       # 已存在
@@ -683,27 +1153,27 @@ better-potree/
 │   │   │   ├── types/         # 新建
 │   │   │   └── index.ts
 │   │   └── package.json
-│   ├── rendering/              # 新建
+│   ├── rendering/              # 已创建
 │   │   ├── src/
 │   │   │   ├── interfaces/
 │   │   │   ├── systems/
 │   │   │   └── index.ts
 │   │   └── package.json
-│   ├── rendering-three/        # 新建
+│   ├── rendering-three/        # 需要补充
 │   │   ├── src/
 │   │   │   ├── materials/
 │   │   │   ├── shaders/
 │   │   │   └── index.ts
 │   │   └── package.json
-│   └── viewer/                 # 新建
+│   └── viewer/                 # 需要补充
 │       ├── src/
-│       │   ├── loaders/
-│       │   ├── controls/
+│       │   ├── loaders/       # 已从 loader-potree 合并
+│       │   ├── controls/      # 已从 controls 合并
 │       │   ├── ui/
 │       │   └── index.ts
 │       └── package.json
 └── apps/
-    └── playground/             # 新建
+    └── playground/             # 已移动
         └── package.json
 ```
 
@@ -722,7 +1192,7 @@ better-potree/
 4. 创建空的 index.ts 文件（每个包）
 
 请提供:
-1. 所有新建包的 package.json
+1. 所有包的 package.json
 2. 更新后的根 package.json
 3. 更新后的 pnpm-workspace.yaml
 4. 每个包的目录结构创建命令
@@ -1102,6 +1572,504 @@ pnpm run test -- poc
 
 ---
 
+## 🏗️ Phase 1 Week 2: 核心基础设施 (4天 / 8个任务)
+
+**目标**: 实现引擎核心基础设施组件
+
+**前置条件**: Phase 1 Week 1 完成
+
+**退出标准**:
+- ✅ SystemScheduler 实现并测试通过
+- ✅ MessageQueue 实现并测试通过
+- ✅ WorkerPool 实现并测试通过
+- ✅ ResourceManager 实现并测试通过
+- ✅ ECS 实现并测试通过
+- ✅ OctreeManager 实现并测试通过
+- ✅ ObjectPools 实现并测试通过
+- ✅ 所有测试通过，覆盖率 > 80%
+
+**说明**: TASK-106 和 TASK-107（TypeScript/Vitest 配置）已在 Phase 1 Week 1 完成，从 TASK-108 开始。
+
+---
+
+### TASK-108: 实现 SystemScheduler (系统调度器)
+
+**任务 ID**: TASK-108
+**依赖**: TASK-104 (核心类型定义)
+**预计时间**: 4 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件:
+  - `architecture-v8.md` 第 2.4 节（系统调度）
+  - `architecture-v8.md` 第 8 节（系统实现）
+- 目标: 实现 ECS 风格的系统调度器，管理所有系统的更新循环
+
+#### 输入
+```typescript
+// 需要实现的接口（已在 TASK-104 定义）
+interface ISystem {
+  readonly name: string;
+  readonly stage: SystemStage;
+  readonly priority?: number;
+  update(deltaTime: number): void;
+  dispose?(): void;
+}
+
+enum SystemStage {
+  INPUT = 0,
+  UPDATE = 100,
+  RENDER = 200,
+  CLEANUP = 300
+}
+```
+
+#### 输出
+- [ ] 创建 `packages/core/src/scheduler/SystemScheduler.ts`
+- [ ] 创建 `packages/core/src/scheduler/types.ts`
+- [ ] 创建 `packages/core/src/scheduler/index.ts`
+- [ ] 创建 `packages/core/src/scheduler/__tests__/SystemScheduler.test.ts`
+- [ ] 测试覆盖率 > 85%
+- [ ] 性能测试: 100 个系统的调度开销 < 1ms
+
+#### LLM Prompt 模板
+```
+我正在开发 better-potree 项目的系统调度器。
+
+参考文档: architecture-v8.md 第 2.4 节
+
+上下文:
+- 核心类型已定义 (TASK-104)
+- SystemStage 和 ISystem 已存在
+
+任务: 实现 SystemScheduler
+
+要求:
+1. 实现 SystemScheduler 类:
+   ```typescript
+   export class SystemScheduler {
+     private systems: ISystem[] = [];
+     private systemsByStage: Map<SystemStage, ISystem[]> = new Map();
+     private running: boolean = false;
+
+     constructor() {
+       // 初始化每个 stage 的系统数组
+     }
+
+     addSystem(system: ISystem): void {
+       // 添加系统并按 stage + priority 排序
+     }
+
+     removeSystem(name: string): void {
+       // 移除系统并调用 dispose
+     }
+
+     update(deltaTime: number): void {
+       // 按 stage 顺序执行所有系统
+       // INPUT → UPDATE → RENDER → CLEANUP
+     }
+
+     dispose(): void {
+       // 清理所有系统
+     }
+   }
+   ```
+
+2. 关键逻辑:
+   - **排序**: 同一 stage 内按 priority 排序（小值优先）
+   - **阶段顺序**: INPUT → UPDATE → RENDER → CLEANUP
+   - **错误处理**: 单个系统错误不影响其他系统
+
+3. 编写测试:
+   - 测试系统添加/移除
+   - 测试系统执行顺序（stage + priority）
+   - 测试错误隔离（一个系统抛错不影响其他）
+   - 性能测试: 100 个系统 × 1000 次更新的耗时
+
+4. 辅助方法:
+   - getSystem(name: string): ISystem | undefined
+   - hasSystem(name: string): boolean
+   - getSystems(): ReadonlyArray<ISystem>
+
+文件结构:
+packages/core/src/scheduler/
+├── SystemScheduler.ts
+├── types.ts
+├── index.ts
+└── __tests__/
+    └── SystemScheduler.test.ts
+
+请提供完整的代码实现。
+```
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- scheduler
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- scheduler
+
+# 3. 性能测试
+# 期望输出: 100 系统 × 1000 次更新 < 100ms
+
+# 4. 类型检查
+pnpm --filter @better-potree/core run typecheck
+```
+
+---
+
+### TASK-109: 实现 MessageQueue (消息队列)
+
+**任务 ID**: TASK-109
+**依赖**: TASK-108
+**预计时间**: 2 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件: `architecture-v8.md` 第 2.5 节（事件与消息）
+- 目标: 实现跨帧消息队列，用于异步任务通信
+
+#### 输入
+```typescript
+// 消息类型示例
+type Message =
+  | { type: 'NODE_LOADED'; nodeId: string; data: any }
+  | { type: 'NODE_FAILED'; nodeId: string; error: Error }
+  | { type: 'RESOURCE_FREED'; resourceId: string }
+```
+
+#### 输出
+- [ ] 创建 `packages/core/src/messaging/MessageQueue.ts`
+- [ ] 创建 `packages/core/src/messaging/types.ts`
+- [ ] 创建 `packages/core/src/messaging/index.ts`
+- [ ] 创建 `packages/core/src/messaging/__tests__/MessageQueue.test.ts`
+- [ ] 测试覆盖率 > 90%
+
+#### LLM Prompt 模板
+```
+我正在开发 better-potree 项目的消息队列。
+
+参考文档: architecture-v8.md 第 2.5 节
+
+任务: 实现跨帧消息队列
+
+要求:
+1. 实现 MessageQueue 类 (见 llm-plan-extension.md TASK-109)
+2. 定义消息类型 (types.ts)
+3. 编写测试 (测试消息入队/出队、处理器注册、批量处理、错误隔离)
+4. 性能测试: 10000 条消息入队/出队 < 10ms
+
+文件结构:
+packages/core/src/messaging/
+├── MessageQueue.ts
+├── types.ts
+├── index.ts
+└── __tests__/
+    └── MessageQueue.test.ts
+
+请提供完整的代码实现。
+```
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- messaging
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- messaging
+
+# 期望: 所有测试通过，覆盖率 > 90%
+```
+
+---
+
+### TASK-110: 实现 WorkerPool (工作线程池)
+
+**任务 ID**: TASK-110
+**依赖**: TASK-109
+**预计时间**: 4 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件:
+  - `architecture-v8.md` 第 9.3 节（Worker Pool）
+  - Potree 源码: `D:\coding\libs\potree\src\WorkerPool.js`
+- 目标: 实现 Web Worker 对象池，用于并行解码
+
+#### 输出
+- [ ] 创建 `packages/core/src/workers/WorkerPool.ts`
+- [ ] 创建 `packages/core/src/workers/types.ts`
+- [ ] 创建 `packages/core/src/workers/index.ts`
+- [ ] 创建 `packages/core/src/workers/__tests__/WorkerPool.test.ts`
+- [ ] 测试覆盖率 > 80%
+
+#### LLM Prompt 模板
+参考 `llm-plan-extension.md` TASK-110 的完整提示词
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- workers
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- workers
+
+# 3. 测试并发
+# 期望: 提交 10 个任务，只创建 4 个 Worker（navigator.hardwareConcurrency）
+
+# 4. 类型检查
+pnpm --filter @better-potree/core run typecheck
+```
+
+---
+
+### TASK-111: 实现 ResourceManager (资源管理器)
+
+**任务 ID**: TASK-111
+**依赖**: TASK-110
+**预计时间**: 5 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件:
+  - `architecture-v8.md` 第 9.2 节（ResourceManager）
+  - Potree 源码: `D:\coding\libs\potree\src\LRU.js`
+- 目标: 实现基于 LRU 的资源管理器，管理 GPU 资源和已加载节点
+
+#### 输出
+- [ ] 创建 `packages/core/src/resources/ResourceManager.ts`
+- [ ] 创建 `packages/core/src/resources/LRUCache.ts`
+- [ ] 创建 `packages/core/src/resources/types.ts`
+- [ ] 创建 `packages/core/src/resources/index.ts`
+- [ ] 创建测试文件
+- [ ] 测试覆盖率 > 85%
+
+#### LLM Prompt 模板
+参考 `llm-plan-extension.md` TASK-111 的完整提示词（包含 LRUCache 和 ResourceManager 实现）
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- resources
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- resources
+
+# 3. 性能测试
+# 期望: 10000 次 LRU 操作 < 50ms
+```
+
+---
+
+### TASK-112: 实现 ECS (Entity Component System)
+
+**任务 ID**: TASK-112
+**依赖**: TASK-104
+**预计时间**: 6 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件: `architecture-v8.md` 第 7 节（ECS 数据模型）
+- 目标: 实现轻量级 ECS，管理点云节点的组件化数据
+
+#### 输出
+- [ ] 创建 `packages/core/src/ecs/World.ts`
+- [ ] 创建 `packages/core/src/ecs/Entity.ts`
+- [ ] 创建 `packages/core/src/ecs/ComponentStore.ts`
+- [ ] 创建 `packages/core/src/ecs/Query.ts`
+- [ ] 创建 `packages/core/src/ecs/components/` (预定义组件)
+- [ ] 创建测试
+- [ ] 测试覆盖率 > 80%
+
+#### LLM Prompt 模板
+参考 `llm-plan-extension.md` TASK-112 的完整提示词（包含 World, ComponentStore, Query 实现和预定义组件）
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- ecs
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- ecs
+
+# 3. 性能测试
+# 期望: 10000 实体查询 < 10ms
+```
+
+---
+
+### TASK-113: 实现 OctreeManager (八叉树管理器)
+
+**任务 ID**: TASK-113
+**依赖**: TASK-112 (ECS)
+**预计时间**: 6 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件:
+  - `architecture-v8.md` 第 5.2 节（OctreeManager）
+  - Potree 源码: `D:\coding\libs\potree\src\PointCloudOctree.js`
+- 目标: 实现八叉树管理器，管理节点层级和元数据
+
+#### 输出
+- [ ] 创建 `packages/core/src/octree/OctreeManager.ts`
+- [ ] 创建 `packages/core/src/octree/OctreeNode.ts`
+- [ ] 创建 `packages/core/src/octree/types.ts`
+- [ ] 创建 `packages/core/src/octree/utils.ts`
+- [ ] 创建测试
+- [ ] 测试覆盖率 > 80%
+
+#### LLM Prompt 模板
+参考 `llm-plan-extension.md` TASK-113 的完整提示词（包含 OctreeNode, OctreeManager, utils 实现）
+
+⚠️ **重要**: 必须在 `loadOctree` 方法中填充 `metadata.sourceId = sourceId`
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- octree
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- octree
+
+# 3. 类型检查
+pnpm --filter @better-potree/core run typecheck
+```
+
+---
+
+### TASK-114: 实现 ObjectPools (对象池)
+
+**任务 ID**: TASK-114
+**依赖**: 无
+**预计时间**: 2 小时
+**优先级**: P1
+
+#### 上下文
+- 阅读文件: `architecture-v8.md` 第 9.1 节（ObjectPools）
+- 目标: 实现对象池，减少高频对象的 GC 压力
+
+#### 输出
+- [ ] 创建 `packages/core/src/pools/ObjectPool.ts`
+- [ ] 创建 `packages/core/src/pools/types.ts`
+- [ ] 创建 `packages/core/src/pools/index.ts`
+- [ ] 创建测试
+- [ ] 测试覆盖率 > 90%
+
+#### LLM Prompt 模板
+参考 `llm-plan-extension.md` TASK-114 的完整提示词
+
+#### 验证方法
+```bash
+# 1. 运行测试
+pnpm --filter @better-potree/core run test -- pools
+
+# 2. 检查覆盖率
+pnpm --filter @better-potree/core run test:coverage -- pools
+
+# 3. 性能测试
+# 期望: 10000 次获取/归还 < 10ms
+```
+
+---
+
+### TASK-115: Phase 1 Week 2 完成检查
+
+**任务 ID**: TASK-115
+**依赖**: TASK-108 ~ TASK-114
+**预计时间**: 1 小时
+**优先级**: P0
+
+#### 上下文
+- 阅读文件: `architecture-v8.md` 第 14 节 Phase 1 Week 2 退出标准
+- 目标: 确保所有 Phase 1 Week 2 目标达成
+
+#### 输出
+- [ ] 创建 `dev_docs/phase1-week2-report.md`
+- [ ] 所有测试通过
+- [ ] 覆盖率达标
+- [ ] 准备进入 Phase 2
+
+#### 验证方法
+```bash
+# 1. 运行完整测试套件
+pnpm run test
+
+# 2. 检查覆盖率
+pnpm run test:coverage
+
+# 3. TypeScript 构建
+pnpm run build:types
+
+# 4. Lint 检查
+pnpm run lint
+
+# 5. 查看报告
+cat dev_docs/phase1-week2-report.md
+```
+
+---
+
+## 🎯 Phase 2: 核心系统实现 (10天 / 15个任务)
+
+**目标**: 实现完整的点云加载、遍历、渲染系统
+
+**前置条件**: Phase 1 Week 2 完成
+
+**退出标准**:
+- ✅ 可以加载并渲染 Potree 点云
+- ✅ LOD 遍历系统工作正常
+- ✅ 流式加载系统工作正常
+- ✅ 渲染系统工作正常
+- ✅ 测试覆盖率 > 70%
+
+**任务概要**:
+- TASK-201: 实现 PotreeLoader (元数据加载器)
+- TASK-202: 实现 BinaryDecoder Worker
+- TASK-203: 实现 TraversalSystem (遍历系统)
+- TASK-204: 实现 StreamingSystem (流式加载系统)
+- TASK-205: 实现 PointCloudMaterial (材质系统)
+- TASK-206: 实现点云着色器 (Shaders)
+- TASK-207: 实现 RenderSystem (渲染系统)
+- TASK-208: 集成所有系统到 Viewer
+- TASK-209 ~ TASK-214: 工具和 UI
+- TASK-215: Phase 2 完成检查
+
+详细任务内容参考 `llm-plan-extension.md` 第 ## 🎯 Phase 2 部分
+
+---
+
+## 🚀 Phase 3: 性能优化与完善 (5天 / 10个任务)
+
+**目标**: 性能优化、完善文档、准备发布
+
+**前置条件**: Phase 2 完成
+
+**退出标准**:
+- ✅ 所有测试通过（覆盖率 > 80%）
+- ✅ 性能基准测试通过
+- ✅ API 文档完整
+- ✅ 示例完整
+- ✅ README 完整
+- ✅ 浏览器兼容性验证通过
+
+**任务概要**:
+- TASK-301: 性能分析和基准测试框架
+- TASK-302: LOD 算法性能优化
+- TASK-303: 渲染性能优化
+- TASK-304: Worker 性能优化
+- TASK-305: 内存管理优化
+- TASK-306: 编写完整的 API 文档
+- TASK-307: 编写单元测试补充
+- TASK-308: 浏览器兼容性测试
+- TASK-309: 创建完整的示例集
+- TASK-310: Phase 3 完成检查和项目交付
+
+详细任务内容参考 `llm-plan-extension.md` 第 ## 🚀 Phase 3 部分
+
+---
+
 ## 🎯 重要架构说明
 
 ### OctreeManager.loadOctree 实现要点
@@ -1135,16 +2103,6 @@ StreamingSystem 是第 8.2 节的核心内容，必须包含以下完整实现�
 - 消息队列（跨帧通信）
 - 可取消加载（AbortController）
 
-**核心方法**:
-1. `processMessages()`: 处理异步消息队列
-2. `scheduleLoads()`: 调度新的加载任务
-3. `startLoad(nodeId)`: 启动单个加载任务
-4. `handleNodeLoaded()`: 处理加载成功
-5. `handleNodeFailed()`: 处理加载失败并重试
-6. `cleanupTasks()`: 清理不再需要的加载任务
-
-参考 architecture-v8.md 第 8.2 节的完整代码（200+ 行）。
-
 ### RenderSystem 包划分说明
 
 **重要**: RenderSystem 的位置已明确：
@@ -1158,49 +2116,6 @@ StreamingSystem 是第 8.2 节的核心内容，必须包含以下完整实现�
   - 具体的 Three.js 渲染实现
 
 **不要**在 `@better-potree/core/systems` 中放置 RenderSystem 实现。
-
----
-
-## 🎯 阶段性检查点
-
-在每个 Phase 结束时，执行以下验证:
-
-### Phase 0 完成检查
-```bash
-# 运行检查脚本
-./scripts/check-phase-0.sh
-
-# 或手动检查:
-pnpm run test              # 所有测试通过
-pnpm run typecheck         # 无类型错误
-pnpm run lint              # 无 lint 错误
-cat poc/POC-REPORT.md      # POC 报告完整
-```
-
-### Phase 1 Week 1 完成检查
-```bash
-# 运行检查脚本
-./scripts/check-phase-1-w1.sh
-
-# 或手动检查:
-pnpm run build             # 所有包构建成功
-pnpm run test              # 所有测试通过
-pnpm run typecheck         # 无类型错误
-pnpm run lint              # 无 lint 错误
-ls packages/*/dist         # 所有包有构建产物
-```
-
----
-
-## 📊 进度跟踪
-
-### 完成统计
-- Phase 0: 0/6 任务完成
-- Phase 1 Week 1: 0/10 任务完成
-- 总计: 0/16 任务完成 (0%)
-
-### 下一个任务
-**当前应执行**: TASK-001 (搭建最小化项目结构)
 
 ---
 
@@ -1220,6 +2135,110 @@ ls packages/*/dist         # 所有包有构建产物
 4. 运行"验证方法"
 5. 如果通过，标记任务完成，继续下一个
 6. 如果失败，向 LLM 反馈错误信息
+
+---
+
+## 📊 完整任务统计
+
+### Phase 1 Week 2 (TASK-108 ~ TASK-115)
+- **任务数**: 8 个
+- **预计时间**: 4 天
+- **核心内容**: 基础设施层（Scheduler, MessageQueue, WorkerPool, ResourceManager, ECS, Octree, ObjectPools）
+
+### Phase 2 (TASK-201 ~ TASK-215)
+- **任务数**: 15 个
+- **预计时间**: 10 天
+- **核心内容**: 核心系统层（数据加载、遍历、流式加载、渲染、工具、UI）
+
+### Phase 3 (TASK-301 ~ TASK-310)
+- **任务数**: 10 个
+- **预计时间**: 5 天
+- **核心内容**: 性能优化、文档、测试、发布
+
+### 总计
+- **总任务数**: 52 个任务
+- **总预计时间**: 25 天（约 5 周）
+- **总测试覆盖目标**: > 80%
+
+---
+
+## 🔄 任务依赖关系图
+
+```
+Phase 0 (POC 验证)
+├── TASK-001 → TASK-002 → TASK-004 → TASK-005 → TASK-006
+└── TASK-001 → TASK-003 ┘
+
+Phase R (包结构重组)
+├── TASK-R01 (创建 rendering 包)
+├── TASK-R02 (合并 types 到 core)
+├── TASK-R03 (合并 loader-potree 到 viewer)
+├── TASK-R04 (合并 controls 到 viewer)
+├── TASK-R05 (处理 tools 包)
+├── TASK-R06 (移动 playground 到 apps)
+├── TASK-R07 (更新 rendering-three 依赖) ← TASK-R01
+└── TASK-R08 (完整验证) ← TASK-R01 ~ TASK-R07
+
+Phase 1 Week 1 (Monorepo 基础设施)
+├── TASK-101 → TASK-102
+├── TASK-101 → TASK-103
+├── TASK-101 → TASK-104 → TASK-105
+└── TASK-101 ← TASK-R08
+
+Phase 1 Week 2 (核心基础设施)
+├── TASK-108 → TASK-109 → TASK-110 → TASK-111
+├── TASK-104 → TASK-112 → TASK-113
+├── TASK-114
+└── TASK-108 ~ TASK-114 → TASK-115
+
+Phase 2 (核心系统层)
+├── TASK-201 (PotreeLoader) ← TASK-113
+├── TASK-202 (BinaryDecoder) ← TASK-110
+├── TASK-203 (TraversalSystem) ← TASK-108, TASK-113
+├── TASK-204 (StreamingSystem) ← TASK-109, TASK-110, TASK-203
+├── TASK-205 (PointCloudMaterial)
+├── TASK-206 (Shaders) ← TASK-205
+├── TASK-207 (RenderSystem) ← TASK-205, TASK-206
+├── TASK-208 (PointCloudViewer) ← TASK-203, TASK-204, TASK-207
+├── TASK-209 ~ TASK-214 (工具和 UI)
+└── TASK-215 (Phase 2 完成检查)
+
+Phase 3 (优化与完善)
+├── TASK-301 (基准测试框架) ← TASK-215
+├── TASK-302 ~ TASK-305 (性能优化) ← TASK-301
+├── TASK-306 ~ TASK-309 (文档和测试) ← TASK-215
+└── TASK-310 (项目交付) ← 所有任务
+```
+
+---
+
+## 🎯 关键里程碑
+
+1. **Phase 0 完成** (Day 3)
+   - POC 验证通过
+   - 架构可行性确认
+
+2. **Phase R 完成** (Day 4)
+   - 包结构符合架构规范
+   - 4 包 + 1 应用结构
+
+3. **Phase 1 完成** (Day 10)
+   - Monorepo 基础设施就绪
+   - 核心基础设施就绪
+   - 测试覆盖率 > 80%
+
+4. **Phase 2 Week 1 完成** (Day 15)
+   - 数据加载和遍历系统就绪
+   - 基础渲染可用
+
+5. **Phase 2 完成** (Day 20)
+   - 完整功能实现
+   - 工具和 UI 可用
+
+6. **Phase 3 完成** (Day 25)
+   - 性能优化完成
+   - 文档和测试完善
+   - 准备发布
 
 ---
 
@@ -1255,20 +2274,32 @@ pnpm --filter playground run dev           # 启动开发服务器
 
 ---
 
-**文档版本**: v1.1
-**最后更新**: 2025-11-16 (架构修复后同步更新)
+**文档版本**: v2.0 (完整合并版)
+**最后更新**: 2025-11-16
 **维护者**: better-potree team
+**状态**: ✅ 完整合并完成
 
 ## 更新日志
 
+### v2.0 (2025-11-16)
+- ✅ 合并 Phase 0 (6 任务)
+- ✅ 新增 Phase R: 包结构重组 (8 任务)
+- ✅ 合并 Phase 1 Week 1 (5 任务)
+- ✅ 新增 Phase 1 Week 2 (8 任务) - 从 llm-plan-extension.md
+- ✅ 新增 Phase 2 (15 任务) - 从 llm-plan-extension.md
+- ✅ 新增 Phase 3 (10 任务) - 从 llm-plan-extension.md
+- ✅ 新增项目阶段概览表
+- ✅ 新增完整任务统计
+- ✅ 新增任务依赖关系图
+- ✅ 新增关键里程碑
+- ✅ 总任务数: 52 个
+
 ### v1.1 (2025-11-16)
-- 更新 SourceConfig 定义: visible 改为可选，transform 改为 number[]
-- 更新 RenderingConfig: 新增 pointSize 字段
-- 更新 Runtime.rendering: 新增 fov 和 pointSize 字段
-- 更新 StateCoordinator: 明确需要 5 个构造参数，新增 camera 订阅
-- 新增 OctreeManager.loadOctree 实现要点说明
-- 新增 StreamingSystem 完整实现说明
-- 明确 RenderSystem 包划分（rendering 抽象 + rendering-three 实现）
+- 更新 SourceConfig 定义
+- 更新 RenderingConfig
+- 更新 Runtime.rendering
+- 更新 StateCoordinator
+- 新增重要架构说明
 
 ### v1.0 (2025-11-16)
 - 初始版本
