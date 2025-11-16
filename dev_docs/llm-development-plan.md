@@ -175,15 +175,16 @@ ls -R poc
 
 要求:
 1. 实现以下类型（参考架构文档）:
-   - SourceConfig
+   - SourceConfig: { id, type, url, visible?: boolean, transform?: number[], materialId?: string }
    - MaterialConfig
-   - RenderingConfig
+   - RenderingConfig: { pointBudget, fov, minNodeSize, pointSize }
    - ConfigState
    - ConfigStore (包含 actions)
 
 2. 实现 createConfigStore 工厂函数:
    - 接受可选的初始配置
    - 返回 Zustand vanilla store
+   - 默认值: pointBudget: 2_000_000, fov: 60, minNodeSize: 100, pointSize: 1.0
    - 实现以下 actions:
      * addSource(config: SourceConfig)
      * removeSource(id: string)
@@ -265,7 +266,7 @@ pnpm --filter @better-potree/core run test:coverage
 要求:
 1. 实现 Runtime 类，包含以下可变状态:
    - camera: Camera (来自 three.js)
-   - rendering: { pointBudget, minNodeSize }
+   - rendering: { pointBudget, minNodeSize, fov, pointSize }
    - visibleNodes: Set<string>
    - visibleNodesList: string[]
    - loadingTasks: Map<string, LoadTask>
@@ -362,8 +363,8 @@ pnpm --filter @better-potree/core run typecheck
 要求:
 1. 实现 StateCoordinator 类:
    - 构造函数接受: configStore, runtime, octreeManager, resourceManager, ecs
-   - 实现 initialSync(): 初始同步配置到运行时
-   - 实现 setupSubscriptions(): 订阅配置变更
+   - 实现 initialSync(): 初始同步配置到运行时（包括 sources, rendering, camera）
+   - 实现 setupSubscriptions(): 订阅配置变更（sources, rendering, camera）
    - 实现 dispose(): 清理订阅
 
 2. 实现私有方法:
@@ -371,7 +372,8 @@ pnpm --filter @better-potree/core run typecheck
    - addSource(config): 添加新数据源
    - removeSource(id): 删除数据源并清理资源
    - updateSource(config): 更新数据源配置
-   - syncRenderingConfig(config): 同步渲染配置
+   - syncRenderingConfig(config): 同步渲染配置（包括 pointBudget, minNodeSize, fov, pointSize，并同步 fov 到相机）
+   - syncCamera(camera): 同步相机配置
    - cleanupRuntimeState(sourceId): 清理运行时状态
 
 3. 关键逻辑:
@@ -1100,6 +1102,65 @@ pnpm run test -- poc
 
 ---
 
+## 🎯 重要架构说明
+
+### OctreeManager.loadOctree 实现要点
+
+在实现 OctreeManager 时，请注意：
+
+```typescript
+async loadOctree(sourceId: string, url: string, type: string): Promise<void> {
+  // 1. 加载 meta.json（Potree 2.0）或其他元数据文件
+  const metadata = await this.fetchMetadata(url, type);
+
+  // ⚠️ 关键: 必须填充 sourceId
+  metadata.sourceId = sourceId;
+  this.metadata.set(sourceId, metadata);
+
+  // 2. 创建根节点...
+}
+```
+
+**原因**: OctreeMetadata 接口要求 sourceId 非空，但 fetchMetadata 返回的数据中 sourceId 为空字符串，必须在这里赋值。
+
+### StreamingSystem 完整实现
+
+StreamingSystem 是第 8.2 节的核心内容，必须包含以下完整实现：
+
+**关键特性**:
+- 异步加载（使用 WorkerPool）
+- 优先级调度（距离相机近的节点优先）
+- 并发控制（MAX_CONCURRENT_LOADS = 8）
+- 错误重试（MAX_RETRIES = 3）
+- 消息队列（跨帧通信）
+- 可取消加载（AbortController）
+
+**核心方法**:
+1. `processMessages()`: 处理异步消息队列
+2. `scheduleLoads()`: 调度新的加载任务
+3. `startLoad(nodeId)`: 启动单个加载任务
+4. `handleNodeLoaded()`: 处理加载成功
+5. `handleNodeFailed()`: 处理加载失败并重试
+6. `cleanupTasks()`: 清理不再需要的加载任务
+
+参考 architecture-v8.md 第 8.2 节的完整代码（200+ 行）。
+
+### RenderSystem 包划分说明
+
+**重要**: RenderSystem 的位置已明确：
+
+- **抽象层**: `@better-potree/rendering/systems/RenderSystem.ts`
+  - 定义 IRenderer 接口
+  - 定义抽象的 RenderSystem 基类
+
+- **实现层**: `@better-potree/rendering-three/ThreeRenderSystem.ts`
+  - ThreeRenderSystem 继承抽象 RenderSystem
+  - 具体的 Three.js 渲染实现
+
+**不要**在 `@better-potree/core/systems` 中放置 RenderSystem 实现。
+
+---
+
 ## 🎯 阶段性检查点
 
 在每个 Phase 结束时，执行以下验证:
@@ -1194,6 +1255,20 @@ pnpm --filter playground run dev           # 启动开发服务器
 
 ---
 
-**文档版本**: v1.0
-**最后更新**: 2025-11-16
+**文档版本**: v1.1
+**最后更新**: 2025-11-16 (架构修复后同步更新)
 **维护者**: better-potree team
+
+## 更新日志
+
+### v1.1 (2025-11-16)
+- 更新 SourceConfig 定义: visible 改为可选，transform 改为 number[]
+- 更新 RenderingConfig: 新增 pointSize 字段
+- 更新 Runtime.rendering: 新增 fov 和 pointSize 字段
+- 更新 StateCoordinator: 明确需要 5 个构造参数，新增 camera 订阅
+- 新增 OctreeManager.loadOctree 实现要点说明
+- 新增 StreamingSystem 完整实现说明
+- 明确 RenderSystem 包划分（rendering 抽象 + rendering-three 实现）
+
+### v1.0 (2025-11-16)
+- 初始版本
