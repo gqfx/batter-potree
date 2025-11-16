@@ -103,6 +103,9 @@ importers:
       '@better-potree/core':
         specifier: workspace:*
         version: link:../core
+      '@better-potree/rendering':
+        specifier: workspace:*
+        version: link:../rendering
       three:
         specifier: ~0.180.0
         version: 0.180.0

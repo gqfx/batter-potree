@@ -36,16 +36,12 @@
     // Path Aliases
     "baseUrl": ".",
     "paths": {
-      "@better-potree/utils": ["./packages/utils/src"],
-      "@better-potree/utils/*": ["./packages/utils/src/*"],
       "@better-potree/core": ["./packages/core/src"],
       "@better-potree/core/*": ["./packages/core/src/*"],
+      "@better-potree/rendering": ["./packages/rendering/src"],
+      "@better-potree/rendering/*": ["./packages/rendering/src/*"],
       "@better-potree/rendering-three": ["./packages/rendering-three/src"],
       "@better-potree/rendering-three/*": ["./packages/rendering-three/src/*"],
-      "@better-potree/loaders": ["./packages/loaders/src"],
-      "@better-potree/loaders/*": ["./packages/loaders/src/*"],
-      "@better-potree/tools": ["./packages/tools/src"],
-      "@better-potree/tools/*": ["./packages/tools/src/*"],
       "@better-potree/viewer": ["./packages/viewer/src"],
       "@better-potree/viewer/*": ["./packages/viewer/src/*"]
     }
