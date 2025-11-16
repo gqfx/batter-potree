@@ -5,7 +5,7 @@
  */
 
 import { createStore } from 'zustand/vanilla';
-import type { ConfigStore, EngineConfig, RenderingConfig, SourceConfig } from './types.js';
+import type { ConfigStore, EngineConfig, MaterialConfig, RenderingConfig, SourceConfig } from './types.js';
 
 /**
  * 默认渲染配置
@@ -140,6 +140,59 @@ export function createConfigStore(initial?: EngineConfig) {
           sources: {
             ...state.sources,
             [id]: { ...state.sources[id], ...partial },
+          },
+        };
+      }),
+
+    /**
+     * 添加材质
+     *
+     * @param config - 材质配置
+     * @throws {Error} 如果材质 ID 已存在
+     */
+    addMaterial: (config: MaterialConfig) =>
+      set((state) => {
+        // 检查 ID 是否已存在
+        if (state.materials[config.id]) {
+          throw new Error(`Material with id "${config.id}" already exists`);
+        }
+
+        return {
+          materials: { ...state.materials, [config.id]: config },
+        };
+      }),
+
+    /**
+     * 删除材质
+     *
+     * @param id - 材质 ID
+     */
+    removeMaterial: (id: string) =>
+      set((state) => {
+        // 使用解构赋值删除指定 key
+        const { [id]: removed, ...rest } = state.materials;
+        return { materials: rest };
+      }),
+
+    /**
+     * 更新材质配置
+     *
+     * @param id - 材质 ID
+     * @param partial - 部分配置更新
+     */
+    updateMaterial: (id: string, partial: Partial<MaterialConfig>) =>
+      set((state) => {
+        // 如果材质不存在，直接返回当前状态
+        if (!state.materials[id]) {
+          // biome-ignore lint/suspicious/noConsole: Development warning for debugging
+          console.warn(`Material with id "${id}" does not exist`);
+          return state;
+        }
+
+        return {
+          materials: {
+            ...state.materials,
+            [id]: { ...state.materials[id], ...partial },
           },
         };
       }),

@@ -5,11 +5,9 @@
  */
 
 import type {
-  SystemStage,
   ISystem,
   OctreeNodeMetadata,
   OctreeMetadata,
-  MaterialType,
   RenderCommand,
   Component,
   ComponentConstructor,
@@ -34,4 +32,7 @@ const testCommand: RenderCommand = {
   numPoints: 1000,
 };
 
-console.log('类型导入测试成功', testSystem, testCommand);
+// 使用导入的类型来消除未使用警告
+const _testMetadata: OctreeNodeMetadata | OctreeMetadata | Component | ComponentConstructor | null = null;
+
+console.log('类型导入测试成功', testSystem, testCommand, _testMetadata);

@@ -174,6 +174,14 @@ export interface ConfigState {
  *   visible: true
  * });
  *
+ * // 添加材质
+ * state.addMaterial({
+ *   id: 'custom-material',
+ *   type: 'point',
+ *   size: 1.5,
+ *   colorEncoding: 'RGB'
+ * });
+ *
  * // 更新渲染配置
  * state.setRenderingConfig({ pointBudget: 5_000_000 });
  * ```
@@ -221,6 +229,49 @@ export interface ConfigStore extends ConfigState {
    * ```
    */
   updateSource: (id: string, partial: Partial<SourceConfig>) => void;
+
+  /**
+   * 添加材质
+   *
+   * @param config - 材质配置
+   * @throws {Error} 如果 ID 已存在
+   *
+   * @example
+   * ```typescript
+   * store.getState().addMaterial({
+   *   id: 'custom-material',
+   *   type: 'point',
+   *   size: 1.5,
+   *   colorEncoding: 'RGB'
+   * });
+   * ```
+   */
+  addMaterial: (config: MaterialConfig) => void;
+
+  /**
+   * 删除材质
+   *
+   * @param id - 材质 ID
+   *
+   * @example
+   * ```typescript
+   * store.getState().removeMaterial('old-material');
+   * ```
+   */
+  removeMaterial: (id: string) => void;
+
+  /**
+   * 更新材质配置
+   *
+   * @param id - 材质 ID
+   * @param partial - 部分配置更新
+   *
+   * @example
+   * ```typescript
+   * store.getState().updateMaterial('custom-material', { size: 2.0 });
+   * ```
+   */
+  updateMaterial: (id: string, partial: Partial<MaterialConfig>) => void;
 
   /**
    * 更新渲染配置

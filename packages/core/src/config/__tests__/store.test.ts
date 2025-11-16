@@ -6,7 +6,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { createConfigStore } from '../store.js';
-import type { SourceConfig } from '../types.js';
+import type { MaterialConfig, SourceConfig } from '../types.js';
 
 describe('ConfigStore', () => {
   describe('初始化', () => {
@@ -305,6 +305,208 @@ describe('ConfigStore', () => {
       expect(newState.rendering).not.toBe(oldRendering);
       // 旧对象不应该被修改
       expect(oldRendering.pointBudget).toBe(2_000_000);
+    });
+  });
+
+  describe('addMaterial', () => {
+    it('应该正确添加新材质', () => {
+      const store = createConfigStore();
+      const state = store.getState();
+
+      const materialConfig: MaterialConfig = {
+        id: 'test-material',
+        type: 'point',
+        size: 1.5,
+        colorEncoding: 'RGB',
+      };
+
+      state.addMaterial(materialConfig);
+
+      const newState = store.getState();
+      expect(newState.materials['test-material']).toEqual(materialConfig);
+    });
+
+    it('应该抛出错误当 ID 已存在', () => {
+      const store = createConfigStore({
+        materials: {
+          existing: {
+            id: 'existing',
+            type: 'point',
+            size: 1.0,
+          },
+        },
+      });
+
+      const state = store.getState();
+
+      expect(() => {
+        state.addMaterial({
+          id: 'existing',
+          type: 'gaussian',
+          size: 2.0,
+        });
+      }).toThrow('Material with id "existing" already exists');
+    });
+
+    it('应该保持状态不可变性', () => {
+      const store = createConfigStore();
+      const oldState = store.getState();
+      const oldMaterials = oldState.materials;
+
+      oldState.addMaterial({
+        id: 'new-material',
+        type: 'point',
+        size: 1.0,
+      });
+
+      const newState = store.getState();
+
+      // 引用应该不同
+      expect(newState.materials).not.toBe(oldMaterials);
+      // 旧对象不应该被修改
+      expect(oldMaterials).toEqual({});
+    });
+  });
+
+  describe('removeMaterial', () => {
+    it('应该正确删除材质', () => {
+      const store = createConfigStore({
+        materials: {
+          toRemove: {
+            id: 'toRemove',
+            type: 'point',
+            size: 1.0,
+          },
+          toKeep: {
+            id: 'toKeep',
+            type: 'gaussian',
+            size: 2.0,
+          },
+        },
+      });
+
+      const state = store.getState();
+      state.removeMaterial('toRemove');
+
+      const newState = store.getState();
+      expect(newState.materials['toRemove']).toBeUndefined();
+      expect(newState.materials['toKeep']).toBeDefined();
+    });
+
+    it('删除不存在的材质不应报错', () => {
+      const store = createConfigStore();
+      const state = store.getState();
+
+      expect(() => {
+        state.removeMaterial('non-existent');
+      }).not.toThrow();
+    });
+
+    it('应该保持状态不可变性', () => {
+      const store = createConfigStore({
+        materials: {
+          existing: {
+            id: 'existing',
+            type: 'point',
+            size: 1.0,
+          },
+        },
+      });
+
+      const oldState = store.getState();
+      const oldMaterials = oldState.materials;
+
+      oldState.removeMaterial('existing');
+
+      const newState = store.getState();
+
+      // 引用应该不同
+      expect(newState.materials).not.toBe(oldMaterials);
+      // 旧对象不应该被修改
+      expect(oldMaterials).toHaveProperty('existing');
+    });
+  });
+
+  describe('updateMaterial', () => {
+    it('应该正确更新材质配置', () => {
+      const store = createConfigStore({
+        materials: {
+          test: {
+            id: 'test',
+            type: 'point',
+            size: 1.0,
+            colorEncoding: 'RGB',
+          },
+        },
+      });
+
+      const state = store.getState();
+      state.updateMaterial('test', { size: 2.0 });
+
+      const newState = store.getState();
+      expect(newState.materials['test'].size).toBe(2.0);
+      expect(newState.materials['test'].colorEncoding).toBe('RGB'); // 其他属性不变
+    });
+
+    it('更新不存在的材质应该打印警告', () => {
+      const store = createConfigStore();
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const state = store.getState();
+      state.updateMaterial('non-existent', { size: 2.0 });
+
+      expect(consoleSpy).toHaveBeenCalledWith('Material with id "non-existent" does not exist');
+      consoleSpy.mockRestore();
+    });
+
+    it('应该保持状态不可变性', () => {
+      const store = createConfigStore({
+        materials: {
+          test: {
+            id: 'test',
+            type: 'point',
+            size: 1.0,
+          },
+        },
+      });
+
+      const oldState = store.getState();
+      const oldMaterials = oldState.materials;
+      const oldMaterial = oldMaterials['test'];
+
+      oldState.updateMaterial('test', { size: 2.0 });
+
+      const newState = store.getState();
+
+      // materials 引用应该不同
+      expect(newState.materials).not.toBe(oldMaterials);
+      // material 引用应该不同
+      expect(newState.materials['test']).not.toBe(oldMaterial);
+      // 旧对象不应该被修改
+      expect(oldMaterial.size).toBe(1.0);
+    });
+
+    it('应该支持更新多个属性', () => {
+      const store = createConfigStore({
+        materials: {
+          test: {
+            id: 'test',
+            type: 'point',
+            size: 1.0,
+            colorEncoding: 'RGB',
+          },
+        },
+      });
+
+      const state = store.getState();
+      state.updateMaterial('test', {
+        size: 2.0,
+        colorEncoding: 'INTENSITY',
+      });
+
+      const newState = store.getState();
+      expect(newState.materials['test'].size).toBe(2.0);
+      expect(newState.materials['test'].colorEncoding).toBe('INTENSITY');
     });
   });
 
