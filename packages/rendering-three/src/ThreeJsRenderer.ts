@@ -3,7 +3,15 @@
  * @module @better-potree/rendering-three
  */
 
-import type { IRenderer, IScene } from '@better-potree/core';
+import type { IRenderer } from '@better-potree/rendering';
+import type {
+  Color,
+  Matrix4,
+  Viewport,
+  RenderStats,
+} from '@better-potree/rendering';
+import type { IBuffer, IMaterial } from '@better-potree/rendering';
+import type { IScene } from '@better-potree/core';
 import * as THREE from 'three';
 import { assertWebGL2Available, checkWebGL2Support } from './utils/webgl2.js';
 
@@ -30,6 +38,9 @@ export interface ThreeRendererConfig {
  */
 export class ThreeJsRenderer implements IRenderer {
   private renderer: THREE.WebGLRenderer;
+  private viewMatrix: Matrix4;
+  private projectionMatrix: Matrix4;
+  private _drawCalls: number = 0;
 
   constructor(config: ThreeRendererConfig = {}) {
     // Check WebGL2 availability before creating renderer
@@ -61,12 +72,196 @@ export class ThreeJsRenderer implements IRenderer {
     // Configure renderer
     this.renderer.sortObjects = false; // Important for point clouds
     this.renderer.autoClear = false; // We'll control clearing manually
+
+    // Initialize matrices
+    this.viewMatrix = [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ] as Matrix4;
+
+    this.projectionMatrix = [
+      1, 0, 0, 0,
+      0, 1, 0, 0,
+      0, 0, 1, 0,
+      0, 0, 0, 1,
+    ] as Matrix4;
   }
 
   /**
-   * Render the scene with the given camera
+   * Get WebGL rendering context
+   *
+   * @returns WebGL2 rendering context
    */
-  public render(scene: IScene, camera: THREE.Camera): void {
+  public getContext(): WebGL2RenderingContext {
+    return this.renderer.getContext() as WebGL2RenderingContext;
+  }
+
+  /**
+   * Get canvas element
+   *
+   * @returns Canvas element
+   */
+  public getCanvas(): HTMLCanvasElement {
+    return this.renderer.domElement;
+  }
+
+  /**
+   * Set canvas size
+   *
+   * @param width - Width in pixels
+   * @param height - Height in pixels
+   */
+  public setSize(width: number, height: number): void {
+    this.renderer.setSize(width, height, false);
+  }
+
+  /**
+   * Get current canvas size
+   *
+   * @returns Width and height
+   */
+  public getSize(): { width: number; height: number } {
+    const size = this.renderer.getSize(new THREE.Vector2());
+    return { width: size.x, height: size.y };
+  }
+
+  /**
+   * Set viewport
+   *
+   * @param viewport - Viewport info
+   */
+  public setViewport(viewport: Viewport): void {
+    this.renderer.setViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+  }
+
+  /**
+   * Get current viewport
+   *
+   * @returns Viewport info
+   */
+  public getViewport(): Viewport {
+    const vp = this.renderer.getViewport(new THREE.Vector4());
+    return {
+      x: vp.x,
+      y: vp.y,
+      width: vp.z,
+      height: vp.w,
+    };
+  }
+
+  /**
+   * Set clear color
+   *
+   * @param color - Background color
+   */
+  public setClearColor(color: Color): void {
+    this.renderer.setClearColor(
+      new THREE.Color(color.r, color.g, color.b),
+      color.a
+    );
+  }
+
+  /**
+   * Clear render buffers
+   *
+   * @param color - Whether to clear color buffer
+   * @param depth - Whether to clear depth buffer
+   * @param stencil - Whether to clear stencil buffer
+   */
+  public clear(color: boolean, depth: boolean, stencil: boolean): void {
+    this.renderer.clear(color, depth, stencil);
+  }
+
+  /**
+   * Set view matrix
+   *
+   * @param matrix - 4x4 view matrix
+   */
+  public setViewMatrix(matrix: Matrix4): void {
+    this.viewMatrix = matrix;
+  }
+
+  /**
+   * Set projection matrix
+   *
+   * @param matrix - 4x4 projection matrix
+   */
+  public setProjectionMatrix(matrix: Matrix4): void {
+    this.projectionMatrix = matrix;
+  }
+
+  /**
+   * Get current view matrix
+   *
+   * @returns 4x4 view matrix
+   */
+  public getViewMatrix(): Matrix4 {
+    return this.viewMatrix;
+  }
+
+  /**
+   * Get current projection matrix
+   *
+   * @returns 4x4 projection matrix
+   */
+  public getProjectionMatrix(): Matrix4 {
+    return this.projectionMatrix;
+  }
+
+  /**
+   * Render buffer data
+   *
+   * @param _buffer - Geometry buffer
+   * @param _material - Material
+   * @param _modelMatrix - Model transform matrix
+   */
+  public render(_buffer: IBuffer, _material: IMaterial, _modelMatrix: Matrix4): void {
+    // TODO: 实现具体的渲染逻辑
+    // 这需要将抽象的 IBuffer 和 IMaterial 转换为 Three.js 对象
+    this._drawCalls++;
+  }
+
+  /**
+   * Get render statistics
+   *
+   * @returns Statistics
+   */
+  public getStats(): RenderStats {
+    const info = this.renderer.info;
+    return {
+      drawCalls: info.render.calls,
+      triangles: info.render.triangles,
+      points: info.render.points,
+      textures: info.memory.textures,
+      programs: info.programs?.length ?? 0,
+    };
+  }
+
+  /**
+   * Reset render statistics
+   */
+  public resetStats(): void {
+    this.renderer.info.reset();
+    this._drawCalls = 0;
+  }
+
+  /**
+   * Dispose of renderer resources
+   */
+  public dispose(): void {
+    this.renderer.dispose();
+  }
+
+  // ===== Legacy methods for backward compatibility =====
+
+  /**
+   * Render the scene with the given camera (legacy method)
+   *
+   * @deprecated Use the RenderSystem instead
+   */
+  public renderScene(scene: IScene, camera: THREE.Camera): void {
     const threeScene = scene.getThreeScene?.();
     if (!threeScene) {
       throw new Error('Scene must provide getThreeScene() method');
@@ -77,49 +272,27 @@ export class ThreeJsRenderer implements IRenderer {
   }
 
   /**
-   * Set the size of the render target
-   */
-  public setSize(width: number, height: number): void {
-    this.renderer.setSize(width, height);
-  }
-
-  /**
-   * Get the underlying DOM element
+   * Get the underlying DOM element (legacy method)
+   *
+   * @deprecated Use getCanvas() instead
    */
   public getDomElement(): HTMLCanvasElement {
-    return this.renderer.domElement;
+    return this.getCanvas();
   }
 
   /**
    * Get the underlying Three.js renderer
+   *
+   * @returns Three.js WebGLRenderer instance
    */
   public getThreeRenderer(): THREE.WebGLRenderer {
     return this.renderer;
   }
 
   /**
-   * Dispose of renderer resources
-   */
-  public dispose(): void {
-    this.renderer.dispose();
-  }
-
-  /**
-   * Clear the renderer
-   */
-  public clear(color = true, depth = true, stencil = true): void {
-    this.renderer.clear(color, depth, stencil);
-  }
-
-  /**
-   * Get the WebGL2 rendering context
-   */
-  public getContext(): WebGL2RenderingContext {
-    return this.renderer.getContext() as WebGL2RenderingContext;
-  }
-
-  /**
    * Enable/disable autoClear
+   *
+   * @param value - Whether to enable
    */
   public setAutoClear(value: boolean): void {
     this.renderer.autoClear = value;
@@ -127,6 +300,8 @@ export class ThreeJsRenderer implements IRenderer {
 
   /**
    * Enable/disable sortObjects
+   *
+   * @param value - Whether to enable
    */
   public setSortObjects(value: boolean): void {
     this.renderer.sortObjects = value;
