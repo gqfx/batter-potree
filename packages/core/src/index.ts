@@ -11,3 +11,5 @@ export * from './lod/LODSelector.js';
 export * from './lod/PointBudget.js';
 export * from './events/EventEmitter.js';
 export * from './events/types.js';
+export * from './config/index.js';
+export * from './runtime/index.js';
