@@ -29,7 +29,6 @@
   "author": "better-potree contributors",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "@better-potree/types": "workspace:*",
     "@better-potree/core": "workspace:*"
   },
   "peerDependencies": {

@@ -2,7 +2,7 @@
  * Unit tests for ViewerAPI class
  */
 
-import type { IPointCloudOctree, IRenderer, IScene, NavigationMode } from '@better-potree/types';
+import type { IPointCloudOctree, IRenderer, IScene, NavigationMode } from '@better-potree/core';
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewerAPI } from '../ViewerAPI';

@@ -6,7 +6,7 @@
  */
 
 import { PointAttribute } from '@better-potree/core';
-import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
 import { Version } from '../Version.js';
 
 // Type mapping for TypedArray constructors

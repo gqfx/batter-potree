@@ -3,7 +3,7 @@
  */
 
 import { PointAttributes } from '@better-potree/core';
-import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createWorkerPool, WorkerPool } from '../workers/WorkerPool';
 

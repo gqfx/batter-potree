@@ -2,7 +2,7 @@
  * Unit tests for Viewer class
  */
 
-import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/types';
+import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Viewer } from '../Viewer';

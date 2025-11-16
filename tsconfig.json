@@ -36,8 +36,6 @@
     // Path Aliases
     "baseUrl": ".",
     "paths": {
-      "@better-potree/types": ["./packages/types/src"],
-      "@better-potree/types/*": ["./packages/types/src/*"],
       "@better-potree/utils": ["./packages/utils/src"],
       "@better-potree/utils/*": ["./packages/utils/src/*"],
       "@better-potree/core": ["./packages/core/src"],

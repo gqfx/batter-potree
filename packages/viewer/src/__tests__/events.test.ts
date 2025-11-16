@@ -2,7 +2,7 @@
  * Unit tests for Viewer event types
  */
 
-import type { IPointCloudOctree } from '@better-potree/types';
+import type { IPointCloudOctree } from '@better-potree/core';
 import type * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import type { ViewerEvents } from '../events';

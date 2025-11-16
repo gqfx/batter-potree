@@ -3,7 +3,7 @@
  * Loads Potree format point clouds (1.x and 2.0)
  */
 
-import type { ILoader, IPointCloudOctree, IPotreeMetadata } from '@better-potree/types';
+import type { ILoader, IPointCloudOctree, IPotreeMetadata } from '@better-potree/core';
 import * as THREE from 'three';
 import { parseAttributes } from './parseAttributes.js';
 

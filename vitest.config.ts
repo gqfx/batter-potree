@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@better-potree/core': resolve(__dirname, './packages/core/src'),
-      '@better-potree/types': resolve(__dirname, './packages/types/src'),
+      
     },
   },
   test: {

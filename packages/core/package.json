@@ -30,7 +30,6 @@
   "author": "better-potree contributors",
   "license": "BSD-2-Clause",
   "dependencies": {
-    "@better-potree/types": "workspace:*",
     "eventemitter3": "^5.0.1",
     "zustand": "^5.0.8"
   },

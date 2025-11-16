@@ -3,7 +3,7 @@
  */
 
 import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
-import type { IPotreeAttributeMetadata, IPotreeMetadata } from '@better-potree/types';
+import type { IPotreeAttributeMetadata, IPotreeMetadata } from '@better-potree/core';
 import { Version } from './Version.js';
 
 /**

@@ -2,7 +2,7 @@
  * Viewer event definitions
  */
 
-import type { IPointCloudOctree } from '@better-potree/types';
+import type { IPointCloudOctree } from '@better-potree/core';
 import type * as THREE from 'three';
 
 /**

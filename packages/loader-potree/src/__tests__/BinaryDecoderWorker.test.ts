@@ -4,7 +4,7 @@
  */
 
 import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
-import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the worker self context

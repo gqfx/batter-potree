@@ -2,7 +2,7 @@
  * Unit tests for PotreeLoader
  */
 
-import type { IPotreeMetadata } from '@better-potree/types';
+import type { IPotreeMetadata } from '@better-potree/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PotreeLoader } from '../PotreeLoader';
 

@@ -59,9 +59,6 @@ importers:
       '@better-potree/core':
         specifier: workspace:*
         version: link:../core
-      '@better-potree/types':
-        specifier: workspace:*
-        version: link:../types
       three:
         specifier: ~0.180.0
         version: 0.180.0
@@ -72,9 +69,6 @@ importers:
 
   packages/core:
     dependencies:
-      '@better-potree/types':
-        specifier: workspace:*
-        version: link:../types
       eventemitter3:
         specifier: ^5.0.1
         version: 5.0.1
@@ -94,9 +88,6 @@ importers:
       '@better-potree/core':
         specifier: workspace:*
         version: link:../core
-      '@better-potree/types':
-        specifier: workspace:*
-        version: link:../types
 
   packages/playground:
     dependencies:
@@ -128,9 +119,6 @@ importers:
       '@better-potree/core':
         specifier: workspace:*
         version: link:../core
-      '@better-potree/types':
-        specifier: workspace:*
-        version: link:../types
       three:
         specifier: ~0.180.0
         version: 0.180.0
@@ -144,9 +132,6 @@ importers:
       '@better-potree/core':
         specifier: workspace:*
         version: link:../core
-      '@better-potree/types':
-        specifier: workspace:*
-        version: link:../types
       three:
         specifier: ~0.180.0
         version: 0.180.0
@@ -154,8 +139,6 @@ importers:
       '@types/three':
         specifier: ~0.180.0
         version: 0.180.0
-
-  packages/types: {}
 
   packages/viewer:
     dependencies:
@@ -174,9 +157,6 @@ importers:
       '@better-potree/tools':
         specifier: workspace:*
         version: link:../tools
-      '@better-potree/types':
-        specifier: workspace:*
-        version: link:../types
       three:
         specifier: ~0.180.0
         version: 0.180.0

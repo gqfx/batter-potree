@@ -3,7 +3,7 @@
  * @module @better-potree/rendering-three/materials
  */
 
-import { PointCloudColorMode, PointShape, PointSizeType } from '@better-potree/types';
+import { PointCloudColorMode, PointShape, PointSizeType } from '@better-potree/core';
 import * as THREE from 'three';
 import { getPointCloudFragmentShader, getPointCloudVertexShader } from '../shaders/index.js';
 

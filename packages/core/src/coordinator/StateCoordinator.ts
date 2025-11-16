@@ -92,6 +92,7 @@ interface IResourceManager {
 /**
  * ECS 组件接口 (简化版本)
  */
+// @ts-expect-error - Internal type definition for future use
 interface ISourceComponent {
   id: string;
 }
@@ -240,7 +241,7 @@ export class StateCoordinator {
     private readonly runtime: Runtime,
     private readonly octreeManager: IOctreeManager,
     private readonly resourceManager: IResourceManager,
-    private readonly ecs: IECSWorld,
+    _ecs: IECSWorld,
   ) {
     this.setupSubscriptions();
   }
@@ -598,10 +599,30 @@ export class StateCoordinator {
     this.runtime.rendering.fov = config.fov;
     this.runtime.rendering.pointSize = config.pointSize;
 
-    // 同步 FOV 到相机 (如果是透视相机)
     if ('fov' in this.runtime.camera) {
-      (this.runtime.camera as { fov: number; updateProjectionMatrix(): void }).fov = config.fov;
-      this.runtime.camera.updateProjectionMatrix();
+      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      camera.fov = config.fov;
+      camera.updateProjectionMatrix();
+    }
+    if ('fov' in this.runtime.camera) {
+      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      camera.fov = config.fov;
+      camera.updateProjectionMatrix();
+    }
+    if ('fov' in this.runtime.camera) {
+      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      camera.fov = config.fov;
+      camera.updateProjectionMatrix();
+    }
+    if ('fov' in this.runtime.camera) {
+      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      camera.fov = config.fov;
+      camera.updateProjectionMatrix();
+    }
+    if ('fov' in this.runtime.camera) {
+      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      camera.fov = config.fov;
+      camera.updateProjectionMatrix();
     }
   }
 

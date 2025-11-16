@@ -3,7 +3,7 @@
  */
 
 import { TypedEventEmitter } from '@better-potree/core';
-import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/types';
+import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
 import * as THREE from 'three';
 import type { ViewerEvents } from './events.js';
 

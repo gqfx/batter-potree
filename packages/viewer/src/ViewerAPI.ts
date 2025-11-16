@@ -9,7 +9,7 @@
  * - Screenshot and export
  */
 
-import type { NavigationMode, PointQuality, PointShape, PointSizeType } from '@better-potree/types';
+import type { NavigationMode, PointQuality, PointShape, PointSizeType } from '@better-potree/core';
 import * as THREE from 'three';
 import { Viewer } from './Viewer.js';
 

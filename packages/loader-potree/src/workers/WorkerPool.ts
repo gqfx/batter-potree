@@ -3,7 +3,7 @@
  * Manages a pool of BinaryDecoderWorker instances for parallel point cloud decoding
  */
 
-import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
 
 /**
  * Worker task in the queue

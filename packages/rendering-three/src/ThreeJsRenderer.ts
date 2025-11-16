@@ -3,7 +3,7 @@
  * @module @better-potree/rendering-three
  */
 
-import type { IRenderer, IScene } from '@better-potree/types';
+import type { IRenderer, IScene } from '@better-potree/core';
 import * as THREE from 'three';
 import { assertWebGL2Available, checkWebGL2Support } from './utils/webgl2.js';
 

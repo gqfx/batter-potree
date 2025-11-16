@@ -14,3 +14,4 @@ export * from './lod/PointBudget.js';
 export * from './octree/OctreeNode.js';
 export * from './octree/PointCloudOctree.js';
 export * from './runtime/index.js';
+export * from './types/index.js';

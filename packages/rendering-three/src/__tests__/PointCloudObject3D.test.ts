@@ -2,7 +2,7 @@
  * Unit tests for PointCloudObject3D
  */
 
-import { PointCloudColorMode, PointSizeType } from '@better-potree/types';
+import { PointCloudColorMode, PointSizeType } from '@better-potree/core';
 import * as THREE from 'three';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PointCloudMaterial } from '../materials/PointCloudMaterial';
