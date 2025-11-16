@@ -138,4 +138,5 @@ This project is based on [Potree](https://github.com/potree/potree) by Markus Sc
 
 - [Potree](https://github.com/potree/potree) - The original point cloud viewer
 - [Three.js](https://threejs.org/) - 3D rendering library
+- [spark.js](https://github.com/sparkjsdev/spark) - An advanced 3D Gaussian Splatting renderer for THREE.js
 - All contributors and supporters of this project
