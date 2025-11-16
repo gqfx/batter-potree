@@ -23,9 +23,9 @@
  * @packageDocumentation
  */
 
-import type { IRenderer } from '../interfaces/IRenderer';
-import type { IMaterial } from '../interfaces/IMaterial';
 import type { IBuffer } from '../interfaces/IBuffer';
+import type { IMaterial } from '../interfaces/IMaterial';
+import type { IRenderer } from '../interfaces/IRenderer';
 import type { Matrix4 } from '../types/common';
 
 /**
@@ -124,11 +124,7 @@ export abstract class RenderSystem implements ISystem {
    * @param renderer - 渲染器实例
    * @param config - 系统配置
    */
-  constructor(
-    name: string,
-    renderer: IRenderer,
-    config: RenderSystemConfig = {}
-  ) {
+  constructor(name: string, renderer: IRenderer, config: RenderSystemConfig = {}) {
     this.name = name;
     this.renderer = renderer;
     this.config = {
@@ -197,10 +193,7 @@ export abstract class RenderSystem implements ISystem {
 
     const transparentIndex = this.renderQueue.transparent.indexOf(object);
     if (transparentIndex !== -1) {
-      (this.renderQueue.transparent as RenderObject[]).splice(
-        transparentIndex,
-        1
-      );
+      (this.renderQueue.transparent as RenderObject[]).splice(transparentIndex, 1);
     }
   }
 
@@ -314,8 +307,7 @@ export abstract class RenderSystem implements ISystem {
     const z = modelMatrix[14];
 
     // 应用视图矩阵变换到视空间
-    const viewZ =
-      viewMatrix[2] * x + viewMatrix[6] * y + viewMatrix[10] * z + viewMatrix[14];
+    const viewZ = viewMatrix[2] * x + viewMatrix[6] * y + viewMatrix[10] * z + viewMatrix[14];
 
     return viewZ;
   }

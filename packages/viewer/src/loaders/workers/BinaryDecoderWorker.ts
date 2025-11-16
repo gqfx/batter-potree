@@ -5,8 +5,8 @@
  * Based on Potree's BinaryDecoderWorker.js
  */
 
-import { PointAttribute } from '@better-potree/core';
 import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
+import { PointAttribute } from '@better-potree/core';
 import { Version } from '../Version.js';
 
 // Type mapping for TypedArray constructors

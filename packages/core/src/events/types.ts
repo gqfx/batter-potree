@@ -14,6 +14,7 @@ export interface PointCloudEvents {
   'transformation-changed': { pointCloud: PointCloudOctree };
   'node-loaded': { node: OctreeNode; pointCloud: PointCloudOctree };
   'node-disposed': { node: OctreeNode; pointCloud: PointCloudOctree };
+  // biome-ignore lint/suspicious/noExplicitAny: Event map index signature requires any for type flexibility
   [key: string]: any; // 索引签名，满足 EventMap 约束
 }
 
@@ -25,6 +26,7 @@ export interface LoaderEvents {
   'load-progress': { loaded: number; total: number; percentage: number };
   'load-complete': { url: string; data: unknown };
   'load-error': { url: string; error: Error };
+  // biome-ignore lint/suspicious/noExplicitAny: Event map index signature requires any for type flexibility
   [key: string]: any;
 }
 
@@ -35,6 +37,7 @@ export interface MeasurementEvents {
   'measurement-added': { id: string; type: string };
   'measurement-removed': { id: string };
   'measurement-changed': { id: string };
+  // biome-ignore lint/suspicious/noExplicitAny: Event map index signature requires any for type flexibility
   [key: string]: any;
 }
 
@@ -45,5 +48,6 @@ export interface CameraEvents {
   'camera-changed': { position: [number, number, number]; target: [number, number, number] };
   'camera-move-start': Record<string, never>;
   'camera-move-end': Record<string, never>;
+  // biome-ignore lint/suspicious/noExplicitAny: Event map index signature requires any for type flexibility
   [key: string]: any;
 }

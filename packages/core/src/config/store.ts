@@ -131,6 +131,7 @@ export function createConfigStore(initial?: EngineConfig) {
       set((state) => {
         // 如果数据源不存在，直接返回当前状态
         if (!state.sources[id]) {
+          // biome-ignore lint/suspicious/noConsole: Development warning for debugging
           console.warn(`Source with id "${id}" does not exist`);
           return state;
         }

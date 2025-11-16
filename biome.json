@@ -7,7 +7,17 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/build", "!**/coverage", "!**/docs"]
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.json",
+      "!**/*.d.ts",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!**/coverage",
+      "!**/docs"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -41,7 +51,12 @@
         "noUnreachableSuper": "error",
         "noUnsafeFinally": "error",
         "noUnusedLabels": "error",
-        "noUnusedVariables": "warn",
+        "noUnusedVariables": {
+          "level": "warn",
+          "options": {
+            "ignoreRestSiblings": true
+          }
+        },
         "useIsNan": "error",
         "useValidForDirection": "error",
         "noInvalidBuiltinInstantiation": "error",
@@ -56,6 +71,7 @@
         "noCatchAssign": "error",
         "noClassAssign": "error",
         "noCompareNegZero": "error",
+        "noConsole": "warn",
         "noControlCharactersInRegex": "error",
         "noDebugger": "warn",
         "noDuplicateCase": "error",
@@ -63,7 +79,7 @@
         "noDuplicateObjectKeys": "error",
         "noDuplicateParameters": "error",
         "noEmptyBlockStatements": "warn",
-        "noExplicitAny": "off",
+        "noExplicitAny": "warn",
         "noExtraNonNullAssertion": "error",
         "noFallthroughSwitchClause": "error",
         "noFunctionAssign": "error",
@@ -82,6 +98,19 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["**/__tests__/**", "**/playground/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off",
+            "noExplicitAny": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

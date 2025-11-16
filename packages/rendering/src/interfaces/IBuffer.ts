@@ -21,8 +21,7 @@
  * @packageDocumentation
  */
 
-import type { BufferUsage, DataType, RenderMode } from '../types/common';
-import type { BoundingBox } from '../types/common';
+import type { BoundingBox, BufferUsage, DataType, RenderMode } from '../types/common';
 
 /**
  * 顶点属性数据
@@ -138,12 +137,7 @@ export interface IBuffer {
    * @param offset - 起始顶点索引
    * @param count - 更新的顶点数量（可选，默认为 data 的长度）
    */
-  updateAttribute(
-    name: string,
-    data: ArrayBufferView,
-    offset: number,
-    count?: number
-  ): void;
+  updateAttribute(name: string, data: ArrayBufferView, offset: number, count?: number): void;
 
   /**
    * 设置索引数据

@@ -4,5 +4,5 @@
  * @module ecs
  */
 
-export * from './ECSWorld';
 export * from './components';
+export * from './ECSWorld';

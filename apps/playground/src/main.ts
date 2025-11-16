@@ -5,10 +5,8 @@
  */
 
 import './style.css';
-import { EarthControls } from '@better-potree/viewer';
-import { PotreeLoader } from '@better-potree/viewer';
 import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
-import { ViewerAPI } from '@better-potree/viewer';
+import { EarthControls, PotreeLoader, ViewerAPI } from '@better-potree/viewer';
 import * as THREE from 'three';
 
 console.log('Better Potree Playground - 初始化中...');

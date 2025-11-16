@@ -25,12 +25,7 @@ export default defineConfig({
   clean: true,
 
   // 不打包依赖
-  external: [
-    'eventemitter3',
-    'zustand',
-    'three',
-    /^three\/.*/,
-  ],
+  external: ['eventemitter3', 'zustand', 'three', /^three\/.*/],
 
   // Tree shaking
   treeshake: true,

@@ -6,14 +6,12 @@
  * @packageDocumentation
  */
 
-// 类型定义
-export * from './types/common';
-
+export * from './interfaces/IBuffer';
+export * from './interfaces/IMaterial';
 // 接口
 export * from './interfaces/IRenderer';
-export * from './interfaces/IMaterial';
-export * from './interfaces/IBuffer';
 export * from './interfaces/IShader';
-
 // 系统
 export * from './systems/RenderSystem';
+// 类型定义
+export * from './types/common';

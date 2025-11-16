@@ -2,8 +2,8 @@
  * Parse Potree point attributes from metadata
  */
 
-import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
 import type { IPotreeAttributeMetadata, IPotreeMetadata } from '@better-potree/core';
+import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
 import { Version } from './Version.js';
 
 /**

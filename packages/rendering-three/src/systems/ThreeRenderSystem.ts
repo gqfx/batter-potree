@@ -19,8 +19,8 @@
  * @packageDocumentation
  */
 
-import { RenderSystem } from '@better-potree/rendering';
 import type { IRenderer, RenderSystemConfig } from '@better-potree/rendering';
+import { RenderSystem } from '@better-potree/rendering';
 import * as THREE from 'three';
 
 /**
@@ -126,8 +126,7 @@ export class ThreeRenderSystem extends RenderSystem {
 
     // 将视图和投影矩阵同步到渲染器
     const viewMatrix = this.camera.matrixWorldInverse.elements;
-    const projectionMatrix = (this.camera as THREE.PerspectiveCamera).projectionMatrix
-      .elements;
+    const projectionMatrix = (this.camera as THREE.PerspectiveCamera).projectionMatrix.elements;
 
     this.renderer.setViewMatrix(viewMatrix as any);
     this.renderer.setProjectionMatrix(projectionMatrix as any);

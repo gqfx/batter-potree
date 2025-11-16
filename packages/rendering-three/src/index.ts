@@ -11,9 +11,9 @@ export * from './materials/PointCloudMaterial.js';
 export * from './objects/PointCloudObject3D.js';
 // Shaders
 export * from './shaders/index.js';
-// Renderer and scene
-export * from './ThreeJsRenderer.js';
 // Systems
 export * from './systems/ThreeRenderSystem.js';
+// Renderer and scene
+export * from './ThreeJsRenderer.js';
 // WebGL2 utilities
 export * from './utils/webgl2.js';

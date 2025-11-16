@@ -27,10 +27,22 @@ export interface Vector3 {
  * 4x4 变换矩阵（行优先，16 个元素）
  */
 export type Matrix4 = readonly [
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number,
-  number, number, number, number
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
 ];
 
 /**
@@ -45,9 +57,7 @@ export interface BoundingBox {
  * 视锥体
  */
 export interface Frustum {
-  readonly planes: readonly [
-    Plane, Plane, Plane, Plane, Plane, Plane
-  ]; // left, right, top, bottom, near, far
+  readonly planes: readonly [Plane, Plane, Plane, Plane, Plane, Plane]; // left, right, top, bottom, near, far
 }
 
 /**

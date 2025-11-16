@@ -14,7 +14,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
+    "format:check": "biome format .",
     "check": "biome check --write .",
     "docs": "typedoc",
     "clean": "pnpm -r exec rm -rf dist node_modules && rm -rf node_modules"

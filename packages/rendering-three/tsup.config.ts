@@ -26,12 +26,7 @@ export default defineConfig({
   clean: true,
 
   // 不打包依赖
-  external: [
-    '@better-potree/core',
-    '@better-potree/rendering',
-    'three',
-    /^three\/.*/,
-  ],
+  external: ['@better-potree/core', '@better-potree/rendering', 'three', /^three\/.*/],
 
   // Tree shaking
   treeshake: true,

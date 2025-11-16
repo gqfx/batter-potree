@@ -4,8 +4,8 @@
  * @module ecs
  */
 
+import type { Matrix4, Vector3 } from 'three';
 import type { Component } from './ECSWorld';
-import type { Vector3, Matrix4 } from 'three';
 
 /**
  * 数据源组件
@@ -35,7 +35,7 @@ export class Transform implements Component {
     public position: Vector3,
     public rotation: Vector3,
     public scale: Vector3,
-    public matrix: Matrix4
+    public matrix: Matrix4,
   ) {}
 }
 
@@ -58,7 +58,7 @@ export class PotreeNodeData implements Component {
     public nodeId: string,
     public sourceId: string,
     public numPoints: number,
-    public gpuBufferId?: string
+    public gpuBufferId?: string,
   ) {}
 }
 
@@ -71,7 +71,7 @@ export class GaussianSplatData implements Component {
   constructor(
     public splatId: string,
     public numSplats: number,
-    public gpuBufferId?: string
+    public gpuBufferId?: string,
   ) {}
 }
 
@@ -83,6 +83,6 @@ export class BoundingBox implements Component {
 
   constructor(
     public min: Vector3,
-    public max: Vector3
+    public max: Vector3,
   ) {}
 }

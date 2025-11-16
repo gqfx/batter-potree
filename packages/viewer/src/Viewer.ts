@@ -2,8 +2,8 @@
  * Main Viewer class - high-level API for better-potree
  */
 
-import { TypedEventEmitter } from '@better-potree/core';
 import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
+import { TypedEventEmitter } from '@better-potree/core';
 import * as THREE from 'three';
 import type { ViewerEvents } from './events.js';
 

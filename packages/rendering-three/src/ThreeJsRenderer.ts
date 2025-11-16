@@ -3,15 +3,16 @@
  * @module @better-potree/rendering-three
  */
 
-import type { IRenderer } from '@better-potree/rendering';
+import type { IScene } from '@better-potree/core';
 import type {
   Color,
+  IBuffer,
+  IMaterial,
+  IRenderer,
   Matrix4,
-  Viewport,
   RenderStats,
+  Viewport,
 } from '@better-potree/rendering';
-import type { IBuffer, IMaterial } from '@better-potree/rendering';
-import type { IScene } from '@better-potree/core';
 import * as THREE from 'three';
 import { assertWebGL2Available, checkWebGL2Support } from './utils/webgl2.js';
 
@@ -74,19 +75,9 @@ export class ThreeJsRenderer implements IRenderer {
     this.renderer.autoClear = false; // We'll control clearing manually
 
     // Initialize matrices
-    this.viewMatrix = [
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1,
-    ] as Matrix4;
+    this.viewMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] as Matrix4;
 
-    this.projectionMatrix = [
-      1, 0, 0, 0,
-      0, 1, 0, 0,
-      0, 0, 1, 0,
-      0, 0, 0, 1,
-    ] as Matrix4;
+    this.projectionMatrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] as Matrix4;
   }
 
   /**
@@ -157,10 +148,7 @@ export class ThreeJsRenderer implements IRenderer {
    * @param color - Background color
    */
   public setClearColor(color: Color): void {
-    this.renderer.setClearColor(
-      new THREE.Color(color.r, color.g, color.b),
-      color.a
-    );
+    this.renderer.setClearColor(new THREE.Color(color.r, color.g, color.b), color.a);
   }
 
   /**

@@ -10,10 +10,10 @@ import { createStore } from 'zustand/vanilla';
  * @internal
  */
 const DEFAULT_RENDERING_CONFIG = {
-    pointBudget: 2000000,
-    fov: 60,
-    minNodeSize: 100,
-    pointSize: 1.0,
+  pointBudget: 2000000,
+  fov: 60,
+  minNodeSize: 100,
+  pointSize: 1.0,
 };
 /**
  * 默认相机配置
@@ -21,8 +21,8 @@ const DEFAULT_RENDERING_CONFIG = {
  * @internal
  */
 const DEFAULT_CAMERA_CONFIG = {
-    position: [0, 0, 10],
-    target: [0, 0, 0],
+  position: [0, 0, 10],
+  target: [0, 0, 0],
 };
 /**
  * 创建配置 Store
@@ -71,71 +71,75 @@ const DEFAULT_CAMERA_CONFIG = {
  * ```
  */
 export function createConfigStore(initial) {
-    return createStore((set) => ({
-        // ========== 初始状态 ==========
-        sources: initial?.sources ?? {},
-        materials: initial?.materials ?? {},
-        rendering: {
-            ...DEFAULT_RENDERING_CONFIG,
-            ...(initial?.rendering ?? {}),
-        },
-        camera: {
-            ...DEFAULT_CAMERA_CONFIG,
-            ...(initial?.camera ?? {}),
-        },
-        // ========== Actions ==========
-        /**
-         * 添加数据源
-         *
-         * @param config - 数据源配置
-         * @throws {Error} 如果数据源 ID 已存在
-         */
-        addSource: (config) => set((state) => {
-            // 检查 ID 是否已存在
-            if (state.sources[config.id]) {
-                throw new Error(`Source with id "${config.id}" already exists`);
-            }
-            return {
-                sources: { ...state.sources, [config.id]: config },
-            };
-        }),
-        /**
-         * 删除数据源
-         *
-         * @param id - 数据源 ID
-         */
-        removeSource: (id) => set((state) => {
-            // 使用解构赋值删除指定 key
-            const { [id]: removed, ...rest } = state.sources;
-            return { sources: rest };
-        }),
-        /**
-         * 更新数据源配置
-         *
-         * @param id - 数据源 ID
-         * @param partial - 部分配置更新
-         */
-        updateSource: (id, partial) => set((state) => {
-            // 如果数据源不存在，直接返回当前状态
-            if (!state.sources[id]) {
-                console.warn(`Source with id "${id}" does not exist`);
-                return state;
-            }
-            return {
-                sources: {
-                    ...state.sources,
-                    [id]: { ...state.sources[id], ...partial },
-                },
-            };
-        }),
-        /**
-         * 更新渲染配置
-         *
-         * @param config - 部分渲染配置更新
-         */
-        setRenderingConfig: (config) => set((state) => ({
-            rendering: { ...state.rendering, ...config },
-        })),
-    }));
+  return createStore((set) => ({
+    // ========== 初始状态 ==========
+    sources: initial?.sources ?? {},
+    materials: initial?.materials ?? {},
+    rendering: {
+      ...DEFAULT_RENDERING_CONFIG,
+      ...(initial?.rendering ?? {}),
+    },
+    camera: {
+      ...DEFAULT_CAMERA_CONFIG,
+      ...(initial?.camera ?? {}),
+    },
+    // ========== Actions ==========
+    /**
+     * 添加数据源
+     *
+     * @param config - 数据源配置
+     * @throws {Error} 如果数据源 ID 已存在
+     */
+    addSource: (config) =>
+      set((state) => {
+        // 检查 ID 是否已存在
+        if (state.sources[config.id]) {
+          throw new Error(`Source with id "${config.id}" already exists`);
+        }
+        return {
+          sources: { ...state.sources, [config.id]: config },
+        };
+      }),
+    /**
+     * 删除数据源
+     *
+     * @param id - 数据源 ID
+     */
+    removeSource: (id) =>
+      set((state) => {
+        // 使用解构赋值删除指定 key
+        const { [id]: removed, ...rest } = state.sources;
+        return { sources: rest };
+      }),
+    /**
+     * 更新数据源配置
+     *
+     * @param id - 数据源 ID
+     * @param partial - 部分配置更新
+     */
+    updateSource: (id, partial) =>
+      set((state) => {
+        // 如果数据源不存在，直接返回当前状态
+        if (!state.sources[id]) {
+          console.warn(`Source with id "${id}" does not exist`);
+          return state;
+        }
+        return {
+          sources: {
+            ...state.sources,
+            [id]: { ...state.sources[id], ...partial },
+          },
+        };
+      }),
+    /**
+     * 更新渲染配置
+     *
+     * @param config - 部分渲染配置更新
+     */
+    setRenderingConfig: (config) =>
+      set((state) => ({
+        rendering: { ...state.rendering, ...config },
+      })),
+  }));
 }
 //# sourceMappingURL=store.js.map

@@ -21,8 +21,7 @@
  * @packageDocumentation
  */
 
-import type { Color } from '../types/common';
-import type { BlendMode, DepthFunc } from '../types/common';
+import type { BlendMode, Color, DepthFunc } from '../types/common';
 import type { IShader } from './IShader';
 
 /**

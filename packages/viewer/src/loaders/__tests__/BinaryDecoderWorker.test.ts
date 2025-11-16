@@ -3,8 +3,8 @@
  * Note: Testing worker code requires special handling since it runs in a worker context
  */
 
-import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
 import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
+import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the worker self context

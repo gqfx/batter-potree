@@ -190,7 +190,7 @@ export interface IShader {
     type: number,
     normalized: boolean,
     stride: number,
-    offset: number
+    offset: number,
   ): void;
 
   /**

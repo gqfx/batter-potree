@@ -4,5 +4,15 @@
  * @module runtime
  */
 export { Runtime } from './Runtime.js';
-export type { GPUResource, GPUResourceType, LoadTask, LoadTaskStatus, MemoryBudgets, NodeData, PerformanceStats, RenderingRuntimeConfig, SourceRuntimeState, } from './types.js';
+export type {
+  GPUResource,
+  GPUResourceType,
+  LoadTask,
+  LoadTaskStatus,
+  MemoryBudgets,
+  NodeData,
+  PerformanceStats,
+  RenderingRuntimeConfig,
+  SourceRuntimeState,
+} from './types.js';
 //# sourceMappingURL=index.d.ts.map

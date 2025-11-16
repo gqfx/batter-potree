@@ -2,11 +2,11 @@
  * 渲染器接口测试
  */
 
-import { describe, it, expect } from 'vitest';
-import type { IRenderer, RendererOptions, Viewport } from '../src/interfaces/IRenderer';
-import type { Color, Matrix4 } from '../src/types/common';
+import { describe, expect, it } from 'vitest';
 import type { IBuffer } from '../src/interfaces/IBuffer';
 import type { IMaterial } from '../src/interfaces/IMaterial';
+import type { IRenderer, RendererOptions, Viewport } from '../src/interfaces/IRenderer';
+import type { Color, Matrix4 } from '../src/types/common';
 
 /**
  * 模拟渲染器实现（用于测试）

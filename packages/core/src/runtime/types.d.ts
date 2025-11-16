@@ -35,26 +35,26 @@ export type LoadTaskStatus = 'pending' | 'loading' | 'loaded' | 'failed';
  * ```
  */
 export interface LoadTask {
-    /** 节点唯一标识符 (格式: sourceId/nodeName) */
-    nodeId: string;
-    /** 所属数据源 ID */
-    sourceId: string;
-    /** 节点数据 URL */
-    url: string;
-    /** 加载优先级 (越高越优先，基于距离相机的远近) */
-    priority: number;
-    /** 当前状态 */
-    status: LoadTaskStatus;
-    /** 取消控制器 (用于中止加载) */
-    abortController?: AbortController;
-    /** 已解码的节点数据 (加载成功后填充) */
-    data?: NodeData;
-    /** 错误信息 (加载失败后填充) */
-    error?: string;
-    /** 重试次数 */
-    retryCount: number;
-    /** 开始加载时间戳 (用于超时检测) */
-    startTime?: number;
+  /** 节点唯一标识符 (格式: sourceId/nodeName) */
+  nodeId: string;
+  /** 所属数据源 ID */
+  sourceId: string;
+  /** 节点数据 URL */
+  url: string;
+  /** 加载优先级 (越高越优先，基于距离相机的远近) */
+  priority: number;
+  /** 当前状态 */
+  status: LoadTaskStatus;
+  /** 取消控制器 (用于中止加载) */
+  abortController?: AbortController;
+  /** 已解码的节点数据 (加载成功后填充) */
+  data?: NodeData;
+  /** 错误信息 (加载失败后填充) */
+  error?: string;
+  /** 重试次数 */
+  retryCount: number;
+  /** 开始加载时间戳 (用于超时检测) */
+  startTime?: number;
 }
 /**
  * 节点数据
@@ -78,14 +78,14 @@ export interface LoadTask {
  * ```
  */
 export interface NodeData {
-    /** 点位置数据 (x, y, z 交错存储) */
-    positions: Float32Array;
-    /** 点颜色数据 (r, g, b 交错存储，0-255) */
-    colors: Uint8Array;
-    /** 点的数量 */
-    numPoints: number;
-    /** GPU 资源 ID (如果已上传到 GPU) */
-    gpuResourceId?: string;
+  /** 点位置数据 (x, y, z 交错存储) */
+  positions: Float32Array;
+  /** 点颜色数据 (r, g, b 交错存储，0-255) */
+  colors: Uint8Array;
+  /** 点的数量 */
+  numPoints: number;
+  /** GPU 资源 ID (如果已上传到 GPU) */
+  gpuResourceId?: string;
 }
 /**
  * 数据源运行时状态
@@ -109,14 +109,14 @@ export interface NodeData {
  * ```
  */
 export interface SourceRuntimeState {
-    /** 数据源配置 (副本) */
-    config: SourceConfig;
-    /** 已加载的节点 (key: nodeId) */
-    loadedNodes: Map<string, NodeData>;
-    /** 当前可见的节点 ID 集合 */
-    visibleNodes: Set<string>;
-    /** 八叉树元数据加载状态 */
-    loadState: 'loading' | 'loaded' | 'failed';
+  /** 数据源配置 (副本) */
+  config: SourceConfig;
+  /** 已加载的节点 (key: nodeId) */
+  loadedNodes: Map<string, NodeData>;
+  /** 当前可见的节点 ID 集合 */
+  visibleNodes: Set<string>;
+  /** 八叉树元数据加载状态 */
+  loadState: 'loading' | 'loaded' | 'failed';
 }
 /**
  * GPU 资源类型
@@ -148,16 +148,16 @@ export type GPUResourceType = 'buffer' | 'texture';
  * ```
  */
 export interface GPUResource {
-    /** 资源唯一标识符 */
-    id: string;
-    /** 资源类型 */
-    type: GPUResourceType;
-    /** 资源大小 (字节) */
-    size: number;
-    /** WebGL/WebGPU 资源句柄 */
-    handle: unknown;
-    /** 最后使用时间戳 (用于 LRU) */
-    lastUsed: number;
+  /** 资源唯一标识符 */
+  id: string;
+  /** 资源类型 */
+  type: GPUResourceType;
+  /** 资源大小 (字节) */
+  size: number;
+  /** WebGL/WebGPU 资源句柄 */
+  handle: unknown;
+  /** 最后使用时间戳 (用于 LRU) */
+  lastUsed: number;
 }
 /**
  * 性能统计
@@ -180,23 +180,23 @@ export interface GPUResource {
  * ```
  */
 export interface PerformanceStats {
-    /** 总帧时间 (ms) */
-    frameTime: number;
-    /** 各系统耗时 (key: systemName, value: duration in ms) */
-    systemTimes: Map<string, number>;
-    /** Draw Calls 数量 */
-    drawCalls: number;
-    /** 渲染的点数 */
-    pointsRendered: number;
-    /** 已加载的节点数 */
-    nodesLoaded: number;
-    /** 内存使用情况 */
-    memoryUsed: {
-        /** GPU 内存使用量 (字节) */
-        gpu: number;
-        /** CPU 内存使用量 (字节) */
-        cpu: number;
-    };
+  /** 总帧时间 (ms) */
+  frameTime: number;
+  /** 各系统耗时 (key: systemName, value: duration in ms) */
+  systemTimes: Map<string, number>;
+  /** Draw Calls 数量 */
+  drawCalls: number;
+  /** 渲染的点数 */
+  pointsRendered: number;
+  /** 已加载的节点数 */
+  nodesLoaded: number;
+  /** 内存使用情况 */
+  memoryUsed: {
+    /** GPU 内存使用量 (字节) */
+    gpu: number;
+    /** CPU 内存使用量 (字节) */
+    cpu: number;
+  };
 }
 /**
  * 渲染运行时配置
@@ -207,14 +207,14 @@ export interface PerformanceStats {
  * 这些值由 StateCoordinator 从 ConfigStore 同步到 Runtime
  */
 export interface RenderingRuntimeConfig {
-    /** 点预算 (每帧最大渲染点数) */
-    pointBudget: number;
-    /** 最小节点屏幕大小 (像素) */
-    minNodeSize: number;
-    /** 视场角 (度) */
-    fov: number;
-    /** 默认点大小 */
-    pointSize: number;
+  /** 点预算 (每帧最大渲染点数) */
+  pointBudget: number;
+  /** 最小节点屏幕大小 (像素) */
+  minNodeSize: number;
+  /** 视场角 (度) */
+  fov: number;
+  /** 默认点大小 */
+  pointSize: number;
 }
 /**
  * 内存预算配置
@@ -225,9 +225,9 @@ export interface RenderingRuntimeConfig {
  * 这些值是只读的，在 Runtime 创建时设置
  */
 export interface MemoryBudgets {
-    /** GPU 内存预算 (字节) */
-    readonly gpuMemory: number;
-    /** CPU 内存预算 (字节) */
-    readonly cpuMemory: number;
+  /** GPU 内存预算 (字节) */
+  readonly gpuMemory: number;
+  /** CPU 内存预算 (字节) */
+  readonly cpuMemory: number;
 }
 //# sourceMappingURL=types.d.ts.map

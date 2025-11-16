@@ -50,7 +50,9 @@ import type { ConfigStore, EngineConfig } from './types.js';
  * });
  * ```
  */
-export declare function createConfigStore(initial?: EngineConfig): import("zustand/vanilla").StoreApi<ConfigStore>;
+export declare function createConfigStore(
+  initial?: EngineConfig,
+): import('zustand/vanilla').StoreApi<ConfigStore>;
 /**
  * 导出类型以便外部使用
  */

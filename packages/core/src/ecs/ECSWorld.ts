@@ -29,6 +29,7 @@ export class ECSWorld {
   private entities = new Set<Entity>();
 
   // 组件存储: Map<ComponentClass, Map<Entity, ComponentInstance>>
+  // biome-ignore lint/suspicious/noExplicitAny: Generic component system requires any for type flexibility
   private components = new Map<any, Map<Entity, any>>();
 
   /**
@@ -65,8 +66,9 @@ export class ECSWorld {
    */
   addComponent<T extends Component>(
     entity: Entity,
+    // biome-ignore lint/suspicious/noExplicitAny: Component constructor requires any for generic instantiation
     componentClass: new (...args: any[]) => T,
-    component: T
+    component: T,
   ): void {
     let componentMap = this.components.get(componentClass);
     if (!componentMap) {
@@ -85,7 +87,8 @@ export class ECSWorld {
    */
   getComponent<T extends Component>(
     entity: Entity,
-    componentClass: new (...args: any[]) => T
+    // biome-ignore lint/suspicious/noExplicitAny: Component constructor requires any for generic instantiation
+    componentClass: new (...args: any[]) => T,
   ): T | undefined {
     return this.components.get(componentClass)?.get(entity);
   }
@@ -98,7 +101,8 @@ export class ECSWorld {
    */
   removeComponent<T extends Component>(
     entity: Entity,
-    componentClass: new (...args: any[]) => T
+    // biome-ignore lint/suspicious/noExplicitAny: Component constructor requires any for generic instantiation
+    componentClass: new (...args: any[]) => T,
   ): void {
     this.components.get(componentClass)?.delete(entity);
   }
@@ -112,7 +116,8 @@ export class ECSWorld {
    */
   hasComponent<T extends Component>(
     entity: Entity,
-    componentClass: new (...args: any[]) => T
+    // biome-ignore lint/suspicious/noExplicitAny: Component constructor requires any for generic instantiation
+    componentClass: new (...args: any[]) => T,
   ): boolean {
     return this.components.get(componentClass)?.has(entity) ?? false;
   }
@@ -146,7 +151,7 @@ export class ECSWorld {
     // 过滤出同时拥有所有组件的实体
     const result: Entity[] = [];
     for (const entity of smallestSet) {
-      if (componentClasses.every(cls => this.hasComponent(entity, cls))) {
+      if (componentClasses.every((cls) => this.hasComponent(entity, cls))) {
         result.push(entity);
       }
     }
@@ -172,8 +177,7 @@ export class ECSWorld {
     return {
       entityCount: this.entities.size,
       componentTypeCount: this.components.size,
-      componentCount: Array.from(this.components.values())
-        .reduce((sum, map) => sum + map.size, 0)
+      componentCount: Array.from(this.components.values()).reduce((sum, map) => sum + map.size, 0),
     };
   }
 }

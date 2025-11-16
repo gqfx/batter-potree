@@ -8,8 +8,8 @@
  * Camera type enumeration
  */
 export var CameraType;
-(function (CameraType) {
-    CameraType["PERSPECTIVE"] = "perspective";
-    CameraType["ORTHOGRAPHIC"] = "orthographic";
+((CameraType) => {
+  CameraType['PERSPECTIVE'] = 'perspective';
+  CameraType['ORTHOGRAPHIC'] = 'orthographic';
 })(CameraType || (CameraType = {}));
 //# sourceMappingURL=camera.js.map

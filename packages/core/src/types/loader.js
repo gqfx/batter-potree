@@ -8,14 +8,14 @@
  * Load state for asynchronous resources
  */
 export var LoadState;
-(function (LoadState) {
-    /** Not yet loaded */
-    LoadState["UNLOADED"] = "unloaded";
-    /** Currently loading */
-    LoadState["LOADING"] = "loading";
-    /** Successfully loaded */
-    LoadState["LOADED"] = "loaded";
-    /** Failed to load */
-    LoadState["FAILED"] = "failed";
+((LoadState) => {
+  /** Not yet loaded */
+  LoadState['UNLOADED'] = 'unloaded';
+  /** Currently loading */
+  LoadState['LOADING'] = 'loading';
+  /** Successfully loaded */
+  LoadState['LOADED'] = 'loaded';
+  /** Failed to load */
+  LoadState['FAILED'] = 'failed';
 })(LoadState || (LoadState = {}));
 //# sourceMappingURL=loader.js.map

@@ -36,5 +36,13 @@
  * ```
  */
 export { createConfigStore } from './store.js';
-export type { CameraConfig, ConfigState, ConfigStore, EngineConfig, MaterialConfig, RenderingConfig, SourceConfig, } from './types.js';
+export type {
+  CameraConfig,
+  ConfigState,
+  ConfigStore,
+  EngineConfig,
+  MaterialConfig,
+  RenderingConfig,
+  SourceConfig,
+} from './types.js';
 //# sourceMappingURL=index.d.ts.map

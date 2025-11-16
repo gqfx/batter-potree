@@ -2,12 +2,12 @@
  * RenderSystem 测试
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { RenderSystem, SystemStage } from '../src/systems/RenderSystem';
-import type { IRenderer } from '../src/interfaces/IRenderer';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { IBuffer } from '../src/interfaces/IBuffer';
 import type { IMaterial } from '../src/interfaces/IMaterial';
+import type { IRenderer } from '../src/interfaces/IRenderer';
 import type { RenderObject, RenderSystemConfig } from '../src/systems/RenderSystem';
+import { RenderSystem, SystemStage } from '../src/systems/RenderSystem';
 import type { Matrix4 } from '../src/types/common';
 
 /**

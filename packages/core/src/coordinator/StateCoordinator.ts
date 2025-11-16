@@ -600,27 +600,42 @@ export class StateCoordinator {
     this.runtime.rendering.pointSize = config.pointSize;
 
     if ('fov' in this.runtime.camera) {
-      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      const camera = this.runtime.camera as unknown as {
+        fov: number;
+        updateProjectionMatrix(): void;
+      };
       camera.fov = config.fov;
       camera.updateProjectionMatrix();
     }
     if ('fov' in this.runtime.camera) {
-      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      const camera = this.runtime.camera as unknown as {
+        fov: number;
+        updateProjectionMatrix(): void;
+      };
       camera.fov = config.fov;
       camera.updateProjectionMatrix();
     }
     if ('fov' in this.runtime.camera) {
-      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      const camera = this.runtime.camera as unknown as {
+        fov: number;
+        updateProjectionMatrix(): void;
+      };
       camera.fov = config.fov;
       camera.updateProjectionMatrix();
     }
     if ('fov' in this.runtime.camera) {
-      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      const camera = this.runtime.camera as unknown as {
+        fov: number;
+        updateProjectionMatrix(): void;
+      };
       camera.fov = config.fov;
       camera.updateProjectionMatrix();
     }
     if ('fov' in this.runtime.camera) {
-      const camera = this.runtime.camera as unknown as { fov: number; updateProjectionMatrix(): void };
+      const camera = this.runtime.camera as unknown as {
+        fov: number;
+        updateProjectionMatrix(): void;
+      };
       camera.fov = config.fov;
       camera.updateProjectionMatrix();
     }
