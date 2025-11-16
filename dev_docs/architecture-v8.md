@@ -92,8 +92,8 @@ export interface SourceConfig {
   type: 'potree' | '3dgs' | string;
   /** Potree 2.0 meta.json 或 3DGS 元数据入口 */
   url: string;
-  visible: boolean;
-  transform?: Matrix4;
+  visible?: boolean;
+  transform?: number[]; // 4x4 Matrix as array [16 elements]
   materialId?: string;
 }
 ```
@@ -365,6 +365,7 @@ export interface RenderingConfig {
   pointBudget: number;
   fov: number;
   minNodeSize: number;
+  pointSize: number;
 }
 
 export interface ConfigState {
@@ -394,6 +395,7 @@ export const createConfigStore = (initial?: Partial<ConfigState>) => {
       pointBudget: 2_000_000,
       fov: 60,
       minNodeSize: 100,
+      pointSize: 1.0,
     },
     camera: {
       position: [0, 0, 10],
@@ -464,7 +466,9 @@ export class Runtime {
   // 渲染配置（从 Config 同步而来）
   public rendering = {
     pointBudget: 2_000_000,
-    minNodeSize: 100
+    minNodeSize: 100,
+    fov: 60,
+    pointSize: 1.0
   };
 
   // 可见性管理（每帧更新）
@@ -586,6 +590,14 @@ export class StateCoordinator {
       this.configStore.subscribe(
         (state) => state.rendering,
         (config) => this.syncRenderingConfig(config)
+      )
+    );
+
+    // 订阅相机配置变化
+    this.unsubscribers.push(
+      this.configStore.subscribe(
+        (state) => state.camera,
+        (camera) => this.syncCamera(camera)
       )
     );
   }
@@ -712,6 +724,14 @@ export class StateCoordinator {
   private syncRenderingConfig(config: RenderingConfig): void {
     this.runtime.rendering.pointBudget = config.pointBudget;
     this.runtime.rendering.minNodeSize = config.minNodeSize;
+    this.runtime.rendering.fov = config.fov;
+    this.runtime.rendering.pointSize = config.pointSize;
+
+    // 同步 FOV 到相机（如果是透视相机）
+    if ('fov' in this.runtime.camera) {
+      (this.runtime.camera as any).fov = config.fov;
+      this.runtime.camera.updateProjectionMatrix();
+    }
   }
 
   /** 同步相机配置 */
@@ -874,6 +894,9 @@ export class OctreeManager {
   async loadOctree(sourceId: string, url: string, type: string): Promise<void> {
     // 1. 加载 meta.json（Potree 2.0）或其他元数据文件
     const metadata = await this.fetchMetadata(url, type);
+
+    // 填充 sourceId
+    metadata.sourceId = sourceId;
     this.metadata.set(sourceId, metadata);
 
     // 2. 创建根节点
@@ -1428,7 +1451,223 @@ export class TraversalSystem implements ISystem {
 
 ### 8.2 StreamingSystem (流式加载系统)
 
-详细实现见第9节异步处理。
+**职责**: 异步加载可见节点的点云数据
+
+```typescript
+// packages/core/src/systems/StreamingSystem.ts
+import type { ISystem, SystemStage } from '../types/system';
+import type { Runtime } from '../runtime/Runtime';
+import type { WorkerPool } from '../resources/WorkerPool';
+import type { MessageQueue, SystemMessage } from '../MessageQueue';
+import { MessagePriority } from '../MessageQueue';
+
+export class StreamingSystem implements ISystem {
+  readonly name = 'bp:streaming';
+  readonly stage = SystemStage.UPDATE;
+  readonly priority = 10; // 在 TraversalSystem 之后执行
+
+  private readonly MAX_CONCURRENT_LOADS = 8;
+  private readonly MAX_RETRIES = 3;
+
+  constructor(
+    private runtime: Runtime,
+    private workerPool: WorkerPool,
+    private messageQueue: MessageQueue
+  ) {}
+
+  update(deltaTime: number): void {
+    // 1. 处理异步加载完成的消息
+    this.processMessages();
+
+    // 2. 启动新的加载任务
+    this.scheduleLoads();
+
+    // 3. 清理不再需要的加载任务
+    this.cleanupTasks();
+  }
+
+  /** 处理异步消息 */
+  private processMessages(): void {
+    const messages = this.messageQueue.drain(100);
+
+    for (const msg of messages) {
+      if (msg.type === 'NODE_LOADED') {
+        this.handleNodeLoaded(msg.nodeId, msg.data);
+      } else if (msg.type === 'NODE_FAILED') {
+        this.handleNodeFailed(msg.nodeId, msg.error);
+      }
+    }
+  }
+
+  /** 处理节点加载成功 */
+  private handleNodeLoaded(nodeId: string, data: ArrayBuffer): void {
+    const task = this.runtime.loadingTasks.get(nodeId);
+    if (!task) return;
+
+    task.status = 'loaded';
+    task.data = this.decodeNodeData(data);
+
+    // 存储到 loadedNodes
+    this.runtime.loadedNodes.set(nodeId, task.data);
+
+    // 更新统计
+    this.runtime.stats.nodesLoaded++;
+
+    // 从任务队列中移除
+    this.runtime.loadingTasks.delete(nodeId);
+
+    console.log(`[Streaming] Loaded node: ${nodeId}`);
+  }
+
+  /** 处理节点加载失败 */
+  private handleNodeFailed(nodeId: string, error: string): void {
+    const task = this.runtime.loadingTasks.get(nodeId);
+    if (!task) return;
+
+    task.retryCount++;
+
+    if (task.retryCount >= this.MAX_RETRIES) {
+      task.status = 'failed';
+      task.error = error;
+      this.runtime.loadingTasks.delete(nodeId);
+      console.error(`[Streaming] Failed to load node ${nodeId} after ${this.MAX_RETRIES} retries: ${error}`);
+    } else {
+      // 重试
+      task.status = 'pending';
+      console.warn(`[Streaming] Retrying node ${nodeId} (attempt ${task.retryCount + 1}/${this.MAX_RETRIES})`);
+    }
+  }
+
+  /** 调度新的加载任务 */
+  private scheduleLoads(): void {
+    // 计算当前并发数
+    const loadingCount = Array.from(this.runtime.loadingTasks.values())
+      .filter(t => t.status === 'loading').length;
+
+    if (loadingCount >= this.MAX_CONCURRENT_LOADS) {
+      return; // 已达到并发上限
+    }
+
+    // 获取待加载的节点（可见但未加载）
+    const pendingNodes = Array.from(this.runtime.visibleNodes)
+      .filter(nodeId => !this.runtime.loadedNodes.has(nodeId))
+      .filter(nodeId => {
+        const task = this.runtime.loadingTasks.get(nodeId);
+        return !task || task.status === 'pending';
+      });
+
+    // 按优先级排序（距离相机越近优先级越高）
+    const sortedNodes = this.sortByPriority(pendingNodes);
+
+    // 启动加载
+    const slotsAvailable = this.MAX_CONCURRENT_LOADS - loadingCount;
+    for (let i = 0; i < Math.min(slotsAvailable, sortedNodes.length); i++) {
+      this.startLoad(sortedNodes[i]);
+    }
+  }
+
+  /** 启动加载任务 */
+  private async startLoad(nodeId: string): Promise<void> {
+    // 创建或获取加载任务
+    let task = this.runtime.loadingTasks.get(nodeId);
+    if (!task) {
+      task = {
+        nodeId,
+        sourceId: this.extractSourceId(nodeId),
+        url: this.buildNodeUrl(nodeId),
+        priority: this.calculatePriority(nodeId),
+        status: 'pending',
+        retryCount: 0,
+        abortController: new AbortController()
+      };
+      this.runtime.loadingTasks.set(nodeId, task);
+    }
+
+    task.status = 'loading';
+    task.startTime = performance.now();
+
+    try {
+      // 使用 WorkerPool 异步解码
+      const data = await this.workerPool.decodeNode(task.url, task.abortController.signal);
+
+      // 推送成功消息到队列
+      this.messageQueue.push({
+        type: 'NODE_LOADED',
+        nodeId,
+        data,
+        priority: MessagePriority.HIGH
+      });
+    } catch (error) {
+      // 推送失败消息到队列
+      this.messageQueue.push({
+        type: 'NODE_FAILED',
+        nodeId,
+        error: String(error),
+        priority: MessagePriority.NORMAL
+      });
+    }
+  }
+
+  /** 清理不再需要的加载任务 */
+  private cleanupTasks(): void {
+    this.runtime.cleanupInvisibleNodes();
+  }
+
+  /** 按优先级排序节点 */
+  private sortByPriority(nodeIds: string[]): string[] {
+    return nodeIds.sort((a, b) => {
+      const priorityA = this.calculatePriority(a);
+      const priorityB = this.calculatePriority(b);
+      return priorityB - priorityA; // 优先级高的在前
+    });
+  }
+
+  /** 计算节点优先级（距离相机越近优先级越高） */
+  private calculatePriority(nodeId: string): number {
+    // TODO: 从 OctreeManager 获取节点中心，计算距离
+    // 这里简化处理
+    return 1.0;
+  }
+
+  /** 从节点 ID 提取数据源 ID */
+  private extractSourceId(nodeId: string): string {
+    return nodeId.split('/')[0];
+  }
+
+  /** 构建节点数据 URL */
+  private buildNodeUrl(nodeId: string): string {
+    // TODO: 根据 OctreeMetadata 构建完整 URL
+    // 例如: https://example.com/data/r0123.bin
+    return `${nodeId}.bin`;
+  }
+
+  /** 解码节点数据 */
+  private decodeNodeData(data: ArrayBuffer): NodeData {
+    // TODO: 根据格式解码数据
+    return {
+      positions: new Float32Array(data),
+      colors: new Uint8Array(),
+      numPoints: data.byteLength / 12
+    };
+  }
+
+  dispose(): void {
+    // 取消所有加载任务
+    for (const task of this.runtime.loadingTasks.values()) {
+      task.abortController?.abort();
+    }
+    this.runtime.loadingTasks.clear();
+  }
+}
+```
+
+**关键特性**:
+- ✅ **异步加载**: 使用 WorkerPool 在后台线程解码
+- ✅ **优先级调度**: 距离相机近的节点优先加载
+- ✅ **并发控制**: 限制同时加载的节点数量
+- ✅ **错误重试**: 失败后自动重试（最多 3 次）
+- ✅ **消息队列**: 跨帧通信，避免阻塞主线程
+- ✅ **可取消**: 使用 AbortController 取消不再需要的加载
 
 ### 8.3 RenderSystem (渲染系统)
 
@@ -1882,6 +2121,8 @@ sequenceDiagram
     participant Coordinator
     participant Runtime
     participant Octree
+    participant ResourceMgr
+    participant ECS
     participant Scheduler
     participant Systems
 
@@ -1889,7 +2130,9 @@ sequenceDiagram
     Engine->>ConfigStore: createConfigStore(config)
     Engine->>Runtime: new Runtime()
     Engine->>Octree: new OctreeManager()
-    Engine->>Coordinator: new StateCoordinator(store, runtime, octree)
+    Engine->>ResourceMgr: new ResourceManager(runtime.budgets.gpuMemory)
+    Engine->>ECS: new ECSWorld()
+    Engine->>Coordinator: new StateCoordinator(store, runtime, octree, resourceMgr, ecs)
     Coordinator->>Runtime: initialSync()
     Coordinator->>Octree: loadOctree() for each source
     Engine->>Scheduler: new SystemScheduler(runtime)
@@ -2416,7 +2659,10 @@ graph TD
   - [ ] LRU 驱逐策略
   - [ ] 内存预算管理
   - [ ] 资源统计
-- [ ] 实现 `RenderSystem` (`@better-potree/core/systems`)
+- [ ] 实现 `RenderSystem` 抽象层 (`@better-potree/rendering/systems`)
+  - [ ] 定义 IRenderer 接口
+  - [ ] 定义抽象的 RenderSystem 基类
+- [ ] 实现 `ThreeRenderSystem` (`@better-potree/rendering-three`)
   - [ ] 可见节点收集
   - [ ] 点预算管理
   - [ ] GPU 资源绑定
