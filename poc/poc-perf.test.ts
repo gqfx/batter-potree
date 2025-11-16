@@ -11,8 +11,8 @@
  * 这些测试验证了架构设计的核心假设：可变状态管理的性能远超不可变状态管理。
  */
 
-import { describe, it, expect } from 'vitest';
 import { Runtime } from '@better-potree/core/runtime';
+import { describe, expect, it } from 'vitest';
 
 /**
  * 不可变状态更新的模拟实现
@@ -37,7 +37,7 @@ function immutableAddNode(state: ImmutableState, nodeId: string): ImmutableState
 function immutableAddLoadedNode(
   state: ImmutableState,
   nodeId: string,
-  data: { positions: Float32Array; colors: Uint8Array; numPoints: number }
+  data: { positions: Float32Array; colors: Uint8Array; numPoints: number },
 ): ImmutableState {
   const newMap = new Map(state.loadedNodes);
   newMap.set(nodeId, data);
@@ -289,7 +289,7 @@ describe('POC - 性能验证', () => {
       expect(duration).toBeLessThan(100);
 
       console.log(`[POC 性能] ${iterations} 次可变更新耗时: ${duration.toFixed(2)}ms`);
-      console.log(`[POC 性能] 平均每次更新: ${(duration / iterations * 1000).toFixed(3)}μs`);
+      console.log(`[POC 性能] 平均每次更新: ${((duration / iterations) * 1000).toFixed(3)}μs`);
     });
 
     it('频繁清空和重新填充 (模拟每帧更新)', () => {
@@ -368,7 +368,9 @@ describe('POC - 性能验证', () => {
       }
 
       console.log(`[POC 性能] 模拟 ${frames} 帧 @ ${fps}fps`);
-      console.log(`[POC 性能] 超出帧预算的帧数: ${slowFrames.length} (${(slowFrames.length / frames * 100).toFixed(1)}%)`);
+      console.log(
+        `[POC 性能] 超出帧预算的帧数: ${slowFrames.length} (${((slowFrames.length / frames) * 100).toFixed(1)}%)`,
+      );
 
       // 验证超出预算的帧数 < 5%
       expect(slowFrames.length / frames).toBeLessThan(0.05);

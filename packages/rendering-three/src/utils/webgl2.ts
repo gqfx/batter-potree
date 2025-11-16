@@ -44,7 +44,8 @@ export function checkWebGL2Support(canvas?: HTMLCanvasElement): WebGL2Support {
     if (!gl) {
       return {
         available: false,
-        error: 'WebGL2 is not supported in this browser. Please use a modern browser with WebGL2 support.',
+        error:
+          'WebGL2 is not supported in this browser. Please use a modern browser with WebGL2 support.',
       };
     }
 

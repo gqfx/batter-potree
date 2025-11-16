@@ -19,13 +19,13 @@
 import type { Camera } from 'three';
 import { PerspectiveCamera } from 'three';
 import type {
-  LoadTask,
-  NodeData,
-  SourceRuntimeState,
   GPUResource,
+  LoadTask,
+  MemoryBudgets,
+  NodeData,
   PerformanceStats,
   RenderingRuntimeConfig,
-  MemoryBudgets,
+  SourceRuntimeState,
 } from './types.js';
 
 /**
@@ -370,10 +370,7 @@ export class Runtime {
    * });
    * ```
    */
-  constructor(
-    camera: Camera = new PerspectiveCamera(),
-    budgets?: Partial<MemoryBudgets>
-  ) {
+  constructor(camera: Camera = new PerspectiveCamera(), budgets?: Partial<MemoryBudgets>) {
     this.camera = camera;
     this.budgets = {
       gpuMemory: budgets?.gpuMemory ?? 2 * 1024 * 1024 * 1024, // 默认 2GB

@@ -2,10 +2,10 @@
  * Unit tests for PointCloudMaterial
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { PointCloudColorMode, PointShape, PointSizeType } from '@better-potree/types';
 import * as THREE from 'three';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PointCloudMaterial } from '../materials/PointCloudMaterial';
-import { PointCloudColorMode, PointSizeType, PointShape } from '@better-potree/types';
 
 describe('PointCloudMaterial', () => {
   describe('Constructor', () => {

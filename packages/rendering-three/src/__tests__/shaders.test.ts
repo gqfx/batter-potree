@@ -2,12 +2,8 @@
  * Unit tests for shader utilities
  */
 
-import { describe, it, expect } from 'vitest';
-import {
-  getPointCloudVertexShader,
-  getPointCloudFragmentShader,
-  shaders,
-} from '../shaders/index';
+import { describe, expect, it } from 'vitest';
+import { getPointCloudFragmentShader, getPointCloudVertexShader, shaders } from '../shaders/index';
 
 describe('shaders', () => {
   describe('getPointCloudVertexShader', () => {

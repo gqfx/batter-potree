@@ -4,7 +4,10 @@
  */
 
 import * as THREE from 'three';
-import { PointCloudMaterial, type PointCloudMaterialConfig } from '../materials/PointCloudMaterial.js';
+import {
+  PointCloudMaterial,
+  type PointCloudMaterialConfig,
+} from '../materials/PointCloudMaterial.js';
 
 /**
  * Point cloud visualization object
@@ -87,7 +90,7 @@ export class PointCloudObject3D extends THREE.Object3D {
       returnNumbers?: Float32Array;
       numberOfReturns?: Float32Array;
       normals?: Float32Array;
-    }
+    },
   ): void {
     const pointCount = positions.length / 3;
 
@@ -106,17 +109,26 @@ export class PointCloudObject3D extends THREE.Object3D {
 
     // Update classification attribute
     if (attributes?.classifications) {
-      this.geometry.setAttribute('classification', new THREE.BufferAttribute(attributes.classifications, 1));
+      this.geometry.setAttribute(
+        'classification',
+        new THREE.BufferAttribute(attributes.classifications, 1),
+      );
     }
 
     // Update returnNumber attribute
     if (attributes?.returnNumbers) {
-      this.geometry.setAttribute('returnNumber', new THREE.BufferAttribute(attributes.returnNumbers, 1));
+      this.geometry.setAttribute(
+        'returnNumber',
+        new THREE.BufferAttribute(attributes.returnNumbers, 1),
+      );
     }
 
     // Update numberOfReturns attribute
     if (attributes?.numberOfReturns) {
-      this.geometry.setAttribute('numberOfReturns', new THREE.BufferAttribute(attributes.numberOfReturns, 1));
+      this.geometry.setAttribute(
+        'numberOfReturns',
+        new THREE.BufferAttribute(attributes.numberOfReturns, 1),
+      );
     }
 
     // Update normal attribute

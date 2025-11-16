@@ -2,11 +2,10 @@
  * Unit tests for Viewer class
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/types';
 import * as THREE from 'three';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Viewer } from '../Viewer';
-import type { IRenderer, IScene, EDLConfig } from '@better-potree/types';
-import type { IPointCloudOctree } from '@better-potree/types';
 
 // Mock implementations
 class MockRenderer implements IRenderer {
@@ -471,7 +470,7 @@ describe('Viewer', () => {
       });
 
       await expect(viewer.load('test.json')).rejects.toThrow(
-        'Point cloud loading not yet implemented'
+        'Point cloud loading not yet implemented',
       );
     });
 
@@ -524,9 +523,7 @@ describe('Viewer', () => {
 
       viewer.remove('nonexistent');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Point cloud "nonexistent" not found'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Point cloud "nonexistent" not found');
 
       consoleSpy.mockRestore();
     });
@@ -774,10 +771,7 @@ describe('Viewer', () => {
 
       viewer.destroy();
 
-      expect(removeEventListenerSpy).toHaveBeenCalledWith(
-        'resize',
-        expect.any(Function)
-      );
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('resize', expect.any(Function));
     });
 
     it('should remove all point clouds on destroy', () => {

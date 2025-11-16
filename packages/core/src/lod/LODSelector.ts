@@ -3,7 +3,7 @@
  * Based on screen-space projection
  */
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import type { OctreeNode } from '../octree/OctreeNode.js';
 
 export interface LODSelectionParams {
@@ -21,10 +21,7 @@ export class LODSelector {
   /**
    * Calculate screen-space radius of a node's bounding sphere
    */
-  static calculateScreenPixelRadius(
-    node: OctreeNode,
-    params: LODSelectionParams,
-  ): number {
+  static calculateScreenPixelRadius(node: OctreeNode, params: LODSelectionParams): number {
     const sphere = node.getBoundingSphere();
     const distance = params.cameraPosition.distanceTo(sphere.center);
 
@@ -43,17 +40,14 @@ export class LODSelector {
    * Determine if node should be visible based on screen size
    */
   static shouldRender(node: OctreeNode, params: LODSelectionParams): boolean {
-    const pixelRadius = this.calculateScreenPixelRadius(node, params);
+    const pixelRadius = LODSelector.calculateScreenPixelRadius(node, params);
     return pixelRadius >= params.minimumNodePixelSize;
   }
 
   /**
    * Calculate priority for node loading (higher = more important)
    */
-  static calculatePriority(
-    node: OctreeNode,
-    params: LODSelectionParams,
-  ): number {
-    return this.calculateScreenPixelRadius(node, params);
+  static calculatePriority(node: OctreeNode, params: LODSelectionParams): number {
+    return LODSelector.calculateScreenPixelRadius(node, params);
   }
 }

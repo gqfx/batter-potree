@@ -2,11 +2,11 @@
  * Unit tests for PointCloudObject3D
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import * as THREE from 'three';
-import { PointCloudObject3D } from '../objects/PointCloudObject3D';
-import { PointCloudMaterial } from '../materials/PointCloudMaterial';
 import { PointCloudColorMode, PointSizeType } from '@better-potree/types';
+import * as THREE from 'three';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PointCloudMaterial } from '../materials/PointCloudMaterial';
+import { PointCloudObject3D } from '../objects/PointCloudObject3D';
 
 describe('PointCloudObject3D', () => {
   describe('Constructor', () => {
@@ -375,16 +375,8 @@ describe('PointCloudObject3D', () => {
       obj.pointBudget = 2_000_000;
 
       // Update geometry
-      const positions = new Float32Array([
-        0, 0, 0,
-        1, 1, 1,
-        2, 2, 2,
-      ]);
-      const colors = new Float32Array([
-        1, 0, 0,
-        0, 1, 0,
-        0, 0, 1,
-      ]);
+      const positions = new Float32Array([0, 0, 0, 1, 1, 1, 2, 2, 2]);
+      const colors = new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
 
       obj.updateGeometry(positions, { colors });
 

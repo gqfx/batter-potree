@@ -41,11 +41,11 @@ export { createConfigStore } from './store.js';
 
 // 导出所有类型
 export type {
-  SourceConfig,
-  MaterialConfig,
-  RenderingConfig,
   CameraConfig,
   ConfigState,
   ConfigStore,
   EngineConfig,
+  MaterialConfig,
+  RenderingConfig,
+  SourceConfig,
 } from './types.js';

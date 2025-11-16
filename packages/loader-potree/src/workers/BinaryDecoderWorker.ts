@@ -5,9 +5,9 @@
  * Based on Potree's BinaryDecoderWorker.js
  */
 
-import { Version } from '../Version.js';
 import { PointAttribute } from '@better-potree/core';
 import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import { Version } from '../Version.js';
 
 // Type mapping for TypedArray constructors
 const typedArrayMapping: Record<string, any> = {
@@ -44,7 +44,7 @@ function decodeSphereMapping(
   view: DataView,
   inOffset: number,
   byteSize: number,
-  numPoints: number
+  numPoints: number,
 ): Float32Array {
   const normals = new Float32Array(numPoints * 3);
 
@@ -60,7 +60,7 @@ function decodeSphereMapping(
     let nz = 1;
     const nw = -1;
 
-    const l = (nx * -nx) + (ny * -ny) + (nz * -nw);
+    const l = nx * -nx + ny * -ny + nz * -nw;
     nz = l;
     nx = nx * Math.sqrt(l);
     ny = ny * Math.sqrt(l);
@@ -84,7 +84,7 @@ function decodeOct16Normals(
   view: DataView,
   inOffset: number,
   byteSize: number,
-  numPoints: number
+  numPoints: number,
 ): Float32Array {
   const normals = new Float32Array(numPoints * 3);
 
@@ -347,7 +347,7 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 
         for (let j = 0; j < numPoints; j++) {
           const value = sourceView.getFloat32(j * 4, true);
-          vectorData[j * numVectorElements + iElement] = (value / scale) + offset;
+          vectorData[j * numVectorElements + iElement] = value / scale + offset;
         }
 
         iElement++;

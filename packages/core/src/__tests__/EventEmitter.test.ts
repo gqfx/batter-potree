@@ -2,7 +2,7 @@
  * Unit tests for Event System
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { TypedEventEmitter } from '../events/EventEmitter';
 import type { PointCloudEvents } from '../events/types';
 

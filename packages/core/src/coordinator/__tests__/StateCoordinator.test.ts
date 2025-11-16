@@ -4,13 +4,12 @@
  * @module coordinator/__tests__/StateCoordinator.test
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StoreApi } from 'zustand/vanilla';
 import { createConfigStore } from '../../config/store.js';
+import type { ConfigStore, SourceConfig } from '../../config/types.js';
 import { Runtime } from '../../runtime/Runtime.js';
 import { StateCoordinator } from '../StateCoordinator.js';
-import type { SourceConfig } from '../../config/types.js';
-import type { StoreApi } from 'zustand/vanilla';
-import type { ConfigStore } from '../../config/types.js';
 
 /**
  * Mock OctreeManager
@@ -49,16 +48,14 @@ class MockECSWorld {
     return id;
   });
 
-  public addComponent = vi.fn(<T>(
-    entity: number,
-    ComponentClass: new (...args: unknown[]) => T,
-    instance: T
-  ) => {
-    const components = this.entities.get(entity);
-    if (components) {
-      components.set(ComponentClass, instance);
-    }
-  });
+  public addComponent = vi.fn(
+    <T>(entity: number, ComponentClass: new (...args: unknown[]) => T, instance: T) => {
+      const components = this.entities.get(entity);
+      if (components) {
+        components.set(ComponentClass, instance);
+      }
+    },
+  );
 
   public query = vi.fn(<T>(ComponentClass: new (...args: unknown[]) => T): number[] => {
     const result: number[] = [];
@@ -70,13 +67,12 @@ class MockECSWorld {
     return result;
   });
 
-  public getComponent = vi.fn(<T>(
-    entity: number,
-    ComponentClass: new (...args: unknown[]) => T
-  ): T | undefined => {
-    const components = this.entities.get(entity);
-    return components?.get(ComponentClass) as T | undefined;
-  });
+  public getComponent = vi.fn(
+    <T>(entity: number, ComponentClass: new (...args: unknown[]) => T): T | undefined => {
+      const components = this.entities.get(entity);
+      return components?.get(ComponentClass) as T | undefined;
+    },
+  );
 
   public removeEntity = vi.fn((entity: number) => {
     this.entities.delete(entity);
@@ -100,13 +96,7 @@ describe('StateCoordinator', () => {
     ecs = new MockECSWorld();
 
     // 创建 StateCoordinator
-    coordinator = new StateCoordinator(
-      configStore,
-      runtime,
-      octreeManager,
-      resourceManager,
-      ecs
-    );
+    coordinator = new StateCoordinator(configStore, runtime, octreeManager, resourceManager, ecs);
   });
 
   describe('初始化', () => {
@@ -196,7 +186,7 @@ describe('StateCoordinator', () => {
       expect(octreeManager.loadOctree).toHaveBeenCalledWith(
         'test-source',
         'http://example.com/meta.json',
-        'potree'
+        'potree',
       );
     });
 
@@ -221,9 +211,7 @@ describe('StateCoordinator', () => {
 
     it('应该在八叉树加载失败后更新 loadState', async () => {
       // Mock 加载失败
-      octreeManager.loadOctree = vi
-        .fn()
-        .mockRejectedValue(new Error('Load failed'));
+      octreeManager.loadOctree = vi.fn().mockRejectedValue(new Error('Load failed'));
 
       const testSource: SourceConfig = {
         id: 'failed-source',

@@ -4,10 +4,10 @@
  * @module runtime/__tests__/Runtime.test
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PerspectiveCamera } from 'three';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Runtime } from '../Runtime.js';
-import type { NodeData, LoadTask } from '../types.js';
+import type { LoadTask, NodeData } from '../types.js';
 
 describe('Runtime', () => {
   let runtime: Runtime;

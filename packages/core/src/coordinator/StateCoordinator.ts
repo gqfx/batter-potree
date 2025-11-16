@@ -48,12 +48,7 @@
  */
 
 import type { StoreApi } from 'zustand/vanilla';
-import type {
-  ConfigStore,
-  SourceConfig,
-  RenderingConfig,
-  CameraConfig,
-} from '../config/types.js';
+import type { CameraConfig, ConfigStore, RenderingConfig, SourceConfig } from '../config/types.js';
 import type { Runtime } from '../runtime/Runtime.js';
 
 /**
@@ -121,11 +116,7 @@ interface IECSWorld {
    * @param ComponentClass - 组件类
    * @param instance - 组件实例
    */
-  addComponent<T>(
-    entity: number,
-    ComponentClass: new (...args: unknown[]) => T,
-    instance: T
-  ): void;
+  addComponent<T>(entity: number, ComponentClass: new (...args: unknown[]) => T, instance: T): void;
 
   /**
    * 查询实体
@@ -142,10 +133,7 @@ interface IECSWorld {
    * @param ComponentClass - 组件类
    * @returns 组件实例或 undefined
    */
-  getComponent<T>(
-    entity: number,
-    ComponentClass: new (...args: unknown[]) => T
-  ): T | undefined;
+  getComponent<T>(entity: number, ComponentClass: new (...args: unknown[]) => T): T | undefined;
 
   /**
    * 移除实体
@@ -252,7 +240,7 @@ export class StateCoordinator {
     private readonly runtime: Runtime,
     private readonly octreeManager: IOctreeManager,
     private readonly resourceManager: IResourceManager,
-    private readonly ecs: IECSWorld
+    private readonly ecs: IECSWorld,
   ) {
     this.setupSubscriptions();
   }
@@ -446,10 +434,7 @@ export class StateCoordinator {
         console.log(`[StateCoordinator] Octree loaded for source: ${config.id}`);
       })
       .catch((error: Error) => {
-        console.error(
-          `[StateCoordinator] Failed to load octree for ${config.id}:`,
-          error
-        );
+        console.error(`[StateCoordinator] Failed to load octree for ${config.id}:`, error);
         const sourceState = this.runtime.sources.get(config.id);
         if (sourceState) {
           sourceState.loadState = 'failed';
@@ -615,8 +600,7 @@ export class StateCoordinator {
 
     // 同步 FOV 到相机 (如果是透视相机)
     if ('fov' in this.runtime.camera) {
-      (this.runtime.camera as { fov: number; updateProjectionMatrix(): void }).fov =
-        config.fov;
+      (this.runtime.camera as { fov: number; updateProjectionMatrix(): void }).fov = config.fov;
       this.runtime.camera.updateProjectionMatrix();
     }
   }

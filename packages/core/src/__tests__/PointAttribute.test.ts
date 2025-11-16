@@ -2,57 +2,39 @@
  * Unit tests for PointAttribute
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  POINT_ATTRIBUTE_TYPES,
   PointAttribute,
   PointAttributeDataType,
   PointAttributeName,
-  POINT_ATTRIBUTE_TYPES,
 } from '../attributes/PointAttribute';
 
 describe('PointAttribute', () => {
   describe('Data Types', () => {
     it('should have correct byte sizes for all data types', () => {
-      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.DOUBLE].size).toBe(
-        8,
-      );
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.DOUBLE].size).toBe(8);
       expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.FLOAT].size).toBe(4);
       expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.INT8].size).toBe(1);
       expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT8].size).toBe(1);
       expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.INT16].size).toBe(2);
-      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT16].size).toBe(
-        2,
-      );
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT16].size).toBe(2);
       expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.INT32].size).toBe(4);
-      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT32].size).toBe(
-        4,
-      );
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT32].size).toBe(4);
       expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.INT64].size).toBe(8);
-      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT64].size).toBe(
-        8,
-      );
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.UINT64].size).toBe(8);
     });
 
     it('should have correct ordinals for all data types', () => {
-      expect(
-        POINT_ATTRIBUTE_TYPES[PointAttributeDataType.DOUBLE].ordinal,
-      ).toBe(0);
-      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.FLOAT].ordinal).toBe(
-        1,
-      );
-      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.INT8].ordinal).toBe(
-        2,
-      );
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.DOUBLE].ordinal).toBe(0);
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.FLOAT].ordinal).toBe(1);
+      expect(POINT_ATTRIBUTE_TYPES[PointAttributeDataType.INT8].ordinal).toBe(2);
     });
   });
 
   describe('Constructor', () => {
     it('should create a custom attribute with correct properties', () => {
-      const attr = new PointAttribute(
-        'CustomAttribute',
-        PointAttributeDataType.FLOAT,
-        3,
-      );
+      const attr = new PointAttribute('CustomAttribute', PointAttributeDataType.FLOAT, 3);
 
       expect(attr.name).toBe('CustomAttribute');
       expect(attr.numElements).toBe(3);
@@ -62,24 +44,13 @@ describe('PointAttribute', () => {
     });
 
     it('should initialize with default range', () => {
-      const attr = new PointAttribute(
-        'Test',
-        PointAttributeDataType.UINT8,
-        1,
-      );
+      const attr = new PointAttribute('Test', PointAttributeDataType.UINT8, 1);
 
-      expect(attr.range).toEqual([
-        Number.POSITIVE_INFINITY,
-        Number.NEGATIVE_INFINITY,
-      ]);
+      expect(attr.range).toEqual([Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]);
     });
 
     it('should initialize with empty description', () => {
-      const attr = new PointAttribute(
-        'Test',
-        PointAttributeDataType.UINT8,
-        1,
-      );
+      const attr = new PointAttribute('Test', PointAttributeDataType.UINT8, 1);
 
       expect(attr.description).toBe('');
     });

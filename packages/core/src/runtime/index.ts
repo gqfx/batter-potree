@@ -6,13 +6,13 @@
 
 export { Runtime } from './Runtime.js';
 export type {
-  LoadTask,
-  LoadTaskStatus,
-  NodeData,
-  SourceRuntimeState,
   GPUResource,
   GPUResourceType,
+  LoadTask,
+  LoadTaskStatus,
+  MemoryBudgets,
+  NodeData,
   PerformanceStats,
   RenderingRuntimeConfig,
-  MemoryBudgets,
+  SourceRuntimeState,
 } from './types.js';

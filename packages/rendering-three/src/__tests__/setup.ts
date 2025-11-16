@@ -159,10 +159,7 @@ class MockWebGL2RenderingContext {
 // Mock HTMLCanvasElement.getContext to return our mock WebGL2 context
 const originalGetContext = HTMLCanvasElement.prototype.getContext;
 
-HTMLCanvasElement.prototype.getContext = function (
-  contextId: string,
-  options?: any
-): any {
+HTMLCanvasElement.prototype.getContext = function (contextId: string, options?: any): any {
   if (contextId === 'webgl2') {
     return new MockWebGL2RenderingContext();
   }

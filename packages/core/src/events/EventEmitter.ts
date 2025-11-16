@@ -27,10 +27,7 @@ export class TypedEventEmitter<TEventMap extends EventMap> {
   /**
    * Add event listener
    */
-  on<K extends EventNames<TEventMap>>(
-    event: K,
-    listener: (data: TEventMap[K]) => void,
-  ): this {
+  on<K extends EventNames<TEventMap>>(event: K, listener: (data: TEventMap[K]) => void): this {
     this.emitter.on(event, listener);
     return this;
   }
@@ -38,10 +35,7 @@ export class TypedEventEmitter<TEventMap extends EventMap> {
   /**
    * Add one-time event listener
    */
-  once<K extends EventNames<TEventMap>>(
-    event: K,
-    listener: (data: TEventMap[K]) => void,
-  ): this {
+  once<K extends EventNames<TEventMap>>(event: K, listener: (data: TEventMap[K]) => void): this {
     this.emitter.once(event, listener);
     return this;
   }
@@ -49,10 +43,7 @@ export class TypedEventEmitter<TEventMap extends EventMap> {
   /**
    * Remove event listener
    */
-  off<K extends EventNames<TEventMap>>(
-    event: K,
-    listener: (data: TEventMap[K]) => void,
-  ): this {
+  off<K extends EventNames<TEventMap>>(event: K, listener: (data: TEventMap[K]) => void): this {
     this.emitter.off(event, listener);
     return this;
   }

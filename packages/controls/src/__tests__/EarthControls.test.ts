@@ -2,8 +2,8 @@
  * Unit tests for EarthControls
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EarthControls, MouseButton } from '../EarthControls';
 
 // Mock HTMLElement dimensions
@@ -15,7 +15,7 @@ class MockHTMLElement {
   addEventListener(
     type: string,
     listener: EventListenerOrEventListenerObject,
-    _options?: AddEventListenerOptions | boolean
+    _options?: AddEventListenerOptions | boolean,
   ): void {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
@@ -52,7 +52,7 @@ const mockDocument = {
   addEventListener(
     type: string,
     listener: EventListenerOrEventListenerObject,
-    _options?: AddEventListenerOptions | boolean
+    _options?: AddEventListenerOptions | boolean,
   ): void {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
@@ -930,9 +930,7 @@ describe('EarthControls', () => {
 
       // Camera should be looking at pivot
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      const toPivot = new THREE.Vector3()
-        .subVectors(controls.pivot!, camera.position)
-        .normalize();
+      const toPivot = new THREE.Vector3().subVectors(controls.pivot!, camera.position).normalize();
 
       // Dot product should be close to 1 (vectors aligned)
       const dot = forward.dot(toPivot);

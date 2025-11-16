@@ -9,8 +9,8 @@
  * - Native DOM events
  */
 
-import * as THREE from 'three';
 import { TypedEventEmitter } from '@better-potree/core';
+import * as THREE from 'three';
 
 /**
  * Mouse button enum
@@ -352,7 +352,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   update(delta: number): void {
     if (!this.enabled) return;
 
-    const fade = Math.pow(0.5, this.fadeFactor * delta);
+    const fade = 0.5 ** (this.fadeFactor * delta);
     const progression = 1 - fade;
 
     // Apply zoom
@@ -363,10 +363,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         .subVectors(this.pivot, this.camera.position)
         .normalize();
 
-      const resolvedPos = new THREE.Vector3().addVectors(
-        this.camera.position,
-        this.zoomDelta
-      );
+      const resolvedPos = new THREE.Vector3().addVectors(this.camera.position, this.zoomDelta);
       resolvedPos.add(targetDir.multiplyScalar(jumpDistance));
       this.zoomDelta.subVectors(resolvedPos, this.camera.position);
     }

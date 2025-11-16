@@ -3,8 +3,8 @@
  * @module @better-potree/rendering-three/shaders
  */
 
-import vertexShader from './pointcloud.vert.glsl?raw';
 import fragmentShader from './pointcloud.frag.glsl?raw';
+import vertexShader from './pointcloud.vert.glsl?raw';
 
 /**
  * Get the point cloud vertex shader source

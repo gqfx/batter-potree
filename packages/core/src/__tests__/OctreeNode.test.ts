@@ -2,17 +2,14 @@
  * Unit tests for OctreeNode
  */
 
-import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
 import { OctreeNode } from '../octree/OctreeNode';
 
 describe('OctreeNode', () => {
   describe('Constructor', () => {
     it('should create root node', () => {
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 10, 10));
       const node = new OctreeNode('r', bbox, 1.0, 0);
 
       expect(node.name).toBe('r');
@@ -24,10 +21,7 @@ describe('OctreeNode', () => {
     });
 
     it('should initialize with 8 null children', () => {
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 10, 10));
       const node = new OctreeNode('r', bbox, 1.0);
 
       expect(node.children.length).toBe(8);
@@ -37,10 +31,7 @@ describe('OctreeNode', () => {
 
   describe('Child Management', () => {
     it('should create child nodes correctly', () => {
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 10, 10));
       const parent = new OctreeNode('r', bbox, 1.0, 0);
       const child = parent.createChild(0);
 
@@ -51,10 +42,7 @@ describe('OctreeNode', () => {
     });
 
     it('should compute child bounding boxes correctly', () => {
-      const parentBox = new THREE.Box3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const parentBox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 10, 10));
 
       // Child 0: -X, -Y, -Z (min octant)
       const child0 = OctreeNode.computeChildBoundingBox(parentBox, 0);
@@ -70,10 +58,7 @@ describe('OctreeNode', () => {
 
   describe('Getters', () => {
     it('should return correct properties', () => {
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(10, 10, 10));
       const node = new OctreeNode('r', bbox, 1.0, 0);
       node.numPoints = 1000;
 

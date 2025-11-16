@@ -2,14 +2,14 @@
  * Unit tests for helper classes
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  AnnotationHelper,
   BoundingBoxHelper,
-  OctreeNodeHelper,
   FrustumHelper,
   MeasurementHelper,
-  AnnotationHelper,
+  OctreeNodeHelper,
 } from '../helpers/index';
 
 describe('BoundingBoxHelper', () => {
@@ -21,10 +21,7 @@ describe('BoundingBoxHelper', () => {
     });
 
     it('should create helper with custom box', () => {
-      const box = new THREE.Box3(
-        new THREE.Vector3(-1, -1, -1),
-        new THREE.Vector3(1, 1, 1)
-      );
+      const box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
       const helper = new BoundingBoxHelper(box);
 
       expect(helper.box).toBe(box);
@@ -40,10 +37,7 @@ describe('BoundingBoxHelper', () => {
   describe('updateBox', () => {
     it('should update the bounding box', () => {
       const helper = new BoundingBoxHelper();
-      const newBox = new THREE.Box3(
-        new THREE.Vector3(-5, -5, -5),
-        new THREE.Vector3(5, 5, 5)
-      );
+      const newBox = new THREE.Box3(new THREE.Vector3(-5, -5, -5), new THREE.Vector3(5, 5, 5));
 
       helper.updateBox(newBox);
 
@@ -53,17 +47,11 @@ describe('BoundingBoxHelper', () => {
     it('should handle multiple updates', () => {
       const helper = new BoundingBoxHelper();
 
-      const box1 = new THREE.Box3(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(1, 1, 1)
-      );
+      const box1 = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 1, 1));
       helper.updateBox(box1);
       expect(helper.box).toBe(box1);
 
-      const box2 = new THREE.Box3(
-        new THREE.Vector3(2, 2, 2),
-        new THREE.Vector3(3, 3, 3)
-      );
+      const box2 = new THREE.Box3(new THREE.Vector3(2, 2, 2), new THREE.Vector3(3, 3, 3));
       helper.updateBox(box2);
       expect(helper.box).toBe(box2);
     });
@@ -103,10 +91,7 @@ describe('OctreeNodeHelper', () => {
 
   describe('updateBounds', () => {
     it('should update node bounds', () => {
-      const helper = new OctreeNodeHelper(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(1, 1, 1)
-      );
+      const helper = new OctreeNodeHelper(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 1, 1));
 
       const newMin = new THREE.Vector3(-5, -5, -5);
       const newMax = new THREE.Vector3(5, 5, 5);
@@ -118,10 +103,7 @@ describe('OctreeNodeHelper', () => {
     });
 
     it('should handle zero-size bounds', () => {
-      const helper = new OctreeNodeHelper(
-        new THREE.Vector3(1, 1, 1),
-        new THREE.Vector3(2, 2, 2)
-      );
+      const helper = new OctreeNodeHelper(new THREE.Vector3(1, 1, 1), new THREE.Vector3(2, 2, 2));
 
       const point = new THREE.Vector3(0, 0, 0);
       helper.updateBounds(point, point);
@@ -131,15 +113,9 @@ describe('OctreeNodeHelper', () => {
     });
 
     it('should update bounding sphere', () => {
-      const helper = new OctreeNodeHelper(
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(1, 1, 1)
-      );
+      const helper = new OctreeNodeHelper(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 1, 1));
 
-      helper.updateBounds(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10)
-      );
+      helper.updateBounds(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
 
       expect(helper.geometry.boundingSphere).toBeDefined();
     });

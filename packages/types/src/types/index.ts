@@ -7,8 +7,8 @@ import type * as THREE from 'three';
 // Re-export all type modules
 export * from './camera.js';
 export * from './loader.js';
-export * from './renderer.js';
 export * from './potree.js';
+export * from './renderer.js';
 
 /**
  * Potree configuration
@@ -31,7 +31,7 @@ export enum NavigationMode {
   ORBIT = 'orbit',
   FLY = 'fly',
   EARTH = 'earth',
-  FPS = 'fps'
+  FPS = 'fps',
 }
 
 /**
@@ -40,7 +40,7 @@ export enum NavigationMode {
 export enum PointSizeType {
   FIXED = 'fixed',
   ATTENUATED = 'attenuated',
-  ADAPTIVE = 'adaptive'
+  ADAPTIVE = 'adaptive',
 }
 
 /**
@@ -49,7 +49,7 @@ export enum PointSizeType {
 export enum PointShape {
   SQUARE = 'square',
   CIRCLE = 'circle',
-  PARABOLOID = 'paraboloid'
+  PARABOLOID = 'paraboloid',
 }
 
 /**
@@ -59,7 +59,7 @@ export enum PointQuality {
   SQUARES = 'squares',
   CIRCLES = 'circles',
   INTERPOLATION = 'interpolation',
-  HQ_SPLATS = 'hq_splats'
+  HQ_SPLATS = 'hq_splats',
 }
 
 /**
@@ -83,7 +83,7 @@ export enum MeasurementType {
   ANGLE = 'angle',
   HEIGHT = 'height',
   CIRCLE = 'circle',
-  AZIMUTH = 'azimuth'
+  AZIMUTH = 'azimuth',
 }
 
 /**
@@ -92,7 +92,7 @@ export enum MeasurementType {
 export enum ClipVolumeType {
   BOX = 'box',
   SPHERE = 'sphere',
-  POLYGON = 'polygon'
+  POLYGON = 'polygon',
 }
 
 /**
@@ -101,7 +101,7 @@ export enum ClipVolumeType {
 export enum ClipMode {
   DISABLED = 'disabled',
   CLIP_OUTSIDE = 'clip_outside',
-  HIGHLIGHT_INSIDE = 'highlight_inside'
+  HIGHLIGHT_INSIDE = 'highlight_inside',
 }
 
 /**

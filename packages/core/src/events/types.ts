@@ -2,8 +2,8 @@
  * Core event type definitions
  */
 
-import type { PointCloudOctree } from '../octree/PointCloudOctree.js';
 import type { OctreeNode } from '../octree/OctreeNode.js';
+import type { PointCloudOctree } from '../octree/PointCloudOctree.js';
 
 /**
  * Point cloud related events

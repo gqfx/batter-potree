@@ -3,9 +3,9 @@
  * Note: Testing worker code requires special handling since it runs in a worker context
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { PointAttributes, PointAttribute, PointAttributeDataType } from '@better-potree/core';
+import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
 import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the worker self context
 const mockSelf = {
@@ -118,10 +118,10 @@ describe('BinaryDecoderWorker', () => {
 
       // Write test data with varying values
       const positions = [
-        [1000, 2000, 3000],  // Will be 1.0, 2.0, 3.0 after scale
-        [500, 4000, 1000],   // Will be 0.5, 4.0, 1.0
-        [3000, 0, 2000],     // Will be 3.0, 0.0, 2.0
-        [0, 0, 5000],        // Will be 0.0, 0.0, 5.0
+        [1000, 2000, 3000], // Will be 1.0, 2.0, 3.0 after scale
+        [500, 4000, 1000], // Will be 0.5, 4.0, 1.0
+        [3000, 0, 2000], // Will be 3.0, 0.0, 2.0
+        [0, 0, 5000], // Will be 0.0, 0.0, 5.0
       ];
 
       positions.forEach(([x, y, z], i) => {
@@ -268,7 +268,7 @@ describe('BinaryDecoderWorker', () => {
       let nz = 1;
       const nw = -1;
 
-      const l = (nx * -nx) + (ny * -ny) + (nz * -nw);
+      const l = nx * -nx + ny * -ny + nz * -nw;
       nz = l;
       nx = nx * Math.sqrt(l);
       ny = ny * Math.sqrt(l);

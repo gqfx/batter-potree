@@ -2,9 +2,9 @@
  * Unit tests for PotreeLoader
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PotreeLoader } from '../PotreeLoader';
 import type { IPotreeMetadata } from '@better-potree/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PotreeLoader } from '../PotreeLoader';
 
 describe('PotreeLoader', () => {
   let loader: PotreeLoader;
@@ -112,12 +112,10 @@ describe('PotreeLoader', () => {
     });
 
     it('should fall back to metadata.json if cloud.js fails', async () => {
-      fetchMock
-        .mockRejectedValueOnce(new Error('Not found'))
-        .mockResolvedValueOnce({
-          ok: true,
-          text: async () => JSON.stringify(validMetadata),
-        });
+      fetchMock.mockRejectedValueOnce(new Error('Not found')).mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify(validMetadata),
+      });
 
       const octree = await loader.load('https://example.com/pointcloud/');
 
@@ -180,7 +178,11 @@ describe('PotreeLoader', () => {
           statusText: 'Not Found',
           text: async () => '',
         })
-        .mockRejectedValueOnce(new Error('Failed to load metadata from https://example.com/pointcloud/metadata.json: Not Found'));
+        .mockRejectedValueOnce(
+          new Error(
+            'Failed to load metadata from https://example.com/pointcloud/metadata.json: Not Found',
+          ),
+        );
 
       await expect(loader.load('https://example.com/pointcloud/')).rejects.toThrow();
     });

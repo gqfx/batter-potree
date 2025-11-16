@@ -5,8 +5,8 @@
  */
 
 import * as THREE from 'three';
-import { OctreeNode } from './OctreeNode.js';
 import type { PointAttributes } from '../attributes/PointAttributes.js';
+import { OctreeNode } from './OctreeNode.js';
 
 /**
  * Octree-based point cloud with hierarchical LOD

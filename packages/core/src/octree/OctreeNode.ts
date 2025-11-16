@@ -41,12 +41,7 @@ export class OctreeNode {
   /** Point attributes for this node */
   public attributes: PointAttributes | null;
 
-  constructor(
-    name: string,
-    boundingBox: THREE.Box3,
-    spacing: number,
-    level: number = 0,
-  ) {
+  constructor(name: string, boundingBox: THREE.Box3, spacing: number, level: number = 0) {
     this.name = name;
     this.boundingBox = boundingBox;
     this.level = level;
@@ -136,10 +131,7 @@ export class OctreeNode {
    * Compute child bounding box for a given octant index
    * @param index Octant index (0-7)
    */
-  static computeChildBoundingBox(
-    parentBox: THREE.Box3,
-    index: number,
-  ): THREE.Box3 {
+  static computeChildBoundingBox(parentBox: THREE.Box3, index: number): THREE.Box3 {
     const min = parentBox.min.clone();
     const max = parentBox.max.clone();
     const center = new THREE.Vector3();
@@ -174,10 +166,7 @@ export class OctreeNode {
    */
   createChild(index: number): OctreeNode {
     const childName = this.name + index.toString();
-    const childBox = OctreeNode.computeChildBoundingBox(
-      this.boundingBox,
-      index,
-    );
+    const childBox = OctreeNode.computeChildBoundingBox(this.boundingBox, index);
     const childSpacing = this.spacing / 2;
     const childLevel = this.level + 1;
 

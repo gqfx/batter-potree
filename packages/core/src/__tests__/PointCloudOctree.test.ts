@@ -2,17 +2,14 @@
  * Unit tests for PointCloudOctree
  */
 
-import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { PointCloudOctree } from '../octree/PointCloudOctree';
+import { describe, expect, it } from 'vitest';
 import { PointAttributes } from '../attributes/PointAttributes';
+import { PointCloudOctree } from '../octree/PointCloudOctree';
 
 describe('PointCloudOctree', () => {
   it('should create octree with root node', () => {
-    const bbox = new THREE.Box3(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(100, 100, 100),
-    );
+    const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 100, 100));
     const attrs = new PointAttributes(['POSITION_CARTESIAN', 'RGB_PACKED']);
     const octree = new PointCloudOctree(bbox, 1.0, attrs);
 
@@ -23,10 +20,7 @@ describe('PointCloudOctree', () => {
   });
 
   it('should find node by name', () => {
-    const bbox = new THREE.Box3(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(100, 100, 100),
-    );
+    const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 100, 100));
     const attrs = new PointAttributes();
     const octree = new PointCloudOctree(bbox, 1.0, attrs);
 
@@ -41,10 +35,7 @@ describe('PointCloudOctree', () => {
   });
 
   it('should get nodes at specific level', () => {
-    const bbox = new THREE.Box3(
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(100, 100, 100),
-    );
+    const bbox = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 100, 100));
     const attrs = new PointAttributes();
     const octree = new PointCloudOctree(bbox, 1.0, attrs);
 

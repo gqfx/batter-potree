@@ -2,7 +2,7 @@
  * Tests for LOD system
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PointBudget } from '../lod/PointBudget';
 
 describe('PointBudget', () => {

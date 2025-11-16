@@ -3,8 +3,8 @@
  * Loads Potree format point clouds (1.x and 2.0)
  */
 
+import type { ILoader, IPointCloudOctree, IPotreeMetadata } from '@better-potree/types';
 import * as THREE from 'three';
-import type { ILoader, IPotreeMetadata, IPointCloudOctree } from '@better-potree/types';
 import { parseAttributes } from './parseAttributes.js';
 
 /**
@@ -48,7 +48,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     }
 
     let text = await response.text();
-    
+
     // Remove JSONP callback if present (for cloud.js format)
     if (text.startsWith('Potree.') || text.startsWith('var ')) {
       const start = text.indexOf('{');
@@ -68,16 +68,8 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
 
     // Parse bounding box
     const boundingBox = new THREE.Box3(
-      new THREE.Vector3(
-        metadata.boundingBox.lx,
-        metadata.boundingBox.ly,
-        metadata.boundingBox.lz,
-      ),
-      new THREE.Vector3(
-        metadata.boundingBox.ux,
-        metadata.boundingBox.uy,
-        metadata.boundingBox.uz,
-      ),
+      new THREE.Vector3(metadata.boundingBox.lx, metadata.boundingBox.ly, metadata.boundingBox.lz),
+      new THREE.Vector3(metadata.boundingBox.ux, metadata.boundingBox.uy, metadata.boundingBox.uz),
     );
 
     // Parse tight bounding box (if available)

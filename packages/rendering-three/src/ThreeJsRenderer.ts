@@ -3,8 +3,8 @@
  * @module @better-potree/rendering-three
  */
 
-import * as THREE from 'three';
 import type { IRenderer, IScene } from '@better-potree/types';
+import * as THREE from 'three';
 import { assertWebGL2Available, checkWebGL2Support } from './utils/webgl2.js';
 
 /**
@@ -54,7 +54,8 @@ export class ThreeJsRenderer implements IRenderer {
     });
 
     // Set pixel ratio
-    const pixelRatio = config.pixelRatio ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1);
+    const pixelRatio =
+      config.pixelRatio ?? (typeof window !== 'undefined' ? window.devicePixelRatio : 1);
     this.renderer.setPixelRatio(pixelRatio);
 
     // Configure renderer

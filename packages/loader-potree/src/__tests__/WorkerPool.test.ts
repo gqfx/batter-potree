@@ -2,10 +2,10 @@
  * Unit tests for WorkerPool
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { WorkerPool, createWorkerPool } from '../workers/WorkerPool';
-import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
 import { PointAttributes } from '@better-potree/core';
+import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createWorkerPool, WorkerPool } from '../workers/WorkerPool';
 
 // Mock Worker class
 class MockWorker {
@@ -130,10 +130,7 @@ describe('WorkerPool', () => {
 
       const promise = workerPool.decode(request);
 
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledWith(
-        request,
-        [request.buffer]
-      );
+      expect(mockWorkers[0].postMessage).toHaveBeenCalledWith(request, [request.buffer]);
 
       // Simulate response
       mockWorkers[0].simulateMessage(createMockResponse());
@@ -270,10 +267,7 @@ describe('WorkerPool', () => {
 
       const promise = workerPool.decode(request);
 
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledWith(
-        request,
-        [request.buffer]
-      );
+      expect(mockWorkers[0].postMessage).toHaveBeenCalledWith(request, [request.buffer]);
 
       mockWorkers[0].simulateMessage(createMockResponse());
       await promise;
@@ -315,11 +309,7 @@ describe('WorkerPool', () => {
 
       expect(workerPool.getQueuedTaskCount()).toBe(0);
 
-      const requests = [
-        createMockRequest(),
-        createMockRequest(),
-        createMockRequest(),
-      ];
+      const requests = [createMockRequest(), createMockRequest(), createMockRequest()];
 
       const promises = requests.map((req) => workerPool.decode(req));
 
@@ -441,7 +431,9 @@ describe('WorkerPool', () => {
       // Simulate a message without a task
       mockWorkers[0].simulateMessage(createMockResponse());
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('Received message from worker without current task');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Received message from worker without current task',
+      );
 
       consoleWarnSpy.mockRestore();
     });

@@ -5,11 +5,11 @@
  */
 
 import './style.css';
-import * as THREE from 'three';
-import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
-import { ViewerAPI } from '@better-potree/viewer';
 import { EarthControls } from '@better-potree/controls';
 import { PotreeLoader } from '@better-potree/loader-potree';
+import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
+import { ViewerAPI } from '@better-potree/viewer';
+import * as THREE from 'three';
 
 console.log('Better Potree Playground - 初始化中...');
 
@@ -28,12 +28,7 @@ const renderer = new ThreeJsRenderer({ canvas });
 const scene = new ThreeScene();
 
 // 创建相机
-const camera = new THREE.PerspectiveCamera(
-  75,
-  canvas.clientWidth / canvas.clientHeight,
-  0.1,
-  1000
-);
+const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
 camera.position.set(10, 10, 10);
 camera.lookAt(0, 0, 0);
 
@@ -46,7 +41,7 @@ const viewer = new ViewerAPI({
   pointBudget: 1_000_000,
   pointSize: 1.0,
   edlEnabled: true,
-  backgroundColor: 0x000000
+  backgroundColor: 0x000000,
 });
 
 // 创建控制器

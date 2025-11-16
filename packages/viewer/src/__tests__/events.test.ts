@@ -2,10 +2,10 @@
  * Unit tests for Viewer event types
  */
 
-import { describe, it, expect } from 'vitest';
-import type { ViewerEvents } from '../events';
-import type * as THREE from 'three';
 import type { IPointCloudOctree } from '@better-potree/types';
+import type * as THREE from 'three';
+import { describe, expect, it } from 'vitest';
+import type { ViewerEvents } from '../events';
 
 describe('ViewerEvents', () => {
   describe('event type definitions', () => {

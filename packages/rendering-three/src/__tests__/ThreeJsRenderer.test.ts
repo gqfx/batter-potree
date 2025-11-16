@@ -2,10 +2,10 @@
  * Unit tests for ThreeJsRenderer and ThreeScene
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import * as THREE from 'three';
-import { ThreeJsRenderer, ThreeScene } from '../ThreeJsRenderer';
 import type { IScene } from '@better-potree/types';
+import * as THREE from 'three';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ThreeJsRenderer, ThreeScene } from '../ThreeJsRenderer';
 
 describe('ThreeJsRenderer', () => {
   describe('Constructor', () => {
@@ -99,7 +99,7 @@ describe('ThreeJsRenderer', () => {
       const camera = new THREE.PerspectiveCamera();
 
       expect(() => renderer.render(invalidScene, camera)).toThrow(
-        'Scene must provide getThreeScene() method'
+        'Scene must provide getThreeScene() method',
       );
     });
 

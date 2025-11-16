@@ -9,9 +9,9 @@
  * - Screenshot and export
  */
 
+import type { NavigationMode, PointQuality, PointShape, PointSizeType } from '@better-potree/types';
 import * as THREE from 'three';
 import { Viewer } from './Viewer.js';
-import type { NavigationMode, PointSizeType, PointShape, PointQuality } from '@better-potree/types';
 
 /**
  * Navigation options
@@ -251,11 +251,7 @@ export class ViewerAPI extends Viewer {
    * @param target - Look at target
    * @param duration - Animation duration in ms
    */
-  moveCameraTo(
-    position: THREE.Vector3,
-    target?: THREE.Vector3,
-    duration: number = 0
-  ): void {
+  moveCameraTo(position: THREE.Vector3, target?: THREE.Vector3, duration: number = 0): void {
     const camera = this.getCamera();
 
     if (duration === 0) {

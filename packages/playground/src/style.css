@@ -5,7 +5,8 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: #1a1a1a;
   color: #e0e0e0;
   overflow: hidden;
@@ -101,7 +102,7 @@ body {
   font-size: 14px;
   font-weight: 600;
   color: #ffffff;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
 }
 
 /* 控制面板 */
@@ -181,7 +182,7 @@ body {
   min-width: 40px;
   text-align: right;
   font-size: 13px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   color: #ffffff;
   vertical-align: middle;
 }
@@ -202,9 +203,11 @@ body {
   border-radius: 4px;
   color: #ffffff;
   font-size: 13px;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   outline: none;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 
 .control-group input[type="text"]:focus {
@@ -226,7 +229,9 @@ body {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .control-group button:hover {
@@ -265,7 +270,7 @@ body {
 }
 
 .info-text li::before {
-  content: '•';
+  content: "•";
   position: absolute;
   left: 0;
   color: #4fc3f7;
@@ -293,7 +298,8 @@ body {
 
 /* 加载动画 */
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

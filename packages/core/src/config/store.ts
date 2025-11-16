@@ -5,12 +5,7 @@
  */
 
 import { createStore } from 'zustand/vanilla';
-import type {
-  ConfigStore,
-  EngineConfig,
-  SourceConfig,
-  RenderingConfig,
-} from './types.js';
+import type { ConfigStore, EngineConfig, RenderingConfig, SourceConfig } from './types.js';
 
 /**
  * 默认渲染配置

@@ -24,8 +24,7 @@ export class FrustumCuller {
     matrixWorldInverse: THREE.Matrix4;
     projectionMatrix: THREE.Matrix4;
   }): void {
-    this.projectionMatrix
-      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    this.projectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projectionMatrix);
   }
 

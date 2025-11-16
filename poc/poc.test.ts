@@ -11,11 +11,11 @@
  * 这些测试验证了 TASK-002、TASK-003、TASK-004 的实现是否满足架构设计要求。
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createConfigStore } from '@better-potree/core/config';
-import { Runtime } from '@better-potree/core/runtime';
-import { StateCoordinator } from '@better-potree/core/coordinator';
 import type { SourceConfig } from '@better-potree/core/config';
+import { createConfigStore } from '@better-potree/core/config';
+import { StateCoordinator } from '@better-potree/core/coordinator';
+import { Runtime } from '@better-potree/core/runtime';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Mock OctreeManager
@@ -27,7 +27,7 @@ class MockOctreeManager {
 
   async loadOctree(sourceId: string, _url: string, _type: string): Promise<void> {
     // 模拟异步加载
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     this.octrees.set(sourceId, { loaded: true });
   }
 
@@ -71,7 +71,7 @@ class MockECSWorld {
   addComponent<T>(
     _entity: number,
     _ComponentClass: new (...args: unknown[]) => T,
-    _instance: T
+    _instance: T,
   ): void {
     // Mock implementation
   }
@@ -80,10 +80,7 @@ class MockECSWorld {
     return Array.from(this.entities.keys());
   }
 
-  getComponent<T>(
-    _entity: number,
-    _ComponentClass: new (...args: unknown[]) => T
-  ): T | undefined {
+  getComponent<T>(_entity: number, _ComponentClass: new (...args: unknown[]) => T): T | undefined {
     return undefined;
   }
 
@@ -112,7 +109,7 @@ describe('POC - 分层状态管理', () => {
       runtime,
       octreeManager as any,
       resourceManager as any,
-      ecs as any
+      ecs as any,
     );
   });
 
@@ -144,7 +141,7 @@ describe('POC - 分层状态管理', () => {
       expect(sourceState?.loadedNodes).toBeInstanceOf(Map);
 
       // 4. 等待异步加载完成
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await new Promise((resolve) => setTimeout(resolve, 20));
 
       // 5. 验证加载状态更新
       expect(runtime.sources.get('test-source-1')?.loadState).toBe('loaded');

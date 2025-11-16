@@ -4,7 +4,7 @@
  * @module config/__tests__/store.test
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createConfigStore } from '../store.js';
 import type { SourceConfig } from '../types.js';
 

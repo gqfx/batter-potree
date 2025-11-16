@@ -2,8 +2,8 @@
  * Viewer event definitions
  */
 
-import type * as THREE from 'three';
 import type { IPointCloudOctree } from '@better-potree/types';
+import type * as THREE from 'three';
 
 /**
  * Viewer event data types
@@ -90,7 +90,7 @@ export interface ViewerEvents {
   /**
    * Fired before each render frame
    */
-  'update': {
+  update: {
     deltaTime: number;
     timestamp: number;
   };
@@ -98,7 +98,7 @@ export interface ViewerEvents {
   /**
    * Fired after each render frame
    */
-  'render': {
+  render: {
     deltaTime: number;
     timestamp: number;
   };
@@ -106,5 +106,5 @@ export interface ViewerEvents {
   /**
    * Fired when viewer is destroyed
    */
-  'destroy': Record<string, never>;
+  destroy: Record<string, never>;
 }

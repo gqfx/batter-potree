@@ -2,12 +2,10 @@
  * Unit tests for ViewerAPI class
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { IPointCloudOctree, IRenderer, IScene, NavigationMode } from '@better-potree/types';
 import * as THREE from 'three';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewerAPI } from '../ViewerAPI';
-import type { IRenderer, IScene } from '@better-potree/types';
-import type { IPointCloudOctree } from '@better-potree/types';
-import type { NavigationMode } from '@better-potree/types';
 
 // Mock implementations
 class MockRenderer implements IRenderer {
@@ -347,7 +345,9 @@ describe('ViewerAPI', () => {
       });
 
       const canvas = renderer.getDomElement();
-      const toDataURLSpy = vi.spyOn(canvas, 'toDataURL').mockReturnValue('data:image/png;base64,abc');
+      const toDataURLSpy = vi
+        .spyOn(canvas, 'toDataURL')
+        .mockReturnValue('data:image/png;base64,abc');
 
       const dataUrl = viewer.screenshot();
 
@@ -365,7 +365,9 @@ describe('ViewerAPI', () => {
       });
 
       const canvas = renderer.getDomElement();
-      const toDataURLSpy = vi.spyOn(canvas, 'toDataURL').mockReturnValue('data:image/jpeg;base64,abc');
+      const toDataURLSpy = vi
+        .spyOn(canvas, 'toDataURL')
+        .mockReturnValue('data:image/jpeg;base64,abc');
 
       viewer.screenshot({
         format: 'image/jpeg',
@@ -481,7 +483,9 @@ describe('ViewerAPI', () => {
       });
 
       const canvas = renderer.getDomElement();
-      const toDataURLSpy = vi.spyOn(canvas, 'toDataURL').mockReturnValue('data:image/jpeg;base64,abc');
+      const toDataURLSpy = vi
+        .spyOn(canvas, 'toDataURL')
+        .mockReturnValue('data:image/jpeg;base64,abc');
 
       const linkClickSpy = vi.fn();
       vi.spyOn(document, 'createElement').mockReturnValue({

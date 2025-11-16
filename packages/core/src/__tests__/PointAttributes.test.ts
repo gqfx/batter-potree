@@ -2,9 +2,9 @@
  * Unit tests for PointAttributes
  */
 
-import { describe, it, expect } from 'vitest';
-import { PointAttributes } from '../attributes/PointAttributes';
+import { describe, expect, it } from 'vitest';
 import { PointAttribute, PointAttributeName } from '../attributes/PointAttribute';
+import { PointAttributes } from '../attributes/PointAttributes';
 
 describe('PointAttributes', () => {
   describe('Constructor', () => {
@@ -18,11 +18,7 @@ describe('PointAttributes', () => {
     });
 
     it('should create from attribute name array', () => {
-      const attrs = new PointAttributes([
-        'POSITION_CARTESIAN',
-        'RGBA_PACKED',
-        'INTENSITY',
-      ]);
+      const attrs = new PointAttributes(['POSITION_CARTESIAN', 'RGBA_PACKED', 'INTENSITY']);
 
       expect(attrs.size).toBe(3);
       expect(attrs.attributes[0]).toBe(PointAttribute.POSITION_CARTESIAN);
@@ -41,11 +37,7 @@ describe('PointAttributes', () => {
     });
 
     it('should ignore unknown attribute names', () => {
-      const attrs = new PointAttributes([
-        'POSITION_CARTESIAN',
-        'UNKNOWN_ATTRIBUTE',
-        'INTENSITY',
-      ]);
+      const attrs = new PointAttributes(['POSITION_CARTESIAN', 'UNKNOWN_ATTRIBUTE', 'INTENSITY']);
 
       expect(attrs.size).toBe(2);
       expect(attrs.byteSize).toBe(14); // 12 + 2
@@ -192,11 +184,7 @@ describe('PointAttributes', () => {
 
   describe('Real-world scenarios', () => {
     it('should handle typical point cloud with position, color, and intensity', () => {
-      const attrs = new PointAttributes([
-        'POSITION_CARTESIAN',
-        'RGB_PACKED',
-        'INTENSITY',
-      ]);
+      const attrs = new PointAttributes(['POSITION_CARTESIAN', 'RGB_PACKED', 'INTENSITY']);
 
       expect(attrs.size).toBe(3);
       expect(attrs.byteSize).toBe(17); // 12 + 3 + 2
@@ -220,11 +208,7 @@ describe('PointAttributes', () => {
     });
 
     it('should handle point cloud with normals', () => {
-      const attrs = new PointAttributes([
-        'POSITION_CARTESIAN',
-        'NORMAL_FLOATS',
-        'RGB_PACKED',
-      ]);
+      const attrs = new PointAttributes(['POSITION_CARTESIAN', 'NORMAL_FLOATS', 'RGB_PACKED']);
 
       expect(attrs.size).toBe(3);
       expect(attrs.byteSize).toBe(27); // 12 + 12 + 3

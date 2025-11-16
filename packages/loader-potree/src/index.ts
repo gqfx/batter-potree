@@ -5,4 +5,4 @@
 
 export { PotreeLoader } from './PotreeLoader.js';
 export { parseAttributes } from './parseAttributes.js';
-export { WorkerPool, createWorkerPool } from './workers/WorkerPool.js';
+export { createWorkerPool, WorkerPool } from './workers/WorkerPool.js';

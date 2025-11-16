@@ -32,10 +32,7 @@ export interface PointAttributeType {
 /**
  * Map of data type enums to their metadata
  */
-export const POINT_ATTRIBUTE_TYPES: Record<
-  PointAttributeDataType,
-  PointAttributeType
-> = {
+export const POINT_ATTRIBUTE_TYPES: Record<PointAttributeDataType, PointAttributeType> = {
   [PointAttributeDataType.DOUBLE]: { name: 'double', size: 8, ordinal: 0 },
   [PointAttributeDataType.FLOAT]: { name: 'float', size: 4, ordinal: 1 },
   [PointAttributeDataType.INT8]: { name: 'int8', size: 1, ordinal: 2 },
@@ -94,11 +91,7 @@ export class PointAttribute {
   /** Value range [min, max] */
   public range: [number, number];
 
-  constructor(
-    name: string,
-    dataType: PointAttributeDataType,
-    numElements: number,
-  ) {
+  constructor(name: string, dataType: PointAttributeDataType, numElements: number) {
     this.name = name;
     this.type = POINT_ATTRIBUTE_TYPES[dataType];
     this.numElements = numElements;

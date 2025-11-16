@@ -82,7 +82,7 @@ export class WorkerPool {
    */
   private handleWorkerMessage(
     instance: WorkerInstance,
-    event: MessageEvent<IWorkerDecodeResponse>
+    event: MessageEvent<IWorkerDecodeResponse>,
   ): void {
     if (!instance.currentTask) {
       console.warn('Received message from worker without current task');
@@ -111,9 +111,7 @@ export class WorkerPool {
     console.error('Worker error:', error);
 
     if (instance.currentTask) {
-      instance.currentTask.reject(
-        new Error(`Worker error: ${error.message || 'Unknown error'}`)
-      );
+      instance.currentTask.reject(new Error(`Worker error: ${error.message || 'Unknown error'}`));
       instance.currentTask = null;
     }
 
@@ -237,10 +235,7 @@ export class WorkerPool {
 /**
  * Factory function to create a WorkerPool with a worker constructor
  */
-export function createWorkerPool(
-  workerFactory: () => Worker,
-  workerCount?: number
-): WorkerPool {
+export function createWorkerPool(workerFactory: () => Worker, workerCount?: number): WorkerPool {
   class CustomWorkerPool extends WorkerPool {
     protected createWorker(): Worker {
       return workerFactory();

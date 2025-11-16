@@ -2,9 +2,9 @@
  * Unit tests for exports
  */
 
-import { describe, it, expect } from 'vitest';
-import { EarthControls, MouseButton } from '../index';
+import { describe, expect, it } from 'vitest';
 import type { EarthControlsEvents } from '../index';
+import { EarthControls, MouseButton } from '../index';
 
 describe('Package Exports', () => {
   it('should export EarthControls', () => {

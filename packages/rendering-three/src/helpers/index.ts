@@ -26,9 +26,18 @@ export class BoundingBoxHelper extends THREE.Box3Helper {
  */
 export class OctreeNodeHelper extends THREE.LineSegments {
   private static readonly EDGES: readonly (readonly [number, number])[] = [
-    [0, 1], [1, 3], [3, 2], [2, 0], // Bottom face
-    [4, 5], [5, 7], [7, 6], [6, 4], // Top face
-    [0, 4], [1, 5], [2, 6], [3, 7], // Vertical edges
+    [0, 1],
+    [1, 3],
+    [3, 2],
+    [2, 0], // Bottom face
+    [4, 5],
+    [5, 7],
+    [7, 6],
+    [6, 4], // Top face
+    [0, 4],
+    [1, 5],
+    [2, 6],
+    [3, 7], // Vertical edges
   ] as const;
 
   constructor(min: THREE.Vector3, max: THREE.Vector3, color: THREE.ColorRepresentation = 0x00ff00) {
@@ -45,14 +54,30 @@ export class OctreeNodeHelper extends THREE.LineSegments {
    */
   public updateBounds(min: THREE.Vector3, max: THREE.Vector3): void {
     const vertices = [
-      min.x, min.y, min.z, // 0
-      max.x, min.y, min.z, // 1
-      min.x, max.y, min.z, // 2
-      max.x, max.y, min.z, // 3
-      min.x, min.y, max.z, // 4
-      max.x, min.y, max.z, // 5
-      min.x, max.y, max.z, // 6
-      max.x, max.y, max.z, // 7
+      min.x,
+      min.y,
+      min.z, // 0
+      max.x,
+      min.y,
+      min.z, // 1
+      min.x,
+      max.y,
+      min.z, // 2
+      max.x,
+      max.y,
+      min.z, // 3
+      min.x,
+      min.y,
+      max.z, // 4
+      max.x,
+      min.y,
+      max.z, // 5
+      min.x,
+      max.y,
+      max.z, // 6
+      max.x,
+      max.y,
+      max.z, // 7
     ];
 
     const indices: number[] = [];
@@ -118,9 +143,16 @@ export class MeasurementHelper extends THREE.Group {
   /**
    * Add a point marker
    */
-  public addPoint(position: THREE.Vector3, color: THREE.ColorRepresentation = 0xff0000, size = 0.1): void {
+  public addPoint(
+    position: THREE.Vector3,
+    color: THREE.ColorRepresentation = 0xff0000,
+    size = 0.1,
+  ): void {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute([position.x, position.y, position.z], 3));
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([position.x, position.y, position.z], 3),
+    );
 
     const material = new THREE.PointsMaterial({ color, size, sizeAttenuation: false });
     const pointMesh = new THREE.Points(geometry, material);
@@ -132,12 +164,13 @@ export class MeasurementHelper extends THREE.Group {
   /**
    * Add a line between two points
    */
-  public addLine(start: THREE.Vector3, end: THREE.Vector3, color: THREE.ColorRepresentation = 0x00ff00): void {
+  public addLine(
+    start: THREE.Vector3,
+    end: THREE.Vector3,
+    color: THREE.ColorRepresentation = 0x00ff00,
+  ): void {
     const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array([
-      start.x, start.y, start.z,
-      end.x, end.y, end.z,
-    ]);
+    const positions = new Float32Array([start.x, start.y, start.z, end.x, end.y, end.z]);
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
     const material = new THREE.LineBasicMaterial({ color });
@@ -185,7 +218,7 @@ export class AnnotationHelper extends THREE.Group {
     position: THREE.Vector3,
     text: string,
     backgroundColor = '#000000',
-    textColor = '#ffffff'
+    textColor = '#ffffff',
   ): THREE.Sprite {
     // Create canvas for text
     const canvas = document.createElement('canvas');

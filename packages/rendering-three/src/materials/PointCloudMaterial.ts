@@ -3,9 +3,9 @@
  * @module @better-potree/rendering-three/materials
  */
 
+import { PointCloudColorMode, PointShape, PointSizeType } from '@better-potree/types';
 import * as THREE from 'three';
-import { PointCloudColorMode, PointSizeType, PointShape } from '@better-potree/types';
-import { getPointCloudVertexShader, getPointCloudFragmentShader } from '../shaders/index.js';
+import { getPointCloudFragmentShader, getPointCloudVertexShader } from '../shaders/index.js';
 
 /**
  * Point cloud material configuration
@@ -63,7 +63,8 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
 
     // Create default textures if not provided
     const gradient = config.gradient ?? PointCloudMaterial.createDefaultGradient();
-    const classificationLUT = config.classificationLUT ?? PointCloudMaterial.createDefaultClassificationLUT();
+    const classificationLUT =
+      config.classificationLUT ?? PointCloudMaterial.createDefaultClassificationLUT();
 
     // Build shader defines
     const defines: Record<string, any> = {};

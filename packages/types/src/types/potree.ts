@@ -149,10 +149,13 @@ export interface IDecodedNodeData {
     min: [number, number, number];
     max: [number, number, number];
   };
-  attributeBuffers: Record<string, {
-    buffer: ArrayBuffer;
-    attribute: IPointAttribute;
-  }>;
+  attributeBuffers: Record<
+    string,
+    {
+      buffer: ArrayBuffer;
+      attribute: IPointAttribute;
+    }
+  >;
 }
 
 /**
@@ -180,12 +183,15 @@ export interface IWorkerDecodeResponse {
     min: [number, number, number];
     max: [number, number, number];
   };
-  attributeBuffers: Record<string, {
-    buffer: ArrayBuffer;
-    attribute: IPointAttribute;
-    preciseBuffer?: ArrayBuffer;
-    offset?: number;
-    scale?: number;
-  }>;
+  attributeBuffers: Record<
+    string,
+    {
+      buffer: ArrayBuffer;
+      attribute: IPointAttribute;
+      preciseBuffer?: ArrayBuffer;
+      offset?: number;
+      scale?: number;
+    }
+  >;
   error?: string;
 }
