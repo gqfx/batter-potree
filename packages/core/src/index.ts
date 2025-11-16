@@ -15,3 +15,7 @@ export * from './octree/OctreeNode.js';
 export * from './octree/PointCloudOctree.js';
 export * from './runtime/index.js';
 export * from './types/index.js';
+export * from './ecs/index.js';
+export * from './systems/index.js';
+export * from './resources/index.js';
+export * from './scheduler/index.js';
