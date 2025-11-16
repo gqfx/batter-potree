@@ -54,6 +54,28 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.8.1)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.6.1)(jsdom@27.0.1(postcss@8.5.6))(yaml@2.8.1)
 
+  apps/playground:
+    dependencies:
+      '@better-potree/rendering-three':
+        specifier: workspace:^
+        version: link:../../packages/rendering-three
+      '@better-potree/viewer':
+        specifier: workspace:*
+        version: link:../../packages/viewer
+      three:
+        specifier: ~0.180.0
+        version: 0.180.0
+    devDependencies:
+      '@rsbuild/core':
+        specifier: ^1.5.17
+        version: 1.5.17
+      '@rsbuild/plugin-type-check':
+        specifier: ^1.2.4
+        version: 1.2.4(@rsbuild/core@1.5.17)(@rspack/core@1.5.8(@swc/helpers@0.5.17))(typescript@5.9.3)
+      '@types/three':
+        specifier: ~0.180.0
+        version: 0.180.0
+
   packages/core:
     dependencies:
       eventemitter3:
@@ -66,25 +88,6 @@ importers:
         specifier: ^5.0.8
         version: 5.0.8
     devDependencies:
-      '@types/three':
-        specifier: ~0.180.0
-        version: 0.180.0
-
-  packages/playground:
-    dependencies:
-      '@better-potree/viewer':
-        specifier: workspace:*
-        version: link:../viewer
-      three:
-        specifier: ~0.180.0
-        version: 0.180.0
-    devDependencies:
-      '@rsbuild/core':
-        specifier: ^1.5.17
-        version: 1.5.17
-      '@rsbuild/plugin-type-check':
-        specifier: ^1.2.4
-        version: 1.2.4(@rsbuild/core@1.5.17)(@rspack/core@1.5.8(@swc/helpers@0.5.17))(typescript@5.9.3)
       '@types/three':
         specifier: ~0.180.0
         version: 0.180.0
