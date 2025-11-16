@@ -43,7 +43,7 @@
 // 配置层 (Zustand) - 低频、声明式
 const config = {
   sources: {
-    pc1: { id: 'pc1', type: 'potree', url: '...', visible: true }
+    pc1: { id: 'pc1', type: 'potree', url: '/meta.json', visible: true } // Potree 2.0 meta.json
   },
   rendering: { pointBudget: 2_000_000, minNodeSize: 100 }
 };
@@ -84,18 +84,13 @@ class OctreeManager {
 **职责**: 描述"用户想要什么"
 
 ```typescript
-// packages/config/src/types.ts
-export interface EngineConfig {
-  sources: Record<string, SourceConfig>;
-  rendering: RenderingConfig;
-  view: ViewConfig;
-  materials: Record<string, MaterialConfig>;
-  tools: ToolsConfig;
-}
+// packages/core/src/config/types.ts
+export type EngineConfig = Partial<ConfigState>; // Engine 接收 Partial，createConfigStore 会填充默认值
 
 export interface SourceConfig {
   id: string;
   type: 'potree' | '3dgs' | string;
+  /** Potree 2.0 meta.json 或 3DGS 元数据入口 */
   url: string;
   visible: boolean;
   transform?: Matrix4;
@@ -111,10 +106,16 @@ export interface SourceConfig {
 **职责**: 描述"引擎当前在做什么"
 
 ```typescript
-// packages/core/src/Runtime.ts
+// packages/core/src/runtime/Runtime.ts
 export class Runtime {
   // 相机状态 (每帧更新)
   camera: Camera;
+
+  // 渲染配置（从 Config 同步而来）
+  rendering = {
+    pointBudget: 2_000_000,
+    minNodeSize: 100
+  };
 
   // 可见性管理 (每帧更新)
   visibleNodes = new Set<string>();
@@ -137,7 +138,6 @@ export class Runtime {
 
   // 性能预算
   readonly budgets = {
-    pointBudget: 2_000_000,
     gpuMemory: 2 * 1024 * 1024 * 1024, // 2GB
     cpuMemory: 1 * 1024 * 1024 * 1024  // 1GB
   };
@@ -179,7 +179,7 @@ graph LR
 放弃复杂的拓扑排序，采用**阶段 (Stage) + 优先级 (Priority)** 的固定顺序。
 
 ```typescript
-// packages/types/src/system.ts
+// packages/core/src/types/system.ts
 export enum SystemStage {
   INPUT = 0,      // 输入处理
   UPDATE = 100,   // 核心逻辑
@@ -342,7 +342,7 @@ graph TD
 ### 4.1 Config Store 实现
 
 ```typescript
-// file: packages/config/src/store.ts
+// file: packages/core/src/config/store.ts
 import { createStore } from 'zustand/vanilla';
 
 export interface SourceConfig {
@@ -424,10 +424,10 @@ export const createConfigStore = (initial?: Partial<ConfigState>) => {
   }));
 };
 
-// Engine API 侧保持一致：透传 Record 形式的 sources
+// Engine API 侧保持一致：透传 Record 形式的 sources（Potree 2.0 使用 meta.json）
 const engine = new Engine({
   sources: {
-    main: { id: 'main', type: 'potree', url: '/cloud.js', visible: true }
+    main: { id: 'main', type: 'potree', url: '/meta.json', visible: true }
   }
 });
 ```
@@ -435,12 +435,12 @@ const engine = new Engine({
 ### 4.2 Runtime State 实现
 
 ```typescript
-// file: packages/core/src/Runtime.ts
+// file: packages/core/src/runtime/Runtime.ts
 import type { Camera } from 'three';
 import { PerspectiveCamera } from 'three';
-import type { OctreeManager } from './octree/OctreeManager';
-import type { ECSWorld } from './ecs/ECSWorld';
-import type { ResourceManager } from './resources/ResourceManager';
+import type { OctreeManager } from '../octree/OctreeManager';
+import type { ECSWorld } from '../ecs/ECSWorld';
+import type { ResourceManager } from '../resources/ResourceManager';
 
 /** 节点加载任务 */
 export interface LoadTask {
@@ -535,18 +535,20 @@ interface SourceRuntimeState {
   config: SourceConfig;
   loadedNodes: Map<string, NodeData>;
   visibleNodes: Set<string>;
+  loadState: 'loading' | 'loaded' | 'failed';
 }
 ```
 
 ### 4.3 StateCoordinator 完整实现
 
 ```typescript
-// file: packages/core/src/StateCoordinator.ts
-import type { ConfigStore, SourceConfig, RenderingConfig } from '@better-potree/config';
-import type { Runtime } from './Runtime';
-import type { OctreeManager } from './octree/OctreeManager';
-import type { ResourceManager } from './resources/ResourceManager';
-import type { ECSWorld } from './ecs/ECSWorld';
+// file: packages/core/src/coordinator/StateCoordinator.ts
+import type { ConfigStore, SourceConfig, RenderingConfig } from '../config/store';
+import type { Runtime } from '../runtime/Runtime';
+import type { OctreeManager } from '../octree/OctreeManager';
+import type { ResourceManager } from '../resources/ResourceManager';
+import type { ECSWorld } from '../ecs/ECSWorld';
+import { SourceComponent } from '../ecs/components';
 
 export class StateCoordinator {
   private unsubscribers: Array<() => void> = [];
@@ -612,11 +614,12 @@ export class StateCoordinator {
 
   /** 添加新的 source */
   private addSource(config: SourceConfig): void {
-    // 1. 在 Runtime 中初始化状态
+    // 1. 在 Runtime 中初始化状态 (存储配置副本,避免直接引用)
     this.runtime.sources.set(config.id, {
-      config,
+      config: { ...config },
       loadedNodes: new Map(),
-      visibleNodes: new Set()
+      visibleNodes: new Set(),
+      loadState: 'loading'
     });
 
     // 2. 在 ECS 中创建实体
@@ -626,10 +629,20 @@ export class StateCoordinator {
     // 3. 异步加载八叉树元数据
     this.octreeManager.loadOctree(config.id, config.url, config.type)
       .then(() => {
+        const sourceState = this.runtime.sources.get(config.id);
+        if (sourceState) {
+          sourceState.loadState = 'loaded';
+        }
         console.log(`[Coordinator] Octree loaded for source: ${config.id}`);
       })
       .catch((error) => {
         console.error(`[Coordinator] Failed to load octree for ${config.id}:`, error);
+        const sourceState = this.runtime.sources.get(config.id);
+        if (sourceState) {
+          sourceState.loadState = 'failed';
+        }
+        // 可选: 自动移除加载失败的 source
+        // this.removeSource(config.id);
       });
   }
 
@@ -738,13 +751,13 @@ function setDifference<T>(a: Set<T>, b: Set<T>): Set<T> {
 
 **状态转换表**:
 
-| 配置变更 | Runtime 操作 | ECS 操作 | Octree 操作 | 资源操作 |
-|---------|-------------|---------|------------|---------|
-| 添加 source | 初始化状态 | 创建实体 | 加载元数据 | - |
-| 删除 source | 清理状态 | 删除实体 | 移除八叉树 | 释放 GPU 资源 |
-| 修改 visible | 清空可见集合 | - | - | - |
-| 修改 transform | 标记需重算 | 更新组件 | - | - |
-| 修改 pointBudget | 更新渲染配置 | - | - | - |
+| 配置变更 | Runtime 操作 | ECS 操作 | Octree 操作 | 资源操作 | loadState |
+|---------|-------------|---------|------------|---------|-----------|
+| 添加 source | 初始化状态(副本) | 创建实体 | 异步加载元数据 | - | loading → loaded/failed |
+| 删除 source | 清理状态 | 删除实体 | 移除八叉树 | 释放 GPU 资源 | - |
+| 修改 visible | 清空可见集合 | - | - | - | 保持不变 |
+| 修改 transform | 标记需重算 | 更新组件 | - | - | 保持不变 |
+| 修改 pointBudget | 更新渲染配置 | - | - | - | - |
 
 ---
 
@@ -859,7 +872,7 @@ export class OctreeManager {
 
   /** 加载八叉树元数据 */
   async loadOctree(sourceId: string, url: string, type: string): Promise<void> {
-    // 1. 加载 cloud.js 或元数据文件
+    // 1. 加载 meta.json（Potree 2.0）或其他元数据文件
     const metadata = await this.fetchMetadata(url, type);
     this.metadata.set(sourceId, metadata);
 
@@ -933,7 +946,7 @@ export class OctreeManager {
   private async fetchMetadata(url: string, type: string): Promise<OctreeMetadata> {
     // 实现根据类型加载不同格式的元数据
     if (type === 'potree') {
-      return this.fetchPotreeMetadata(url);
+      return this.fetchPotree2Metadata(url); // Potree 2.0 meta.json
     }
     if (type === '3dgs') {
       return this.fetch3dgsMetadata(url);
@@ -941,26 +954,32 @@ export class OctreeManager {
     throw new Error(`Unsupported octree type: ${type}`);
   }
 
-  private async fetchPotreeMetadata(url: string): Promise<OctreeMetadata> {
-    // 加载 Potree 的 cloud.js
+  /** Potree 2.0 - meta.json */
+  private async fetchPotree2Metadata(url: string): Promise<OctreeMetadata> {
     const response = await fetch(url);
-    const text = await response.text();
+    const data = await response.json();
 
-    // 解析 cloud.js (通常是 JSON 或 JS 对象)
-    // 这里简化处理
-    const data = JSON.parse(text.replace(/^.*?=\s*/, '')); // 移除赋值语句
-
+    // meta.json 结构示例:
+    // {
+    //   "version": "2.0",
+    //   "octreeDir": "data",
+    //   "bounds": { "min": [x,y,z], "max": [x,y,z] },
+    //   "spacing": 1.0,
+    //   "scale": 0.01,
+    //   "hierarchyStepSize": 5,
+    //   "pointAttributes": ["POSITION_CARTESIAN", "COLOR_PACKED"]
+    // }
     return {
       sourceId: '',
-      version: data.version,
+      version: data.version ?? '2.0',
       boundingBox: new Box3(
-        new Vector3().fromArray(data.boundingBox.lx),
-        new Vector3().fromArray(data.boundingBox.ux)
+        new Vector3().fromArray(data.bounds.min),
+        new Vector3().fromArray(data.bounds.max)
       ),
-      spacing: data.spacing,
-      scale: data.scale,
-      hierarchyStepSize: data.hierarchyStepSize || 5,
-      pointAttributes: data.pointAttributes || ['POSITION_CARTESIAN', 'COLOR_PACKED']
+      spacing: data.spacing ?? 1,
+      scale: data.scale ?? 0.01,
+      hierarchyStepSize: data.hierarchyStepSize ?? 5,
+      pointAttributes: data.pointAttributes ?? ['POSITION_CARTESIAN', 'COLOR_PACKED']
     };
   }
 
@@ -1015,9 +1034,9 @@ export class OctreeManager {
 ### 6.1 SystemScheduler 实现
 
 ```typescript
-// file: packages/core/src/SystemScheduler.ts
-import type { ISystem, SystemStage } from '@better-potree/types';
-import type { Runtime } from './Runtime';
+// packages/core/src/scheduler/SystemScheduler.ts
+import type { ISystem, SystemStage } from '../types/system';
+import type { Runtime } from '../runtime/Runtime';
 
 export class SystemScheduler {
   private systems = new Map<SystemStage, ISystem[]>();
@@ -1240,19 +1259,24 @@ export class ECSWorld {
 // file: packages/core/src/ecs/components.ts
 import type { Vector3, Matrix4 } from 'three';
 import type { Component } from './ECSWorld';
-import type { SourceConfig } from '@better-potree/config';
+import type { SourceConfig } from '../config/types';
 
 /** 数据源组件 */
 export class SourceComponent implements Component {
-  constructor(
-    public id: string,
-    public type: string,
-    public url: string,
-    public visible: boolean = true
-  ) {}
+  public id: string;
+  public type: string;
+  public url: string;
+  public visible: boolean;
+
+  constructor(config: SourceConfig) {
+    this.id = config.id;
+    this.type = config.type;
+    this.url = config.url;
+    this.visible = config.visible ?? true;
+  }
 
   static fromConfig(config: SourceConfig): SourceComponent {
-    return new SourceComponent(config.id, config.type, config.url, config.visible ?? true);
+    return new SourceComponent(config);
   }
 }
 
@@ -1307,9 +1331,9 @@ export class BoundingBox implements Component {
 **职责**: 视锥剔除 + LOD 选择
 
 ```typescript
-// file: packages/core/src/systems/TraversalSystem.ts
-import type { ISystem, SystemStage } from '@better-potree/types';
-import type { Runtime } from '../Runtime';
+// packages/core/src/systems/TraversalSystem.ts
+import type { ISystem, SystemStage } from '../types/system';
+import type { Runtime } from '../runtime/Runtime';
 import type { OctreeManager } from '../octree/OctreeManager';
 import type { OctreeNode } from '../octree/OctreeNode';
 import { Frustum, Matrix4, Vector3 } from 'three';
@@ -1366,7 +1390,7 @@ export class TraversalSystem implements ISystem {
     // 2. LOD 选择
     const screenSize = this.calculateScreenSize(node);
 
-    if (screenSize < this.runtime.minNodeSize || node.isLeaf) {
+    if (screenSize < this.runtime.rendering.minNodeSize || node.isLeaf) {
       // 节点足够小或是叶子节点，加入可见集合
       this.runtime.visibleNodes.add(node.metadata.id);
       return;
@@ -2002,18 +2026,18 @@ const engine = new Engine({
   canvas: document.getElementById('canvas') as HTMLCanvasElement,
 
   config: {
+    sources: {
+      main: { id: 'main', type: 'potree', url: '/meta.json', visible: true }
+    },
     rendering: {
       pointBudget: 2_000_000,
-      pointSize: 1.0,
       fov: 60,
       minNodeSize: 100
     },
 
-    view: {
-      camera: {
-        position: [100, 100, 100],
-        target: [0, 0, 0]
-      }
+    camera: {
+      position: [100, 100, 100],
+      target: [0, 0, 0]
     }
   }
 });
@@ -2027,7 +2051,7 @@ engine.start();
 engine.addSource({
   id: 'stanford-dragon',
   type: 'potree',
-  url: 'https://example.com/pointclouds/dragon/cloud.js',
+  url: 'https://example.com/pointclouds/dragon/meta.json', // Potree 2.0 元数据
   visible: true
 });
 
@@ -2053,28 +2077,209 @@ engine.setSourceVisible('stanford-dragon', false);
 
 ## 13. 模块划分
 
-### 13.1 包结构
+> **重要更新**: 本节已基于包重构计划更新。详细的重构计划请参考 [package-restructure-plan.md](./package-restructure-plan.md)
+
+### 13.1 包结构概览
+
+**精简后的 Monorepo 结构** (从8个包减少到4个核心包):
 
 ```
 better-potree/
 ├── packages/
-│   ├── types/              # @better-potree/types
-│   ├── config/             # @better-potree/config
-│   ├── core/               # @better-potree/core
-│   │   ├── Runtime.ts
-│   │   ├── StateCoordinator.ts
-│   │   ├── SystemScheduler.ts
-│   │   ├── octree/
-│   │   ├── ecs/
-│   │   ├── systems/
-│   │   └── resources/
-│   ├── rendering-three/    # @better-potree/rendering-three
-│   ├── loaders/            # @better-potree/loaders
-│   ├── controls/           # @better-potree/controls
-│   ├── tools/              # @better-potree/tools
-│   └── viewer/             # @better-potree/viewer
-└── playground/
+│   ├── core/                              # @better-potree/core
+│   │   ├── src/
+│   │   │   ├── config/                    # ConfigStore (Zustand)
+│   │   │   ├── runtime/                   # Runtime 类
+│   │   │   ├── coordinator/               # StateCoordinator
+│   │   │   ├── octree/                    # OctreeManager, OctreeNode
+│   │   │   ├── ecs/                       # ECSWorld, components
+│   │   │   ├── systems/                   # 核心系统
+│   │   │   ├── resources/                 # 资源管理
+│   │   │   ├── scheduler/                 # SystemScheduler
+│   │   │   ├── types/                     # 核心类型定义
+│   │   │   └── index.ts
+│   │   ├── tests/
+│   │   └── package.json
+│   │
+│   ├── rendering/                         # @better-potree/rendering (抽象层)
+│   │   ├── src/
+│   │   │   ├── interfaces/                # IRenderer, IMaterial, IBuffer
+│   │   │   ├── systems/                   # 抽象的 RenderSystem
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   ├── rendering-three/                   # @better-potree/rendering-three
+│   │   ├── src/
+│   │   │   ├── ThreeRenderer.ts
+│   │   │   ├── materials/
+│   │   │   ├── shaders/
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   └── viewer/                            # @better-potree/viewer
+│       ├── src/
+│       │   ├── Engine.ts
+│       │   ├── loaders/                   # PotreeLoader, 3DGSLoader
+│       │   ├── controls/                  # 相机控制
+│       │   ├── ui/                        # UI 组件
+│       │   └── index.ts
+│       └── package.json
+│
+├── apps/
+│   └── playground/                        # 开发和演示应用
+│
+├── tests/
+│   ├── integration/                       # 跨包集成测试
+│   ├── e2e/                               # 端到端测试
+│   ├── fixtures/                          # 测试数据
+│   └── utils/                             # 测试工具
+│
+├── docs/
+│   ├── api/                               # API 文档
+│   ├── guides/                            # 使用指南
+│   └── architecture/                      # 架构文档
+│
+└── dev_docs/                              # 开发文档
+    ├── architecture-v8.md
+    └── package-restructure-plan.md
 ```
+
+### 13.2 包职责定义
+
+#### 13.2.1 @better-potree/core
+
+**职责**: 引擎核心逻辑,与渲染后端无关
+
+**包含内容**:
+- ✅ 配置管理 (`config/`) - ConfigStore, 类型定义
+- ✅ 运行时状态 (`runtime/`) - Runtime 类
+- ✅ 状态协调 (`coordinator/`) - StateCoordinator
+- ✅ 八叉树系统 (`octree/`) - OctreeManager, OctreeNode
+- ✅ ECS 系统 (`ecs/`) - ECSWorld, 组件定义
+- ✅ 核心系统 (`systems/`) - TraversalSystem, StreamingSystem, RenderCoordinatorSystem
+- ✅ 资源管理 (`resources/`) - ResourceManager, WorkerPool, ObjectPools, MessageQueue
+- ✅ 系统调度 (`scheduler/`) - SystemScheduler
+- ✅ 类型定义 (`types/`) - 所有核心类型
+
+**依赖**:
+- `zustand` - 状态管理
+- `three` - 只用于类型 (Vector3, Matrix4, Box3 等)
+
+#### 13.2.2 @better-potree/rendering
+
+**职责**: 渲染抽象层,定义渲染接口
+
+**包含内容**:
+- ✅ 渲染器接口 (`interfaces/IRenderer.ts`)
+- ✅ 材质接口 (`interfaces/IMaterial.ts`)
+- ✅ 缓冲区接口 (`interfaces/IBuffer.ts`)
+- ✅ 着色器接口 (`interfaces/IShader.ts`)
+- ✅ 抽象的 RenderSystem (`systems/RenderSystem.ts`)
+
+**依赖**:
+- `@better-potree/core` - 核心类型
+
+#### 13.2.3 @better-potree/rendering-three
+
+**职责**: Three.js 渲染实现
+
+**包含内容**:
+- ✅ ThreeRenderer - IRenderer 的 Three.js 实现
+- ✅ 材质实现 (`materials/`) - PointCloudMaterial, GaussianSplatMaterial
+- ✅ 着色器 (`shaders/`) - GLSL 着色器代码
+- ✅ 缓冲区实现 (`buffers/`) - Three.js BufferGeometry 封装
+- ✅ ThreeRenderSystem - RenderSystem 的 Three.js 实现
+
+**依赖**:
+- `@better-potree/core` - 核心类型
+- `@better-potree/rendering` - 渲染接口
+- `three` - Three.js 库
+
+#### 13.2.4 @better-potree/viewer
+
+**职责**: 高级 API 和用户功能
+
+**包含内容**:
+- ✅ Engine 类 - 主引擎 API,组装所有组件
+- ✅ 加载器 (`loaders/`) - PotreeLoader, GaussianSplatLoader, decoder.worker
+- ✅ 相机控制 (`controls/`) - OrbitControls, FirstPersonControls
+- ✅ UI 组件 (`ui/`) - PerformancePanel, SettingsPanel (可选)
+
+**依赖**:
+- `@better-potree/core` - 核心引擎
+- `@better-potree/rendering` - 渲染接口
+- `@better-potree/rendering-three` - Three.js 渲染实现
+
+### 13.3 包依赖关系图
+
+```mermaid
+graph TD
+    core["@better-potree/core<br/>(config, runtime, octree, ecs, systems)"]
+    rendering["@better-potree/rendering<br/>(抽象接口)"]
+    rendering_three["@better-potree/rendering-three<br/>(Three.js 实现)"]
+    viewer["@better-potree/viewer<br/>(Engine API, loaders, controls)"]
+    playground["playground<br/>(开发应用)"]
+
+    rendering --> core
+    rendering_three --> rendering
+    rendering_three --> core
+    viewer --> rendering_three
+    viewer --> rendering
+    viewer --> core
+    playground --> viewer
+
+    style core fill:#e1f5ff
+    style rendering fill:#fff4e1
+    style rendering_three fill:#ffe1f5
+    style viewer fill:#e1ffe1
+    style playground fill:#f5f5f5
+```
+
+### 13.4 分层架构
+
+```
+┌─────────────────────────────────────────────────┐
+│  @better-potree/viewer                          │  ← 用户层
+│  (Engine API, loaders, controls)                │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  @better-potree/rendering-three                 │  ← 实现层
+│  (Three.js 渲染实现)                            │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  @better-potree/rendering                       │  ← 抽象层
+│  (渲染接口定义)                                 │
+└─────────────────────────────────────────────────┘
+                    ↓
+┌─────────────────────────────────────────────────┐
+│  @better-potree/core                            │  ← 核心层
+│  (config, runtime, octree, ecs, systems)        │
+└─────────────────────────────────────────────────┘
+```
+
+### 13.5 重构说明
+
+**为什么从8个包减少到4个包?**
+
+1. **降低初期复杂度** - 4个包足够清晰,又不过度设计
+2. **明确职责边界** - 清晰的分层: core → rendering → rendering-three → viewer
+3. **便于快速迭代** - 减少包间依赖管理的开销
+4. **保留可扩展性** - 未来可以按需拆分新包
+
+**主要变化**:
+
+| 原包 | 新位置 | 原因 |
+|------|--------|------|
+| `@better-potree/types` | `@better-potree/core/types` | 太小,与 core 强耦合 |
+| `@better-potree/config` | `@better-potree/core/config` | 与 core 强耦合 |
+| `@better-potree/loaders` | `@better-potree/viewer/loaders` | 与用户 API 强相关 |
+| `@better-potree/controls` | `@better-potree/viewer/controls` | 与用户 API 强相关 |
+| `@better-potree/tools` | 根目录 `scripts/` | 开发工具,不是包 |
+| (新增) | `@better-potree/rendering` | 解决渲染层耦合问题 |
+
+**详细的重构计划和实施步骤请参考**: [package-restructure-plan.md](./package-restructure-plan.md)
 
 ---
 
@@ -2116,48 +2321,49 @@ better-potree/
 任务清单:
 - [ ] 搭建 Monorepo (pnpm workspace)
   - [ ] 配置 package.json 和 pnpm-workspace.yaml
-  - [ ] 创建 packages 目录结构
+  - [ ] 创建 4 个核心包: `@better-potree/core`, `@better-potree/rendering`, `@better-potree/rendering-three`, `@better-potree/viewer`
+  - [ ] **重要说明**: types 和 config 已合并到 `@better-potree/core` 中
 - [ ] 配置工具链
   - [ ] TypeScript (tsconfig.json)
   - [ ] Rsbuild (rsbuild.config.ts)
   - [ ] Vitest (vitest.config.ts)
   - [ ] Biome (biome.json)
-- [ ] 实现 `@better-potree/types`
-  - [ ] 定义 `ISystem`, `SystemStage` 接口
-  - [ ] 定义核心配置类型
-  - [ ] 编写类型测试
-- [ ] 实现完整的 `ConfigStore` (`@better-potree/config`)
-  - [ ] 完整的 `EngineConfig` 类型定义
-  - [ ] 所有 actions (addSource, removeSource, updateSource, setRenderingConfig)
+- [ ] 实现 `@better-potree/core` 的基础结构
+  - [ ] 创建目录: `config/`, `types/`, `runtime/`, `coordinator/`, `octree/`, `ecs/`, `systems/`, `resources/`, `scheduler/`
+  - [ ] 定义核心类型 (`types/system.ts`, `types/octree.ts`, `types/rendering.ts`)
+  - [ ] 实现完整的 `ConfigStore` (`config/store.ts`)
   - [ ] 单元测试覆盖率 > 80%
 
 **Week 2: 核心基础设施**
 
 任务清单:
-- [ ] 实现 `Runtime` 类 (`@better-potree/core`)
+- [ ] 实现 `Runtime` 类 (`@better-potree/core/runtime`)
   - [ ] 完整的可变状态属性
   - [ ] 性能统计和预算管理
   - [ ] 辅助方法实现
-- [ ] 实现 `StateCoordinator` (`@better-potree/core`)
-  - [ ] 完整的状态同步逻辑
+- [ ] 实现 `StateCoordinator` (`@better-potree/core/coordinator`)
+  - [ ] 完整的状态同步逻辑 (Config → Runtime)
   - [ ] 资源清理逻辑
+  - [ ] 错误处理(loadState: loading/loaded/failed)
   - [ ] 边界情况处理
   - [ ] 单元测试覆盖率 > 90%
-- [ ] 实现 `SystemScheduler` (`@better-potree/core`)
+- [ ] 实现 `SystemScheduler` (`@better-potree/core/scheduler`)
   - [ ] 系统注册与排序
   - [ ] 阶段执行逻辑
   - [ ] 错误处理
-- [ ] 实现基础设施组件
+- [ ] 实现基础设施组件 (`@better-potree/core/resources`)
   - [ ] `MessageQueue` (优先级队列)
   - [ ] `ObjectPools` (Vector3, Matrix4, TypedArray 池)
   - [ ] `WorkerPool` (基础版本)
-- [ ] 实现轻量级 `ECSWorld`
+  - [ ] `ResourceManager` (接收 runtime.budgets.gpuMemory 作为 memoryLimit，含 LRU 驱逐)
+- [ ] 实现轻量级 `ECSWorld` (`@better-potree/core/ecs`)
   - [ ] createEntity, addComponent, query 方法
   - [ ] 基于 Map 的高效查询
-- [ ] 实现八叉树基础
+  - [ ] 定义核心组件 (`SourceComponent`, `Transform`, `Visibility`)
+- [ ] 实现八叉树基础 (`@better-potree/core/octree`)
   - [ ] `OctreeNode` 类定义
   - [ ] `OctreeManager` 基础实现
-  - [ ] 元数据加载 (支持 Potree cloud.js)
+  - [ ] 元数据加载 (支持 Potree 2.0 meta.json)
 
 **退出标准**:
 - ✅ 所有包可以正常构建
@@ -2186,7 +2392,7 @@ better-potree/
   - [ ] AbortController 集成
   - [ ] 与 WorkerPool 集成
   - [ ] 单元测试
-- [ ] 完善 `WorkerPool`
+- [ ] 完善 `WorkerPool` (`@better-potree/core/resources`)
   - [ ] 任务队列管理
   - [ ] 背压控制
   - [ ] Worker 通信协议
@@ -2195,13 +2401,13 @@ better-potree/
 **Week 4: 渲染与加载**
 
 任务清单:
-- [ ] 实现 `decoder.worker.ts`
+- [ ] 实现 `decoder.worker.ts` (`@better-potree/viewer/loaders`)
   - [ ] Potree 二进制格式解码
   - [ ] 点云数据解压缩
   - [ ] 错误处理
   - [ ] 性能优化
-- [ ] 实现 `PotreeLoader` (`@better-potree/loaders`)
-  - [ ] cloud.js 解析
+- [ ] 实现 `PotreeLoader` (`@better-potree/viewer/loaders`)
+  - [ ] meta.json 解析 (Potree 2.0)
   - [ ] hierarchy.bin 解析
   - [ ] 节点 URL 构建
   - [ ] 元数据验证
@@ -2301,9 +2507,9 @@ better-potree/
 ```typescript
 // poc/poc.test.ts
 import { describe, it, expect, vi } from 'vitest';
-import { createConfigStore } from '@better-potree/config';
-import { Runtime } from '@better-potree/core';
-import { StateCoordinator } from '@better-potree/coordinator';
+import { createConfigStore } from '@better-potree/core/config';
+import { Runtime } from '@better-potree/core/runtime';
+import { StateCoordinator } from '@better-potree/core/coordinator';
 
 describe('POC: 分层状态管理', () => {
   it('Config 变更能正确同步到 Runtime', () => {
@@ -2396,11 +2602,12 @@ describe('StateCoordinator', () => {
       config.getState().addSource({
         id: 'test-source',
         type: 'potree',
-        url: 'http://example.com/cloud.js',
+        url: 'http://example.com/meta.json',
         visible: true
       });
 
       expect(runtime.sources.has('test-source')).toBe(true);
+      expect(runtime.sources.get('test-source')?.loadState).toBe('loading');
       expect(ecs.query(SourceComponent).length).toBe(1);
     });
 
@@ -2442,7 +2649,7 @@ describe('引擎集成测试', () => {
           test: {
             id: 'test',
             type: 'potree',
-            url: 'test-data/cloud.js',
+            url: 'test-data/meta.json',
             visible: true
           }
         },
