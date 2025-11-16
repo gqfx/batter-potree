@@ -44,8 +44,6 @@
       "@better-potree/rendering-three/*": ["./packages/rendering-three/src/*"],
       "@better-potree/loaders": ["./packages/loaders/src"],
       "@better-potree/loaders/*": ["./packages/loaders/src/*"],
-      "@better-potree/controls": ["./packages/controls/src"],
-      "@better-potree/controls/*": ["./packages/controls/src/*"],
       "@better-potree/tools": ["./packages/tools/src"],
       "@better-potree/tools/*": ["./packages/tools/src/*"],
       "@better-potree/viewer": ["./packages/viewer/src"],

@@ -54,19 +54,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@24.8.1)(@vitest/browser@3.2.4)(@vitest/ui@3.2.4)(jiti@2.6.1)(jsdom@27.0.1(postcss@8.5.6))(yaml@2.8.1)
 
-  packages/controls:
-    dependencies:
-      '@better-potree/core':
-        specifier: workspace:*
-        version: link:../core
-      three:
-        specifier: ~0.180.0
-        version: 0.180.0
-    devDependencies:
-      '@types/three':
-        specifier: ~0.180.0
-        version: 0.180.0
-
   packages/core:
     dependencies:
       eventemitter3:
@@ -82,12 +69,6 @@ importers:
       '@types/three':
         specifier: ~0.180.0
         version: 0.180.0
-
-  packages/loader-potree:
-    dependencies:
-      '@better-potree/core':
-        specifier: workspace:*
-        version: link:../core
 
   packages/playground:
     dependencies:
@@ -142,15 +123,9 @@ importers:
 
   packages/viewer:
     dependencies:
-      '@better-potree/controls':
-        specifier: workspace:*
-        version: link:../controls
       '@better-potree/core':
         specifier: workspace:*
         version: link:../core
-      '@better-potree/loader-potree':
-        specifier: workspace:*
-        version: link:../loader-potree
       '@better-potree/rendering-three':
         specifier: workspace:*
         version: link:../rendering-three
