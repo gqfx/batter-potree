@@ -30,7 +30,6 @@
   "dependencies": {
     "@better-potree/core": "workspace:*",
     "@better-potree/rendering-three": "workspace:*",
-    "@better-potree/loader-potree": "workspace:*",
     "@better-potree/controls": "workspace:*",
     "@better-potree/tools": "workspace:*"
   },

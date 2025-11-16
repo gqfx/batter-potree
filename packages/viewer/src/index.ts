@@ -6,3 +6,4 @@
 export * from './events.js';
 export * from './Viewer.js';
 export * from './ViewerAPI.js';
+export * from './loaders/index.js';

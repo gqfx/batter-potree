@@ -6,7 +6,7 @@
 
 import './style.css';
 import { EarthControls } from '@better-potree/controls';
-import { PotreeLoader } from '@better-potree/loader-potree';
+import { PotreeLoader } from '@better-potree/viewer';
 import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
 import { ViewerAPI } from '@better-potree/viewer';
 import * as THREE from 'three';
