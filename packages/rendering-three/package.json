@@ -18,7 +18,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc --build",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
   "keywords": [
