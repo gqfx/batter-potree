@@ -108,19 +108,6 @@ importers:
         specifier: ~0.180.0
         version: 0.180.0
 
-  packages/tools:
-    dependencies:
-      '@better-potree/core':
-        specifier: workspace:*
-        version: link:../core
-      three:
-        specifier: ~0.180.0
-        version: 0.180.0
-    devDependencies:
-      '@types/three':
-        specifier: ~0.180.0
-        version: 0.180.0
-
   packages/viewer:
     dependencies:
       '@better-potree/core':
@@ -129,9 +116,6 @@ importers:
       '@better-potree/rendering-three':
         specifier: workspace:*
         version: link:../rendering-three
-      '@better-potree/tools':
-        specifier: workspace:*
-        version: link:../tools
       three:
         specifier: ~0.180.0
         version: 0.180.0

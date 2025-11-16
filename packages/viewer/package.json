@@ -29,8 +29,7 @@
   "license": "BSD-2-Clause",
   "dependencies": {
     "@better-potree/core": "workspace:*",
-    "@better-potree/rendering-three": "workspace:*",
-    "@better-potree/tools": "workspace:*"
+    "@better-potree/rendering-three": "workspace:*"
   },
   "peerDependencies": {
     "three": "~0.180.0"
