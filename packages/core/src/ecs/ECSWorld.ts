@@ -4,14 +4,12 @@
  * @module ecs
  */
 
+import type { Component } from '../types/component.js';
+
 export type Entity = number;
 
-/**
- * 组件基类接口
- */
-export interface Component {
-  __componentType?: string;
-}
+// Re-export Component for backward compatibility
+export type { Component } from '../types/component.js';
 
 /**
  * ECS 世界

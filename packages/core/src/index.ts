@@ -19,3 +19,4 @@ export * from './runtime/index.js';
 export * from './scheduler/index.js';
 export * from './systems/index.js';
 export * from './types/index.js';
+export * from './exports/core-types.js';

@@ -9,6 +9,10 @@ export * from './camera.js';
 export * from './loader.js';
 export * from './potree.js';
 export * from './renderer.js';
+export * from './system.js';
+export * from './octree.js';
+export * from './rendering.js';
+export * from './component.js';
 
 /**
  * Potree configuration

@@ -5,7 +5,7 @@
  */
 
 import type { Matrix4, Vector3 } from 'three';
-import type { Component } from './ECSWorld';
+import type { Component } from '../types/component.js';
 
 /**
  * 数据源组件
