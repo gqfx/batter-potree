@@ -3,9 +3,9 @@
  */
 
 import * as THREE from 'three';
-import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { TraversalSystem } from '../TraversalSystem.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IPointCloudOctree, IPointCloudOctreeNode } from '../../types/potree.js';
+import { TraversalSystem } from '../TraversalSystem.js';
 
 describe('TraversalSystem', () => {
   let system: TraversalSystem;
@@ -54,10 +54,7 @@ describe('TraversalSystem', () => {
     mockOctree = {
       url: 'http://example.com/pointcloud/',
       spacing: 0.1,
-      boundingBox: new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      ),
+      boundingBox: new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10)),
       tightBoundingBox: new THREE.Box3(
         new THREE.Vector3(-10, -10, -10),
         new THREE.Vector3(10, 10, 10),

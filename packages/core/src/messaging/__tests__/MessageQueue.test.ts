@@ -38,9 +38,7 @@ describe('MessageQueue', () => {
       queue.process();
 
       expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'TEST', value: 42 }),
-      );
+      expect(handler).toHaveBeenCalledWith(expect.objectContaining({ type: 'TEST', value: 42 }));
     });
 
     it('应该支持批量推送', () => {
@@ -215,14 +213,8 @@ describe('MessageQueue', () => {
       queue.process();
 
       expect(handler).toHaveBeenCalledTimes(2);
-      expect(handler).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({ value: 2 }),
-      );
-      expect(handler).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ value: 4 }),
-      );
+      expect(handler).toHaveBeenNthCalledWith(1, expect.objectContaining({ value: 2 }));
+      expect(handler).toHaveBeenNthCalledWith(2, expect.objectContaining({ value: 4 }));
     });
 
     it('应该支持移除过滤器', () => {

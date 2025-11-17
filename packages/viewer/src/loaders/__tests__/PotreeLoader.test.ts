@@ -141,11 +141,7 @@ describe('PotreeLoader', () => {
       const octree = await loader.load('https://example.com/pointcloud/');
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(fetchMock).toHaveBeenNthCalledWith(
-        1,
-        'https://example.com/pointcloud/cloud.js',
-        {},
-      );
+      expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://example.com/pointcloud/cloud.js', {});
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
         'https://example.com/pointcloud/metadata.json',

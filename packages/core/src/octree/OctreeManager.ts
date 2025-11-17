@@ -21,7 +21,7 @@
 
 import * as THREE from 'three';
 import type { PointAttributes } from '../attributes/PointAttributes.js';
-import { OctreeNode } from './OctreeNode.js';
+import type { OctreeNode } from './OctreeNode.js';
 import { PointCloudOctree } from './PointCloudOctree.js';
 import type { OctreeMetadata, OctreeStats } from './types.js';
 import { makeGlobalNodeId } from './utils.js';
@@ -309,16 +309,9 @@ export class OctreeManager {
       new THREE.Vector3(...metadata.boundingBox.max),
     );
 
-    const offset = metadata.offset
-      ? new THREE.Vector3(...metadata.offset)
-      : new THREE.Vector3();
+    const offset = metadata.offset ? new THREE.Vector3(...metadata.offset) : new THREE.Vector3();
 
-    const octree = new PointCloudOctree(
-      boundingBox,
-      metadata.spacing,
-      metadata.attributes,
-      offset,
-    );
+    const octree = new PointCloudOctree(boundingBox, metadata.spacing, metadata.attributes, offset);
 
     octree.setName(metadata.name);
     octree.root.numPoints = metadata.points;

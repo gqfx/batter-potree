@@ -3,9 +3,9 @@
  */
 
 import * as THREE from 'three';
-import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
-import { StreamingSystem } from '../StreamingSystem.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IPointCloudOctree, IPointCloudOctreeNode } from '../../types/potree.js';
+import { StreamingSystem } from '../StreamingSystem.js';
 
 describe('StreamingSystem', () => {
   let system: StreamingSystem;
@@ -13,16 +13,10 @@ describe('StreamingSystem', () => {
   let mockNode: IPointCloudOctreeNode;
   let fetchMock: ReturnType<typeof vi.fn>;
 
-  const createMockNode = (
-    name: string,
-    level: number = 0,
-  ): IPointCloudOctreeNode => ({
+  const createMockNode = (name: string, level: number = 0): IPointCloudOctreeNode => ({
     name,
     level,
-    boundingBox: new THREE.Box3(
-      new THREE.Vector3(-10, -10, -10),
-      new THREE.Vector3(10, 10, 10),
-    ),
+    boundingBox: new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10)),
     numPoints: 10000,
     children: new Array(8).fill(null),
     loaded: false,
@@ -41,10 +35,7 @@ describe('StreamingSystem', () => {
     mockOctree = {
       url: 'http://example.com/pointcloud/',
       spacing: 0.1,
-      boundingBox: new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      ),
+      boundingBox: new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10)),
       tightBoundingBox: new THREE.Box3(
         new THREE.Vector3(-10, -10, -10),
         new THREE.Vector3(10, 10, 10),
@@ -253,12 +244,10 @@ describe('StreamingSystem', () => {
 
   describe('error handling', () => {
     it('should retry on failure', async () => {
-      fetchMock
-        .mockRejectedValueOnce(new Error('Network error'))
-        .mockResolvedValueOnce({
-          ok: true,
-          arrayBuffer: async () => new ArrayBuffer(100),
-        });
+      fetchMock.mockRejectedValueOnce(new Error('Network error')).mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(100),
+      });
 
       system.requestLoad(mockOctree, mockNode, 1.0);
       system.update(0.016);

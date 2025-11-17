@@ -70,9 +70,7 @@ export type EntityId = string | number;
  * }
  * ```
  */
-export type ComponentConstructor<T extends Component = Component> = new (
-  ...args: any[]
-) => T;
+export type ComponentConstructor<T extends Component = Component> = new (...args: any[]) => T;
 
 /**
  * 组件查询接口

@@ -21,7 +21,13 @@
  * ```
  */
 
-import type { ObjectCleaner, ObjectFactory, ObjectPoolStats, ObjectResetter, Poolable } from './types.js';
+import type {
+  ObjectCleaner,
+  ObjectFactory,
+  ObjectPoolStats,
+  ObjectResetter,
+  Poolable,
+} from './types.js';
 
 /**
  * 对象池配置
@@ -260,10 +266,6 @@ export class ObjectPool<T> {
    * 检查对象是否实现了 Poolable 接口
    */
   private isPoolable(obj: T): obj is T & Poolable {
-    return (
-      obj !== null &&
-      typeof obj === 'object' &&
-      ('reset' in obj || 'clear' in obj)
-    );
+    return obj !== null && typeof obj === 'object' && ('reset' in obj || 'clear' in obj);
   }
 }

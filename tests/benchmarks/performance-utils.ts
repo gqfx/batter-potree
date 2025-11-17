@@ -98,10 +98,7 @@ export class BenchmarkRunner {
    * @param fn - 测试函数
    * @returns 测试结果
    */
-  async run(
-    config: BenchmarkConfig,
-    fn: () => void | Promise<void>,
-  ): Promise<BenchmarkResult> {
+  async run(config: BenchmarkConfig, fn: () => void | Promise<void>): Promise<BenchmarkResult> {
     const warmupIterations = config.warmupIterations ?? 10;
     const iterations = config.iterations ?? 100;
 
@@ -134,8 +131,7 @@ export class BenchmarkRunner {
     const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
     const minTime = Math.min(...times);
     const maxTime = Math.max(...times);
-    const variance =
-      times.reduce((sum, time) => sum + (time - avgTime) ** 2, 0) / times.length;
+    const variance = times.reduce((sum, time) => sum + (time - avgTime) ** 2, 0) / times.length;
     const stdDev = Math.sqrt(variance);
     const opsPerSecond = 1000 / avgTime;
 
@@ -181,16 +177,10 @@ export class BenchmarkRunner {
     ];
 
     for (const result of results) {
-      lines.push(
-        `│ ${result.name.padEnd(30)} │ Avg: ${result.avgTime.toFixed(2)}ms │`,
-      );
-      lines.push(
-        `│ ${''.padEnd(30)} │ Ops/s: ${result.opsPerSecond.toFixed(0)} │`,
-      );
+      lines.push(`│ ${result.name.padEnd(30)} │ Avg: ${result.avgTime.toFixed(2)}ms │`);
+      lines.push(`│ ${''.padEnd(30)} │ Ops/s: ${result.opsPerSecond.toFixed(0)} │`);
       if (result.memoryUsed !== undefined) {
-        lines.push(
-          `│ ${''.padEnd(30)} │ Memory: ${(result.memoryUsed / 1024).toFixed(2)}KB │`,
-        );
+        lines.push(`│ ${''.padEnd(30)} │ Memory: ${(result.memoryUsed / 1024).toFixed(2)}KB │`);
       }
       lines.push('├─────────────────────────────────────────────────────────────────┤');
     }

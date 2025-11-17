@@ -2,9 +2,9 @@
  * SystemScheduler 测试套件
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { type ISystem, SystemStage } from '../../types/system';
 import { SystemScheduler } from '../SystemScheduler';
-import { SystemStage, type ISystem } from '../../types/system';
 
 /**
  * 创建一个测试系统
@@ -17,7 +17,7 @@ function createTestSystem(
     shouldThrow?: boolean;
     updateCallback?: (deltaTime: number) => void;
     disposeCallback?: () => void;
-  } = {}
+  } = {},
 ): ISystem {
   return {
     name,
@@ -166,12 +166,7 @@ describe('SystemScheduler', () => {
 
       // no-priority 默认为 0，应该和 priority-0 一起在最前面
       // 相同优先级的系统按添加顺序执行
-      expect(executionOrder).toEqual([
-        'priority-0',
-        'no-priority',
-        'priority-5',
-        'priority-10',
-      ]);
+      expect(executionOrder).toEqual(['priority-0', 'no-priority', 'priority-5', 'priority-10']);
     });
   });
 
@@ -212,10 +207,7 @@ describe('SystemScheduler', () => {
       scheduler.update(0.016);
 
       expect(errorHandler).toHaveBeenCalledTimes(1);
-      expect(errorHandler).toHaveBeenCalledWith(
-        expect.any(Error),
-        'error-system'
-      );
+      expect(errorHandler).toHaveBeenCalledWith(expect.any(Error), 'error-system');
     });
 
     it('移除系统时的 dispose 错误应该被处理', () => {
@@ -410,9 +402,7 @@ describe('SystemScheduler', () => {
       // 期望总时间 < 150ms（考虑性能波动）
       expect(totalTime).toBeLessThan(150);
 
-      console.log(
-        `性能测试: 100 系统 × 1000 次更新 = ${totalTime.toFixed(2)}ms`
-      );
+      console.log(`性能测试: 100 系统 × 1000 次更新 = ${totalTime.toFixed(2)}ms`);
     });
 
     it('单次调度 100 个系统应在 1ms 内完成', () => {
@@ -439,9 +429,7 @@ describe('SystemScheduler', () => {
       // 期望单帧时间 < 1ms
       expect(singleFrameTime).toBeLessThan(1);
 
-      console.log(
-        `性能测试: 单次调度 100 系统 = ${singleFrameTime.toFixed(3)}ms`
-      );
+      console.log(`性能测试: 单次调度 100 系统 = ${singleFrameTime.toFixed(3)}ms`);
     });
   });
 

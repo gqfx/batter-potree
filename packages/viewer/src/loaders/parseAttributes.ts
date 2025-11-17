@@ -35,7 +35,9 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
       attributeNames = cloudjs.pointAttributes.trim().split(/\s+/);
     } else if (Array.isArray(cloudjs.pointAttributes)) {
       // For Potree 1.x, should be string array
-      attributeNames = cloudjs.pointAttributes.filter((attr): attr is string => typeof attr === 'string');
+      attributeNames = cloudjs.pointAttributes.filter(
+        (attr): attr is string => typeof attr === 'string',
+      );
     } else {
       console.warn('Invalid pointAttributes format:', cloudjs.pointAttributes);
       attributeNames = [];
@@ -62,7 +64,7 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
     if (Array.isArray(cloudjs.pointAttributes)) {
       // For Potree 2.0+, should be IPotreeAttributeMetadata[]
       const attrs = cloudjs.pointAttributes.filter(
-        (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr
+        (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr,
       );
       pointAttributes.push(...attrs);
     } else {

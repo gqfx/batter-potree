@@ -4,7 +4,7 @@
  * @module benchmarks/memory
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ResourceManager } from '../../packages/core/src/resources/ResourceManager';
 import { BenchmarkRunner, MemoryProfiler } from './performance-utils';
 

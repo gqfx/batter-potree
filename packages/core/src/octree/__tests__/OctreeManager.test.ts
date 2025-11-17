@@ -47,7 +47,11 @@ describe('OctreeManager', () => {
     it('应该能够加载八叉树', async () => {
       const mockFetch = createMockFetch();
 
-      const metadata = await manager.loadOctree('pc1', 'http://example.com/metadata.json', mockFetch);
+      const metadata = await manager.loadOctree(
+        'pc1',
+        'http://example.com/metadata.json',
+        mockFetch,
+      );
 
       expect(metadata).toBeDefined();
       expect(metadata.sourceId).toBe('pc1');
@@ -59,7 +63,11 @@ describe('OctreeManager', () => {
     it('应该填充 metadata.sourceId', async () => {
       const mockFetch = createMockFetch();
 
-      const metadata = await manager.loadOctree('my-source', 'http://example.com/data.json', mockFetch);
+      const metadata = await manager.loadOctree(
+        'my-source',
+        'http://example.com/data.json',
+        mockFetch,
+      );
 
       expect(metadata.sourceId).toBe('my-source');
     });

@@ -117,7 +117,9 @@ export class SettingsPanel {
     if (!this.element) return;
 
     // Point Budget slider
-    const budgetSlider = this.element.querySelector('[data-setting="pointBudget"]') as HTMLInputElement;
+    const budgetSlider = this.element.querySelector(
+      '[data-setting="pointBudget"]',
+    ) as HTMLInputElement;
     const budgetValue = this.element.querySelector('[data-value="pointBudget"]');
     if (budgetSlider && budgetValue) {
       budgetSlider.addEventListener('input', () => {

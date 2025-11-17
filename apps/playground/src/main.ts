@@ -5,9 +5,9 @@
  */
 
 import './style.css';
-import { ThreeJsRenderer, ThreeScene, PointCloudMaterial } from '@better-potree/rendering-three';
-import { EarthControls, PotreeLoader, ViewerAPI, PointCloudColorMode } from '@better-potree/viewer';
 import type { IPointCloudOctree, IPotreeMetadata } from '@better-potree/core';
+import { PointCloudMaterial, ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
+import { EarthControls, PointCloudColorMode, PotreeLoader, ViewerAPI } from '@better-potree/viewer';
 import * as THREE from 'three';
 
 console.log('Better Potree Playground - 初始化中...');
@@ -292,7 +292,9 @@ function createControlsPanel() {
     try {
       // 检查浏览器是否支持 File System Access API
       if (!('showDirectoryPicker' in window)) {
-        alert('您的浏览器不支持本地文件夹选择功能。\n请使用 Chrome 86+、Edge 86+ 或其他支持 File System Access API 的浏览器。');
+        alert(
+          '您的浏览器不支持本地文件夹选择功能。\n请使用 Chrome 86+、Edge 86+ 或其他支持 File System Access API 的浏览器。',
+        );
         return;
       }
 
@@ -520,7 +522,6 @@ function createControlsPanel() {
         `;
         loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
-
     } catch (error) {
       console.error('加载本地文件夹失败:', error);
 

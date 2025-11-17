@@ -4,8 +4,8 @@
  * @module messaging
  */
 
-export { MessageQueue } from './MessageQueue.js';
 export type { MessageQueueOptions } from './MessageQueue.js';
+export { MessageQueue } from './MessageQueue.js';
 export type {
   BaseMessage,
   Message,

@@ -2,8 +2,8 @@
  * PointCloudViewer 单元测试
  */
 
-import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock Three.js WebGLRenderer
 vi.mock('three', async () => {

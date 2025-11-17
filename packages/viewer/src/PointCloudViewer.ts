@@ -23,11 +23,11 @@
  */
 
 import {
+  type IPointCloudOctree,
+  type IPointCloudOctreeNode,
   StreamingSystem,
   TraversalSystem,
   TypedEventEmitter,
-  type IPointCloudOctree,
-  type IPointCloudOctreeNode,
 } from '@better-potree/core';
 import { PointCloudMaterial } from '@better-potree/rendering-three';
 import * as THREE from 'three';
@@ -382,7 +382,11 @@ export class PointCloudViewer extends TypedEventEmitter<PointCloudViewerEvents> 
     const result = this.traversalSystem.getLastResult();
     for (const visibleNode of result.visibleNodes) {
       if (!visibleNode.node.loaded && !visibleNode.node.loading) {
-        this.streamingSystem.requestLoad(visibleNode.octree, visibleNode.node, visibleNode.priority);
+        this.streamingSystem.requestLoad(
+          visibleNode.octree,
+          visibleNode.node,
+          visibleNode.priority,
+        );
       }
     }
 

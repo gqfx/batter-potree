@@ -4,9 +4,9 @@
  * @module benchmarks/lod
  */
 
-import { describe, it, expect } from 'vitest';
-import { LODSelector } from '../../packages/core/src/lod/LODSelector';
+import { describe, expect, it } from 'vitest';
 import { FrustumCuller } from '../../packages/core/src/lod/FrustumCuller';
+import { LODSelector } from '../../packages/core/src/lod/LODSelector';
 import { PointBudget } from '../../packages/core/src/lod/PointBudget';
 import { OctreeNode } from '../../packages/core/src/octree/OctreeNode';
 import { BenchmarkRunner } from './performance-utils';
@@ -27,7 +27,7 @@ describe('LOD Performance Benchmarks', () => {
             max: [i * 10 + 10, i * 10 + 10, i * 10 + 10],
           },
           numPoints: Math.floor(Math.random() * 100000),
-          spacing: 1.0 / (i % 10 + 1),
+          spacing: 1.0 / ((i % 10) + 1),
         }),
       );
     }
@@ -82,8 +82,7 @@ describe('LOD Performance Benchmarks', () => {
     };
 
     // 创建测试包围盒
-    const boxes: Array<{ min: [number, number, number]; max: [number, number, number] }> =
-      [];
+    const boxes: Array<{ min: [number, number, number]; max: [number, number, number] }> = [];
     for (let i = 0; i < 1000; i++) {
       boxes.push({
         min: [i * 5, i * 5, i * 5],

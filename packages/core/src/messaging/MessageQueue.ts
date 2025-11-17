@@ -77,9 +77,10 @@ export class MessageQueue<T extends BaseMessage = BaseMessage> {
    * ```
    */
   push(message: T): void {
-    const msg = this.options.addTimestamp && !message.timestamp
-      ? { ...message, timestamp: performance.now() }
-      : message;
+    const msg =
+      this.options.addTimestamp && !message.timestamp
+        ? { ...message, timestamp: performance.now() }
+        : message;
 
     this.queue.push(msg as T);
   }

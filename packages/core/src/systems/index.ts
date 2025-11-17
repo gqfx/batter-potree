@@ -4,5 +4,5 @@
  * @module systems
  */
 
-export * from './TraversalSystem.js';
 export * from './StreamingSystem.js';
+export * from './TraversalSystem.js';

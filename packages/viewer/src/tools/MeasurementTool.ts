@@ -16,7 +16,7 @@
  * ```
  */
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import type { PointCloudViewer } from '../PointCloudViewer.js';
 
 /**
@@ -71,10 +71,7 @@ export class MeasurementTool {
    * @param _viewer - 点云查看器（保留用于未来扩展）
    * @param _config - 配置选项（保留用于未来扩展）
    */
-  constructor(
-    _viewer: PointCloudViewer,
-    _config: MeasurementToolConfig = {},
-  ) {
+  constructor(_viewer: PointCloudViewer, _config: MeasurementToolConfig = {}) {
     // 占位符实现 - 将在Phase 3中完善
   }
 

@@ -4,16 +4,15 @@
  * 验证新类型可以从模块导入
  */
 
+import { MaterialType_Enum, SystemStage_Enum } from '../exports/core-types.js';
 import type {
-  ISystem,
-  OctreeNodeMetadata,
-  OctreeMetadata,
-  RenderCommand,
   Component,
   ComponentConstructor,
+  ISystem,
+  OctreeMetadata,
+  OctreeNodeMetadata,
+  RenderCommand,
 } from '../types/index.js';
-
-import { SystemStage_Enum, MaterialType_Enum } from '../exports/core-types.js';
 
 // 编译时类型检查
 const testSystem: ISystem = {
@@ -33,6 +32,7 @@ const testCommand: RenderCommand = {
 };
 
 // 使用导入的类型来消除未使用警告
-const _testMetadata: OctreeNodeMetadata | OctreeMetadata | Component | ComponentConstructor | null = null;
+const _testMetadata: OctreeNodeMetadata | OctreeMetadata | Component | ComponentConstructor | null =
+  null;
 
 console.log('类型导入测试成功', testSystem, testCommand, _testMetadata);

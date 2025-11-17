@@ -170,9 +170,7 @@ describe('WorkerPool', () => {
         }
       } as unknown as typeof Worker;
 
-      await expect(errorPool.execute({ value: 1 })).rejects.toThrow(
-        'Worker processing error',
-      );
+      await expect(errorPool.execute({ value: 1 })).rejects.toThrow('Worker processing error');
 
       global.Worker = originalWorker;
       errorPool.dispose();
@@ -181,9 +179,7 @@ describe('WorkerPool', () => {
     it('应该在 Pool 已销毁时拒绝任务', async () => {
       pool.dispose();
 
-      await expect(pool.execute({ value: 1 })).rejects.toThrow(
-        'WorkerPool has been disposed',
-      );
+      await expect(pool.execute({ value: 1 })).rejects.toThrow('WorkerPool has been disposed');
     });
   });
 

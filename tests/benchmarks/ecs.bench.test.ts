@@ -4,12 +4,9 @@
  * @module benchmarks/ecs
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { TransformComponent, VisibilityComponent } from '../../packages/core/src/ecs/components';
 import { ECSWorld } from '../../packages/core/src/ecs/ECSWorld';
-import {
-  TransformComponent,
-  VisibilityComponent,
-} from '../../packages/core/src/ecs/components';
 import { BenchmarkRunner } from './performance-utils';
 
 describe('ECS Performance Benchmarks', () => {

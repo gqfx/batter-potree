@@ -19,7 +19,11 @@
  * ```
  */
 
-import type { IPointCloudOctree, IPointCloudOctreeNode, IWorkerDecodeResponse } from '../types/potree.js';
+import type {
+  IPointCloudOctree,
+  IPointCloudOctreeNode,
+  IWorkerDecodeResponse,
+} from '../types/potree.js';
 import type { ISystem, SystemStage } from '../types/system.js';
 import type { WorkerPool } from '../workers/WorkerPool.js';
 
