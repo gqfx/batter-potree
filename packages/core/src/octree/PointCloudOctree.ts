@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { PointAttributes } from '../attributes/PointAttributes.js';
 import { OctreeNode } from './OctreeNode.js';
+import { VisibilityTexture } from './VisibilityTexture.js';
 
 /**
  * Octree-based point cloud with hierarchical LOD
@@ -48,6 +49,9 @@ export class PointCloudOctree {
   /** World transformation offset */
   public offset: THREE.Vector3;
 
+  /** Visibility texture for GPU LOD traversal */
+  public visibilityTexture: VisibilityTexture;
+
   constructor(
     boundingBox: THREE.Box3,
     spacing: number,
@@ -75,6 +79,9 @@ export class PointCloudOctree {
     // Runtime state
     this.visibleNodes = [];
     this.numVisiblePoints = 0;
+
+    // GPU LOD support
+    this.visibilityTexture = new VisibilityTexture();
   }
 
   /**
@@ -161,11 +168,48 @@ export class PointCloudOctree {
   }
 
   /**
+   * Update visibility texture from current visible nodes
+   *
+   * This should be called after visibility culling to update the GPU texture
+   * with the current set of visible nodes.
+   *
+   * @example
+   * ```ts
+   * octree.visibleNodes = culledNodes;
+   * octree.updateVisibilityTexture();
+   * ```
+   */
+  updateVisibilityTexture(): void {
+    if (this.visibleNodes.length === 0) {
+      return;
+    }
+
+    // Compute and update texture
+    const result = this.visibilityTexture.compute(this.visibleNodes);
+    this.visibilityTexture.update(result);
+
+    // Update vnStart indices
+    for (const [node, offset] of result.offsets) {
+      node.vnStart = offset;
+    }
+  }
+
+  /**
+   * Get visibility texture for use in shaders
+   *
+   * @returns Three.js DataTexture or null if not yet computed
+   */
+  getVisibilityTexture(): THREE.DataTexture | null {
+    return this.visibilityTexture.getTexture();
+  }
+
+  /**
    * Dispose of octree resources
    */
   dispose(): void {
     this.traverse((node) => {
       node.dispose();
     });
+    this.visibilityTexture.dispose();
   }
 }

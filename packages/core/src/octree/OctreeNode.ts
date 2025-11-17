@@ -41,6 +41,9 @@ export class OctreeNode {
   /** Point attributes for this node */
   public attributes: PointAttributes | null;
 
+  /** Visible node start index (for GPU visibility texture) */
+  public vnStart: number;
+
   constructor(name: string, boundingBox: THREE.Box3, spacing: number, level: number = 0) {
     this.name = name;
     this.boundingBox = boundingBox;
@@ -50,6 +53,7 @@ export class OctreeNode {
     this.geometry = null;
     this.loaded = false;
     this.attributes = null;
+    this.vnStart = -1;
 
     // Initialize 8 children slots
     this.children = new Array(8).fill(null);
