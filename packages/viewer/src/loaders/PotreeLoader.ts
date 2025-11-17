@@ -233,7 +233,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       : boundingBox.clone();
 
     // Determine octree directory
-    let octreeDir = metadata.octreeDir;
+    let octreeDir = metadata.octreeDir || 'data';
     if (!octreeDir.endsWith('/')) {
       octreeDir += '/';
     }
