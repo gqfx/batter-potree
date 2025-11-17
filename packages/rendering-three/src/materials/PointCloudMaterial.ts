@@ -35,6 +35,16 @@ export interface PointCloudMaterialConfig {
   gradient?: THREE.Texture;
   /** Classification LUT texture */
   classificationLUT?: THREE.Texture;
+  /** Enable GPU LOD traversal */
+  enableGPULOD?: boolean;
+  /** Visibility texture for GPU LOD */
+  visibilityTexture?: THREE.Texture;
+  /** Octree size for GPU LOD */
+  octreeSize?: number;
+  /** Node level for GPU LOD */
+  level?: number;
+  /** VN start index for GPU LOD */
+  vnStart?: number;
 }
 
 /**
@@ -60,11 +70,17 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
     const elevationRange = config.elevationRange ?? [0, 1];
     const intensityRange = config.intensityRange ?? [0, 1];
     const useEDL = config.useEDL ?? false;
+    const enableGPULOD = config.enableGPULOD ?? false;
+    const octreeSize = config.octreeSize ?? 1.0;
+    const level = config.level ?? 0;
+    const vnStart = config.vnStart ?? 0;
 
     // Create default textures if not provided
     const gradient = config.gradient ?? PointCloudMaterial.createDefaultGradient();
     const classificationLUT =
       config.classificationLUT ?? PointCloudMaterial.createDefaultClassificationLUT();
+    const visibilityTexture =
+      config.visibilityTexture ?? PointCloudMaterial.createDefaultVisibilityTexture();
 
     // Build shader defines
     const defines: Record<string, any> = {};
@@ -141,6 +157,15 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       minSize: { value: minSize },
       maxSize: { value: maxSize },
       uOctreeSpacing: { value: 1.0 },
+
+      // GPU LOD uniforms
+      uEnableGPULOD: { value: enableGPULOD },
+      visibilityTexture: { value: visibilityTexture },
+      uVNStart: { value: vnStart },
+      uLevel: { value: level },
+      uOctreeSize: { value: octreeSize },
+      uVisibilityTextureWidth: { value: visibilityTexture.image?.width ?? 1 },
+      uVisibilityTextureHeight: { value: visibilityTexture.image?.height ?? 1 },
 
       // Color uniforms
       uColor: { value: new THREE.Color(1, 1, 1) },
@@ -282,6 +307,49 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
     }
   }
 
+  /**
+   * Enable or disable GPU LOD traversal
+   *
+   * @param enabled - Whether to enable GPU LOD
+   */
+  public setGPULODEnabled(enabled: boolean): void {
+    if (this.uniforms?.uEnableGPULOD) {
+      this.uniforms.uEnableGPULOD.value = enabled;
+    }
+  }
+
+  /**
+   * Update GPU LOD parameters for the current node
+   *
+   * @param vnStart - VN start index for this node
+   * @param level - Octree level of this node
+   * @param octreeSize - Total octree size
+   */
+  public updateGPULODParams(vnStart: number, level: number, octreeSize: number): void {
+    if (this.uniforms) {
+      if (this.uniforms.uVNStart) this.uniforms.uVNStart.value = vnStart;
+      if (this.uniforms.uLevel) this.uniforms.uLevel.value = level;
+      if (this.uniforms.uOctreeSize) this.uniforms.uOctreeSize.value = octreeSize;
+    }
+  }
+
+  /**
+   * Update visibility texture for GPU LOD traversal
+   *
+   * @param texture - The visibility texture containing octree traversal data
+   */
+  public updateVisibilityTexture(texture: THREE.Texture): void {
+    if (this.uniforms) {
+      if (this.uniforms.visibilityTexture) this.uniforms.visibilityTexture.value = texture;
+      if (this.uniforms.uVisibilityTextureWidth) {
+        this.uniforms.uVisibilityTextureWidth.value = texture.image?.width ?? 1;
+      }
+      if (this.uniforms.uVisibilityTextureHeight) {
+        this.uniforms.uVisibilityTextureHeight.value = texture.image?.height ?? 1;
+      }
+    }
+  }
+
   private _updateColorModeDefines(): void {
     if (!this.defines) {
       this.defines = {};
@@ -420,6 +488,41 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       imageData.data[idx + 2] = i; // B
       imageData.data[idx + 3] = 255; // A
     }
+    ctx.putImageData(imageData, 0, 0);
+
+    const texture = new THREE.Texture(canvas);
+    texture.needsUpdate = true;
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+
+    return texture;
+  }
+
+  /**
+   * Create a default visibility texture for GPU LOD
+   *
+   * Creates a 1x1 black texture that signals no child nodes exist.
+   * This serves as a placeholder when GPU LOD is not enabled.
+   *
+   * @returns Default visibility texture
+   */
+  private static createDefaultVisibilityTexture(): THREE.Texture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      throw new Error('Failed to create canvas context');
+    }
+
+    // Fill with black (0,0,0,0) indicating no children
+    const imageData = ctx.createImageData(1, 1);
+    imageData.data[0] = 0; // R
+    imageData.data[1] = 0; // G
+    imageData.data[2] = 0; // B
+    imageData.data[3] = 0; // A
     ctx.putImageData(imageData, 0, 0);
 
     const texture = new THREE.Texture(canvas);

@@ -37,6 +37,15 @@ uniform float minSize;
 uniform float maxSize;
 uniform float uOctreeSpacing;
 
+// Uniforms - GPU LOD traversal
+uniform sampler2D visibilityTexture;
+uniform float uVNStart;
+uniform float uLevel;
+uniform float uOctreeSize;
+uniform float uVisibilityTextureWidth;
+uniform float uVisibilityTextureHeight;
+uniform bool uEnableGPULOD;
+
 // Uniforms - color
 uniform vec3 uColor;
 uniform float uOpacity;
@@ -127,6 +136,77 @@ vec3 getColor() {
   return outputColor;
 }
 
+/**
+ * Get LOD depth by traversing octree using visibility texture
+ *
+ * Traverses the octree hierarchy from the current node level to find
+ * the leaf node containing the current point. Returns the depth offset
+ * from the starting level.
+ *
+ * @return LOD depth offset from uLevel
+ */
+float getLOD() {
+  vec3 offset = vec3(0.0);
+  int iOffset = int(uVNStart);
+  float depth = 0.0;
+
+  // Traverse octree until we find the leaf node containing this point
+  // Max 30 levels to prevent infinite loops
+  for (float i = 0.0; i <= 30.0; i++) {
+    // Calculate node size at current level
+    float nodeSizeAtLevel = uOctreeSize / pow(2.0, i + uLevel);
+
+    // Calculate 3D index of child containing this point
+    vec3 index3d = (position - offset) / nodeSizeAtLevel;
+    ivec3 iIndex = ivec3(index3d);
+
+    // Convert 3D index to child index (0-7)
+    // Using Z-Y-X order: childIndex = x + y*2 + z*4
+    int childIndex = iIndex.x + iIndex.y * 2 + iIndex.z * 4;
+
+    // Query visibility texture to get next VN start
+    int index = iOffset + childIndex;
+    vec2 texCoord = vec2(
+      float(index % int(uVisibilityTextureWidth)),
+      float(index / int(uVisibilityTextureWidth))
+    ) / vec2(uVisibilityTextureWidth, uVisibilityTextureHeight);
+
+    vec4 visibility = texture(visibilityTexture, texCoord);
+
+    // Decode VN start from RG channels (16-bit value)
+    float nextVNStart = visibility.r * 255.0 + visibility.g * 255.0 * 256.0;
+
+    // If nextVNStart is 0, this is a leaf node
+    if (nextVNStart == 0.0) break;
+
+    // Move to next level
+    iOffset = int(nextVNStart);
+    offset = offset + vec3(iIndex) * nodeSizeAtLevel;
+    depth++;
+  }
+
+  return depth;
+}
+
+/**
+ * Calculate point size attenuation based on LOD depth
+ *
+ * Points deeper in the octree are rendered smaller to maintain
+ * consistent visual density across LOD levels.
+ *
+ * @return Attenuated point size in world space
+ */
+float getPointSizeAttenuation() {
+  float lod = getLOD();
+  float lodLevel = uLevel + lod;
+
+  // Points at deeper levels need to be smaller
+  // attenuation = 2^lodLevel scales inversely with node size
+  float attenuation = pow(2.0, lodLevel);
+
+  return attenuation * size;
+}
+
 // Point size calculation
 float getPointSize() {
   float pointSize = 1.0;
@@ -146,12 +226,25 @@ float getPointSize() {
       pointSize = size * projFactor;
     }
   #elif defined(ADAPTIVE_POINT_SIZE)
-    if (uUseOrthographicCamera) {
-      float worldSpaceSize = size * r;
-      pointSize = (worldSpaceSize / uOrthoWidth) * uScreenWidth;
+    if (uEnableGPULOD) {
+      // Use GPU LOD traversal for adaptive point sizing
+      float attenuatedSize = getPointSizeAttenuation();
+      if (uUseOrthographicCamera) {
+        float worldSpaceSize = attenuatedSize * r / pow(2.0, uLevel);
+        pointSize = (worldSpaceSize / uOrthoWidth) * uScreenWidth;
+      } else {
+        float worldSpaceSize = attenuatedSize * r / pow(2.0, uLevel);
+        pointSize = worldSpaceSize * projFactor;
+      }
     } else {
-      float worldSpaceSize = size * r;
-      pointSize = worldSpaceSize * projFactor;
+      // Fallback to simple adaptive sizing without GPU LOD
+      if (uUseOrthographicCamera) {
+        float worldSpaceSize = size * r;
+        pointSize = (worldSpaceSize / uOrthoWidth) * uScreenWidth;
+      } else {
+        float worldSpaceSize = size * r;
+        pointSize = worldSpaceSize * projFactor;
+      }
     }
   #else
     // Default to fixed
