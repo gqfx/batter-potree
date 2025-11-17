@@ -73,7 +73,7 @@ export interface IPotreeMetadata {
     uy: number;
     uz: number;
   };
-  pointAttributes: string[] | IPotreeAttributeMetadata[];
+  pointAttributes: string | string[] | IPotreeAttributeMetadata[];
   spacing: number;
   scale: number;
   points: number;

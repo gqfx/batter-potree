@@ -28,7 +28,20 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
 
   if (version.upTo('1.7')) {
     // Potree 1.x format
-    for (const attributeName of cloudjs.pointAttributes as string[]) {
+    // pointAttributes can be a string (space-separated) or array
+    let attributeNames: string[];
+    if (typeof cloudjs.pointAttributes === 'string') {
+      // Handle space-separated string format
+      attributeNames = cloudjs.pointAttributes.trim().split(/\s+/);
+    } else if (Array.isArray(cloudjs.pointAttributes)) {
+      // For Potree 1.x, should be string array
+      attributeNames = cloudjs.pointAttributes.filter((attr): attr is string => typeof attr === 'string');
+    } else {
+      console.warn('Invalid pointAttributes format:', cloudjs.pointAttributes);
+      attributeNames = [];
+    }
+
+    for (const attributeName of attributeNames) {
       const oldAttribute = (PointAttribute as any)[attributeName];
 
       if (oldAttribute) {
@@ -46,7 +59,15 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
     }
   } else {
     // Potree 2.0+ format
-    pointAttributes.push(...(cloudjs.pointAttributes as IPotreeAttributeMetadata[]));
+    if (Array.isArray(cloudjs.pointAttributes)) {
+      // For Potree 2.0+, should be IPotreeAttributeMetadata[]
+      const attrs = cloudjs.pointAttributes.filter(
+        (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr
+      );
+      pointAttributes.push(...attrs);
+    } else {
+      console.warn('Invalid pointAttributes format for Potree 2.0+:', cloudjs.pointAttributes);
+    }
   }
 
   const attributes = new PointAttributes();
