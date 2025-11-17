@@ -5,9 +5,9 @@
  */
 
 import './style.css';
-import type { IPointCloudOctree, IPotreeMetadata } from '@better-potree/core';
-import { PointCloudMaterial, ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
-import { EarthControls, PointCloudColorMode, PotreeLoader, ViewerAPI } from '@better-potree/viewer';
+import type { IPointCloudOctree } from '@better-potree/core';
+import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
+import { EarthControls, PotreeLoader, ViewerAPI } from '@better-potree/viewer';
 import * as THREE from 'three';
 
 console.log('Better Potree Playground - 初始化中...');
@@ -31,10 +31,27 @@ const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clien
 camera.position.set(10, 10, 10);
 camera.lookAt(0, 0, 0);
 
-// 创建 Viewer
+// 创建 Viewer（使用适配器包装renderer）
+// ThreeJsRenderer 实现的是 @better-potree/rendering 的 IRenderer
+// 需要适配到 @better-potree/core 的 IRenderer
+const rendererAdapter = {
+  render: (scene: any, camera: THREE.Camera) => {
+    renderer.renderScene(scene, camera);
+  },
+  setSize: (width: number, height: number) => {
+    renderer.setSize(width, height);
+  },
+  dispose: () => {
+    renderer.dispose();
+  },
+  getDomElement: () => {
+    return renderer.getDomElement();
+  },
+};
+
 const viewer = new ViewerAPI({
   container,
-  renderer,
+  renderer: rendererAdapter as any,
   scene,
   camera,
   pointBudget: 1_000_000,
@@ -206,6 +223,12 @@ function createControlsPanel() {
       </div>
 
       <div class="control-group">
+        <button id="load-test-data" style="width: 100%; margin-bottom: 8px;">
+          🧪 加载测试数据
+        </button>
+      </div>
+
+      <div class="control-group">
         <input
           type="text"
           id="pointcloud-url"
@@ -284,9 +307,72 @@ function createControlsPanel() {
     controls.setPivot(new THREE.Vector3(0, 0, 0));
   });
 
+  // 加载测试数据
+  const loadTestDataButton = document.getElementById('load-test-data');
+  const loadStatus = document.getElementById('load-status');
+
+  loadTestDataButton?.addEventListener('click', async () => {
+    const testDataPath = 'D:/3d_models/pointcloud/inchurch_colorized_las_converted/cloud.js';
+
+    try {
+      if (loadStatus) {
+        loadStatus.style.display = 'block';
+        loadStatus.innerHTML = `正在加载测试数据...`;
+        loadStatus.style.background = 'rgba(0,255,0,0.1)';
+      }
+
+      console.log('正在加载测试数据:', testDataPath);
+
+      // 使用 viewer.load() API 加载点云
+      const octree = await viewer.load(testDataPath);
+
+      console.log('测试数据加载成功:', octree);
+
+      // 调整相机以适应点云边界
+      if (octree.boundingBox) {
+        const boundingBox = octree.boundingBox;
+        const center = boundingBox.getCenter(new THREE.Vector3());
+        const size = boundingBox.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        camera.position.copy(center);
+        camera.position.z += maxDim * 2;
+        camera.lookAt(center);
+        controls.setPivot(center);
+
+        // 隐藏网格和坐标轴（可选）
+        gridHelper.visible = false;
+        axesHelper.visible = false;
+      }
+
+      if (loadStatus) {
+        const numPoints = octree.root?.numPoints ?? 0;
+        const size = octree.boundingBox?.getSize(new THREE.Vector3());
+        loadStatus.innerHTML = `
+          ✅ 测试数据加载成功<br>
+          路径: ${testDataPath}<br>
+          版本: ${octree.version}<br>
+          根节点点数: ${numPoints.toLocaleString()}<br>
+          ${size ? `包围盒: (${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})<br>` : ''}
+          <br>
+          ⚠️ 点云渲染功能待实现（Phase 4）
+        `;
+        loadStatus.style.background = 'rgba(255,165,0,0.1)';
+      }
+    } catch (error) {
+      console.error('加载测试数据失败:', error);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `❌ 加载失败: ${error instanceof Error ? error.message : String(error)}`;
+        loadStatus.style.background = 'rgba(255,0,0,0.1)';
+      }
+
+      alert(`加载失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
+
   // 加载本地文件夹
   const loadFolderButton = document.getElementById('load-local-folder');
-  const loadStatus = document.getElementById('load-status');
 
   loadFolderButton?.addEventListener('click', async () => {
     try {
@@ -376,122 +462,20 @@ function createControlsPanel() {
         loadStatus.innerHTML = `正在解析点云结构...`;
       }
 
-      // 加载点云 octree
+      // 加载点云 octree（仅元数据和层级结构）
       const octree: IPointCloudOctree = await customLoader.load(metadataFileName);
 
       console.log('点云结构加载成功:', octree);
       console.log('根节点:', octree.root);
       console.log('点属性:', octree.pointAttributes);
 
-      if (loadStatus) {
-        loadStatus.innerHTML = `正在加载根节点点数据...`;
-      }
-
-      // 加载根节点的点数据
       if (!octree.root) {
         throw new Error('点云没有根节点');
       }
 
-      // 从 octree.url 中获取 octreeDir (PotreeLoader 已经构建好了完整路径)
-      // octree.url 格式类似 "data/" 或完整路径
-      // 我们需要从 metadata 中获取 octreeDir
-      let octreeDir = 'data'; // 默认值
-
-      // 重新读取元数据来获取 octreeDir
-      const metadataText = await metadataFile.text();
-      let metadata: IPotreeMetadata;
-
-      if (metadataFileName.toLowerCase() === 'metadata.json') {
-        metadata = JSON.parse(metadataText);
-      } else {
-        // cloud.js 格式
-        const jsonMatch = metadataText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          metadata = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('无法解析元数据');
-        }
-      }
-
-      if (metadata.octreeDir) {
-        octreeDir = metadata.octreeDir;
-      }
-
-      const rootNodePath = `${octreeDir}/r.bin`;
-
-      console.log('加载根节点数据:', rootNodePath);
-
-      // 加载根节点二进制数据
-      const rootData = await loadLocalFile(rootNodePath);
-
-      console.log('根节点数据大小:', rootData.byteLength, 'bytes');
-
-      // 简单解析二进制数据（基础实现，仅用于演示）
-      // 注意：完整实现应该使用 BinaryDecoderWorker
-      const view = new DataView(rootData);
-      const numPoints = octree.root.numPoints;
-
-      console.log('点数:', numPoints);
-
-      // 假设是 Potree 2.0 格式，带有 position(xyz, int32) + color(rgb, uint16)
-      // 实际格式需要根据 pointAttributes 来确定
-      const positions = new Float32Array(numPoints * 3);
-      const colors = new Uint8Array(numPoints * 3);
-
-      // 获取点属性的字节大小
-      const pointByteSize = octree.pointAttributes.byteSize;
-
-      console.log('点字节大小:', pointByteSize);
-
-      // 解析每个点（简化版本）
-      let offset = 0;
-      for (let i = 0; i < numPoints; i++) {
-        // 读取位置 (假设是 int32 * 3)
-        const x = view.getInt32(offset, true);
-        const y = view.getInt32(offset + 4, true);
-        const z = view.getInt32(offset + 8, true);
-
-        // 转换到实际坐标
-        const scale = octree.scale;
-        const bbox = octree.boundingBox;
-        positions[i * 3] = bbox.min.x + x * scale;
-        positions[i * 3 + 1] = bbox.min.y + y * scale;
-        positions[i * 3 + 2] = bbox.min.z + z * scale;
-
-        // 读取颜色 (假设是 uint16 * 3)
-        const r = view.getUint16(offset + 12, true);
-        const g = view.getUint16(offset + 14, true);
-        const b = view.getUint16(offset + 16, true);
-
-        // 转换到 0-255
-        colors[i * 3] = (r / 65535) * 255;
-        colors[i * 3 + 1] = (g / 65535) * 255;
-        colors[i * 3 + 2] = (b / 65535) * 255;
-
-        offset += pointByteSize;
-      }
-
-      console.log('点数据解析完成');
-
-      // 创建 BufferGeometry
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
-
-      // 创建点云材质
-      const material = new PointCloudMaterial({
-        size: viewer.getPointSize(),
-        colorMode: PointCloudColorMode.RGB,
-      });
-
-      // 创建点云对象
-      const points = new THREE.Points(geometry, material);
-      points.name = `PointCloud_${directoryHandle.name}`;
-
-      // 添加到场景
-      scene.add(points);
-
-      console.log('点云已添加到场景');
+      // TODO: 将 octree 添加到 viewer 中
+      // 目前 Viewer API 还没有实现完整的点云渲染功能
+      // 这需要等待 Phase 4 实现完成后才能使用
 
       // 调整相机以适应点云边界
       const boundingBox = octree.boundingBox;
@@ -512,15 +496,18 @@ function createControlsPanel() {
 
       // 更新加载状态
       if (loadStatus) {
+        const numPoints = octree.root.numPoints;
         loadStatus.innerHTML = `
-          ✅ 成功加载并显示点云<br>
+          ✅ 点云元数据加载成功<br>
           文件夹: ${directoryHandle.name}<br>
           元数据: ${metadataFileName}<br>
           版本: ${octree.version}<br>
-          点数: ${numPoints.toLocaleString()}<br>
-          包围盒: (${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})
+          根节点点数: ${numPoints.toLocaleString()}<br>
+          包围盒: (${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})<br>
+          <br>
+          ⚠️ 点云渲染功能待实现（Phase 4）
         `;
-        loadStatus.style.background = 'rgba(0,255,0,0.1)';
+        loadStatus.style.background = 'rgba(255,165,0,0.1)';
       }
     } catch (error) {
       console.error('加载本地文件夹失败:', error);
@@ -554,18 +541,44 @@ function createControlsPanel() {
         loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
 
-      console.log('正在加载点云:', url);
-      const pointCloud = await loader.load(url);
-      console.log('点云加载成功:', pointCloud);
+      console.log('正在使用 Viewer API 加载点云:', url);
 
-      if (loadStatus) {
-        loadStatus.innerHTML = `✅ 成功加载远程点云<br>URL: ${url}`;
+      // 使用 viewer.load() API 加载点云
+      const octree = await viewer.load(url);
+
+      console.log('点云加载成功:', octree);
+
+      // 调整相机以适应点云边界
+      if (octree.boundingBox) {
+        const boundingBox = octree.boundingBox;
+        const center = boundingBox.getCenter(new THREE.Vector3());
+        const size = boundingBox.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        camera.position.copy(center);
+        camera.position.z += maxDim * 2;
+        camera.lookAt(center);
+        controls.setPivot(center);
+
+        // 隐藏网格和坐标轴（可选）
+        gridHelper.visible = false;
+        axesHelper.visible = false;
       }
 
-      // TODO: 将点云添加到场景
-      // 这需要等待 rendering-three 包实现 PointCloudObject3D
-
-      alert('点云元数据加载成功！\n(渲染功能将在后续实现)');
+      if (loadStatus) {
+        const numPoints = octree.root?.numPoints ?? 0;
+        const size = octree.boundingBox?.getSize(new THREE.Vector3());
+        loadStatus.innerHTML = `
+          ✅ 点云元数据加载成功<br>
+          URL: ${url}<br>
+          版本: ${octree.version}<br>
+          根节点点数: ${numPoints.toLocaleString()}<br>
+          ${size ? `包围盒: (${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})<br>` : ''}
+          <br>
+          ⚠️ 点云渲染功能待实现（Phase 4）
+        `;
+        loadStatus.style.background = 'rgba(255,165,0,0.1)';
+      }
     } catch (error) {
       console.error('加载点云失败:', error);
 
