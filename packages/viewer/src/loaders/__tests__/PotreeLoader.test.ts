@@ -20,6 +20,27 @@ describe('PotreeLoader', () => {
     vi.clearAllMocks();
   });
 
+  describe('constructor', () => {
+    it('should create loader with default config', () => {
+      const defaultLoader = new PotreeLoader();
+      expect(defaultLoader).toBeDefined();
+    });
+
+    it('should accept custom fetch options', () => {
+      const customLoader = new PotreeLoader({
+        fetchOptions: { credentials: 'include' },
+      });
+      expect(customLoader).toBeDefined();
+    });
+
+    it('should accept autoLoadHierarchy option', () => {
+      const customLoader = new PotreeLoader({
+        autoLoadHierarchy: false,
+      });
+      expect(customLoader).toBeDefined();
+    });
+  });
+
   describe('load()', () => {
     const validMetadata: IPotreeMetadata = {
       version: '1.7',
@@ -55,7 +76,7 @@ describe('PotreeLoader', () => {
 
       const octree = await loader.load('https://example.com/pointcloud/');
 
-      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/cloud.js');
+      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/cloud.js', {});
       expect(octree.url).toBe('https://example.com/pointcloud/r/');
       expect(octree.spacing).toBe(0.1);
       expect(octree.version).toBe('1.7');
@@ -69,7 +90,7 @@ describe('PotreeLoader', () => {
 
       const octree = await loader.load('https://example.com/pointcloud');
 
-      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/cloud.js');
+      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/cloud.js', {});
       expect(octree.url).toBe('https://example.com/pointcloud/r/');
     });
 
@@ -81,7 +102,7 @@ describe('PotreeLoader', () => {
 
       const octree = await loader.load('https://example.com/pointcloud/cloud.js');
 
-      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/cloud.js');
+      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/cloud.js', {});
       expect(octree.url).toBe('https://example.com/pointcloud/r/');
     });
 
@@ -107,7 +128,7 @@ describe('PotreeLoader', () => {
 
       const octree = await loader.load('https://example.com/pointcloud/metadata.json');
 
-      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/metadata.json');
+      expect(fetchMock).toHaveBeenCalledWith('https://example.com/pointcloud/metadata.json', {});
       expect(octree.version).toBe('2.0');
     });
 
@@ -120,8 +141,16 @@ describe('PotreeLoader', () => {
       const octree = await loader.load('https://example.com/pointcloud/');
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
-      expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://example.com/pointcloud/cloud.js');
-      expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://example.com/pointcloud/metadata.json');
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        'https://example.com/pointcloud/cloud.js',
+        {},
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        'https://example.com/pointcloud/metadata.json',
+        {},
+      );
       expect(octree.version).toBe('1.7');
     });
 
@@ -432,7 +461,11 @@ describe('PotreeLoader', () => {
 
       const octree = await loader.load('https://example.com/pointcloud/');
 
-      expect(octree.root).toBeNull();
+      // Root node is now created with metadata
+      expect(octree.root).not.toBeNull();
+      expect(octree.root?.name).toBe('r');
+      expect(octree.root?.level).toBe(0);
+      expect(octree.root?.numPoints).toBe(5000);
     });
 
     it('should preserve spacing and scale', async () => {

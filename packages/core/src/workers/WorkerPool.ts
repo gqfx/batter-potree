@@ -207,7 +207,7 @@ export class WorkerPool<T = unknown, R = unknown> {
 
     // 标记 Worker 为空闲
     worker.busy = false;
-    worker.currentTaskId = undefined;
+    delete worker.currentTaskId;
 
     // 处理队列中的下一个任务
     this.processNextTask(worker);
@@ -228,7 +228,7 @@ export class WorkerPool<T = unknown, R = unknown> {
 
     // 重置 Worker 状态
     worker.busy = false;
-    worker.currentTaskId = undefined;
+    delete worker.currentTaskId;
 
     // 尝试处理下一个任务
     this.processNextTask(worker);
