@@ -9,6 +9,8 @@ export * from './helpers/index.js';
 export * from './materials/PointCloudMaterial.js';
 // Objects
 export * from './objects/PointCloudObject3D.js';
+// Scene
+export * from './PointCloudScene.js';
 // Shaders
 export * from './shaders/index.js';
 // Systems
