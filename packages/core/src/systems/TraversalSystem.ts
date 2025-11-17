@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import type { IPointCloudOctree, IPointCloudOctreeNode } from '../types/potree.js';
 import type { ISystem, SystemStage } from '../types/system.js';
+import { BinaryHeap } from '../utils/BinaryHeap.js';
 
 /**
  * 遍历系统配置
@@ -70,6 +71,22 @@ export interface TraversalResult {
   readonly traversedNodes: number;
   /** 遍历耗时（毫秒） */
   readonly traversalTime: number;
+}
+
+/**
+ * 优先级队列中的元素
+ *
+ * @internal
+ */
+interface PriorityQueueElement {
+  /** 八叉树节点 */
+  readonly node: IPointCloudOctreeNode;
+  /** 所属点云 */
+  readonly octree: IPointCloudOctree;
+  /** 父节点（用于调试） */
+  readonly parent: IPointCloudOctreeNode | null;
+  /** 节点权重（用于优先级排序） */
+  weight: number;
 }
 
 /**
@@ -259,16 +276,36 @@ export class TraversalSystem implements ISystem {
 
     const cameraPosition = this.camera.position;
 
-    // 使用栈进行深度优先遍历
-    const stack: IPointCloudOctreeNode[] = [octree.root];
+    // 使用优先级队列（最小堆），权重越小优先级越高
+    const priorityQueue = new BinaryHeap<PriorityQueueElement>(
+      (element) => 1 / element.weight,
+    );
 
-    while (stack.length > 0) {
-      const node = stack.pop()!;
+    // 初始化：将根节点加入队列
+    const rootWeight = this.computeWeight(octree.root, cameraPosition);
+    priorityQueue.push({
+      node: octree.root,
+      octree,
+      parent: null,
+      weight: rootWeight,
+    });
+
+    let numVisiblePoints = 0;
+
+    // 优先级队列遍历
+    while (priorityQueue.size() > 0) {
+      const element = priorityQueue.pop()!;
+      const node = element.node;
       traversedCount++;
 
       // 视锥剔除
       if (!this.frustum.intersectsBox(node.boundingBox)) {
         continue;
+      }
+
+      // 点预算检查（提前终止）
+      if (numVisiblePoints + node.numPoints > this.config.pointBudget) {
+        break;
       }
 
       // 计算到相机的距离
@@ -278,9 +315,14 @@ export class TraversalSystem implements ISystem {
       // 计算屏幕大小
       const screenSize = this.calculateScreenSize(node, distance);
 
-      // 检查 LOD 条件
-      if (node.level >= this.config.maxLevel || screenSize < this.config.minScreenSize) {
-        // 添加当前节点但不继续遍历子节点
+      // LOD 判断：是否应该继续细分
+      const shouldSubdivide =
+        node.level < this.config.maxLevel &&
+        screenSize >= this.config.minScreenSize &&
+        node.children.some((child) => child !== null);
+
+      if (!shouldSubdivide) {
+        // 不再细分，添加当前节点到可见列表
         const priority = this.calculatePriority(distance, screenSize, node.level);
         visibleNodes.push({
           node,
@@ -289,52 +331,19 @@ export class TraversalSystem implements ISystem {
           screenSize,
           priority,
         });
-        continue;
-      }
-
-      // 检查是否有子节点
-      const hasChildren = node.children.some((child) => child !== null);
-
-      if (!hasChildren) {
-        // 叶子节点，添加到可见列表
-        const priority = this.calculatePriority(distance, screenSize, node.level);
-        visibleNodes.push({
-          node,
-          octree,
-          distance,
-          screenSize,
-          priority,
-        });
+        numVisiblePoints += node.numPoints;
       } else {
-        // 有子节点，添加当前节点并继续遍历
-        const priority = this.calculatePriority(distance, screenSize, node.level);
-        visibleNodes.push({
-          node,
-          octree,
-          distance,
-          screenSize,
-          priority,
-        });
-
-        // 添加子节点到栈（按距离排序，远的先入栈）
-        const childrenWithDistance: Array<{
-          node: IPointCloudOctreeNode;
-          distance: number;
-        }> = [];
-
+        // 继续细分，将子节点加入优先级队列
         for (const child of node.children) {
           if (child) {
-            const childCenter = child.boundingBox.getCenter(new THREE.Vector3());
-            const childDistance = childCenter.distanceTo(cameraPosition);
-            childrenWithDistance.push({ node: child, distance: childDistance });
+            const childWeight = this.computeWeight(child, cameraPosition);
+            priorityQueue.push({
+              node: child,
+              octree,
+              parent: node,
+              weight: childWeight,
+            });
           }
-        }
-
-        // 按距离降序排序，使近的子节点最后出栈（优先处理）
-        childrenWithDistance.sort((a, b) => b.distance - a.distance);
-
-        for (const { node: child } of childrenWithDistance) {
-          stack.push(child);
         }
       }
     }
@@ -413,5 +422,67 @@ export class TraversalSystem implements ISystem {
     }
 
     return result;
+  }
+
+  /**
+   * 计算节点权重（用于优先级队列排序）
+   *
+   * 权重越大，优先级越高（越早处理）
+   * 计算方式：
+   * - 透视相机：基于屏幕像素半径
+   * - 正交相机：基于节点对角线长度
+   *
+   * 参考 Potree 原版实现（Potree_update_visibility.js:352-390）
+   *
+   * @param node - 八叉树节点
+   * @param cameraPosition - 相机位置
+   * @returns 节点权重
+   */
+  private computeWeight(node: IPointCloudOctreeNode, cameraPosition: THREE.Vector3): number {
+    if (!this.camera) {
+      return 0;
+    }
+
+    const boundingSphere = node.boundingBox.getBoundingSphere(new THREE.Sphere());
+    const center = boundingSphere.center;
+    const radius = boundingSphere.radius;
+
+    // 计算到相机的距离
+    const dx = cameraPosition.x - center.x;
+    const dy = cameraPosition.y - center.y;
+    const dz = cameraPosition.z - center.z;
+    const distanceSquared = dx * dx + dy * dy + dz * dz;
+    const distance = Math.sqrt(distanceSquared);
+
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      // 透视相机：计算屏幕像素半径
+      const fov = (this.camera.fov * Math.PI) / 180;
+      const slope = Math.tan(fov / 2);
+      const projFactor = (0.5 * this.config.screenHeight) / (slope * distance);
+      const screenPixelRadius = radius * projFactor;
+
+      // 如果屏幕像素半径小于最小节点像素大小，权重为 0（不处理）
+      if (screenPixelRadius < this.config.minScreenSize) {
+        return 0;
+      }
+
+      let weight = screenPixelRadius;
+
+      // 如果相机在节点内部（距离小于半径），给予最大权重
+      if (distance - radius < 0) {
+        weight = Number.MAX_VALUE;
+      }
+
+      return weight;
+    } else if (this.camera instanceof THREE.OrthographicCamera) {
+      // 正交相机：使用节点对角线长度作为权重
+      const size = node.boundingBox.getSize(new THREE.Vector3());
+      const diagonal = size.length();
+
+      return diagonal;
+    }
+
+    // 默认权重
+    return 1;
   }
 }

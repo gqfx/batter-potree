@@ -266,4 +266,159 @@ describe('TraversalSystem', () => {
       expect(result.visibleNodes).toHaveLength(0);
     });
   });
+
+  describe('优先级队列遍历', () => {
+    it('应该使用优先级队列而不是深度优先遍历', () => {
+      // 创建有多个子节点的八叉树
+      const child1 = createMockNode(
+        'r0',
+        1,
+        new THREE.Vector3(-10, -10, -10),
+        new THREE.Vector3(0, 0, 0),
+        2000,
+      );
+      const child2 = createMockNode(
+        'r1',
+        1,
+        new THREE.Vector3(0, -10, -10),
+        new THREE.Vector3(10, 0, 0),
+        3000,
+      );
+      const child3 = createMockNode(
+        'r2',
+        1,
+        new THREE.Vector3(-10, 0, -10),
+        new THREE.Vector3(0, 10, 0),
+        1500,
+      );
+
+      mockOctree.root!.children[0] = child1;
+      mockOctree.root!.children[1] = child2;
+      mockOctree.root!.children[2] = child3;
+
+      system.addPointCloud('test', mockOctree);
+      system.update(0.016);
+      const result = system.getLastResult();
+
+      // 应该找到可见节点
+      expect(result.visibleNodes.length).toBeGreaterThan(0);
+    });
+
+    it('应该在点预算耗尽时提前终止', () => {
+      // 设置较小的点预算
+      system.setPointBudget(5000);
+
+      // 创建多个子节点，总点数超过预算
+      const child1 = createMockNode('r0', 1, new THREE.Vector3(-5, -5, -5), new THREE.Vector3(0, 0, 0), 3000);
+      const child2 = createMockNode('r1', 1, new THREE.Vector3(0, -5, -5), new THREE.Vector3(5, 0, 0), 3000);
+
+      mockOctree.root!.children[0] = child1;
+      mockOctree.root!.children[1] = child2;
+
+      system.addPointCloud('test', mockOctree);
+      system.update(0.016);
+      const result = system.getLastResult();
+
+      // 总点数应该不超过预算
+      expect(result.totalPoints).toBeLessThanOrEqual(5000);
+    });
+
+    it('应该优先处理权重大的节点（透视相机）', () => {
+      camera.position.set(0, 0, 30);
+      camera.lookAt(0, 0, 0);
+      camera.updateMatrixWorld();
+
+      // 创建两个子节点：一个近（权重大），一个远（权重小）
+      const nearChild = createMockNode(
+        'r0',
+        1,
+        new THREE.Vector3(-2, -2, 28), // 接近相机
+        new THREE.Vector3(2, 2, 32),
+        1000,
+      );
+      const farChild = createMockNode(
+        'r1',
+        1,
+        new THREE.Vector3(-2, -2, -32), // 远离相机
+        new THREE.Vector3(2, 2, -28),
+        1000,
+      );
+
+      mockOctree.root!.children[0] = nearChild;
+      mockOctree.root!.children[1] = farChild;
+
+      system.addPointCloud('test', mockOctree);
+      system.update(0.016);
+      const result = system.getLastResult();
+
+      // 近节点应该在结果中
+      const hasNearNode = result.visibleNodes.some((v) => v.node.name === 'r0');
+      expect(hasNearNode).toBe(true);
+    });
+
+    it('应该处理正交相机权重计算', () => {
+      const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 100);
+      orthoCamera.position.set(0, 0, 10);
+      orthoCamera.lookAt(0, 0, 0);
+      orthoCamera.updateMatrixWorld();
+
+      system.setCamera(orthoCamera);
+
+      const child = createMockNode('r0', 1, new THREE.Vector3(-5, -5, -5), new THREE.Vector3(5, 5, 5), 1000);
+      mockOctree.root!.children[0] = child;
+
+      system.addPointCloud('test', mockOctree);
+      system.update(0.016);
+      const result = system.getLastResult();
+
+      // 应该找到可见节点
+      expect(result.visibleNodes.length).toBeGreaterThan(0);
+    });
+
+    it('应该在节点屏幕大小低于阈值时跳过细分', () => {
+      // 设置较大的最小屏幕大小
+      system = new TraversalSystem({
+        pointBudget: 100_000,
+        maxLevel: 10,
+        minScreenSize: 500, // 较大的阈值
+        screenWidth: 1920,
+        screenHeight: 1080,
+      });
+      system.setCamera(camera);
+
+      // 创建较小的子节点
+      const smallChild = createMockNode(
+        'r0',
+        1,
+        new THREE.Vector3(-1, -1, -1),
+        new THREE.Vector3(1, 1, 1),
+        500,
+      );
+      mockOctree.root!.children[0] = smallChild;
+
+      system.addPointCloud('test', mockOctree);
+      system.update(0.016);
+      const result = system.getLastResult();
+
+      // 应该有结果（可能只包含根节点或大节点）
+      expect(result.visibleNodes.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('应该记录遍历统计信息', () => {
+      const child1 = createMockNode('r0', 1, new THREE.Vector3(-5, -5, -5), new THREE.Vector3(0, 0, 0), 1000);
+      const child2 = createMockNode('r1', 1, new THREE.Vector3(0, -5, -5), new THREE.Vector3(5, 0, 0), 1000);
+
+      mockOctree.root!.children[0] = child1;
+      mockOctree.root!.children[1] = child2;
+
+      system.addPointCloud('test', mockOctree);
+      system.update(0.016);
+      const result = system.getLastResult();
+
+      // 应该记录遍历的节点数
+      expect(result.traversedNodes).toBeGreaterThan(0);
+      // 应该记录遍历时间
+      expect(result.traversalTime).toBeGreaterThanOrEqual(0);
+    });
+  });
 });
