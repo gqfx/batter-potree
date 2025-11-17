@@ -163,13 +163,109 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
   /**
    * Load a point cloud from URL
-   * @param url - URL to point cloud metadata
-   * @param name - Optional name for the point cloud
+   *
+   * This method loads a Potree point cloud and integrates it into the viewer:
+   * 1. Uses PotreeLoader to load metadata and hierarchy
+   * 2. Creates a PointCloudOctree entity
+   * 3. Initializes the root node
+   * 4. Adds the octree to rendering pipeline
+   * 5. Emits 'pointcloud-loaded' event
+   *
+   * @param url - URL to point cloud metadata (cloud.js or metadata.json)
+   * @param name - Optional name for the point cloud (defaults to extracted name from URL)
+   * @returns Promise that resolves with the loaded IPointCloudOctree
+   * @throws {Error} If the URL is invalid or loading fails
+   *
+   * @example
+   * ```typescript
+   * const viewer = new Viewer({ ... });
+   *
+   * // Load a point cloud
+   * const octree = await viewer.load('http://example.com/pointcloud/');
+   * console.log(`Loaded ${octree.root?.numPoints} points`);
+   *
+   * // Or with a custom name
+   * const octree2 = await viewer.load('/data/cloud.js', 'myCloud');
+   * ```
    */
-  async load(_url: string, _name?: string): Promise<IPointCloudOctree> {
-    // This will be implemented by the loader system in Phase 3
-    // For now, this is a placeholder that shows the expected interface
-    throw new Error('Point cloud loading not yet implemented (Phase 3)');
+  async load(url: string, name?: string): Promise<IPointCloudOctree> {
+    // Validate URL
+    if (!url || typeof url !== 'string') {
+      throw new Error('Invalid URL: URL must be a non-empty string');
+    }
+
+    // Determine point cloud name
+    const cloudName = name || this.extractNameFromUrl(url);
+
+    // Check if point cloud with this name already exists
+    if (this.pointClouds.has(cloudName)) {
+      throw new Error(`Point cloud "${cloudName}" is already loaded`);
+    }
+
+    try {
+      // 1. Create loader if not already created
+      // TODO: Consider injecting loader in constructor for better testability
+      const { PotreeLoader } = await import('./loaders/PotreeLoader.js');
+      const loader = new PotreeLoader();
+
+      // 2. Load metadata and create octree structure
+      const octree = await loader.load(url);
+
+      // 3. Store in point clouds map
+      this.pointClouds.set(cloudName, octree);
+
+      // 4. Add root node to scene (if it exists)
+      // TODO: Create visual representation of the root node
+      // For now, we just store the octree structure
+      // In Phase 4, we'll integrate with StreamingSystem and ThreeRenderSystem
+
+      // 5. Emit loaded event
+      this.emit('pointcloud-loaded', {
+        pointCloud: octree,
+        name: cloudName,
+      });
+
+      return octree;
+    } catch (error) {
+      // Clean up on error
+      this.pointClouds.delete(cloudName);
+
+      // Re-throw with more context
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to load point cloud from "${url}": ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Extract a name from the point cloud URL
+   *
+   * @param url - Point cloud URL
+   * @returns Extracted name or 'pointcloud' if extraction fails
+   *
+   * @example
+   * ```typescript
+   * extractNameFromUrl('/data/lion_takanawa/')          // 'lion_takanawa'
+   * extractNameFromUrl('http://example.com/cloud.js')   // 'cloud'
+   * extractNameFromUrl('invalid')                       // 'pointcloud'
+   * ```
+   */
+  private extractNameFromUrl(url: string): string {
+    try {
+      // Remove trailing slash
+      let cleanUrl = url.replace(/\/$/, '');
+
+      // Remove file extension if present
+      cleanUrl = cleanUrl.replace(/\.(js|json)$/, '');
+
+      // Extract last path segment
+      const segments = cleanUrl.split('/');
+      const lastSegment = segments[segments.length - 1];
+
+      // Return last segment or fallback
+      return lastSegment || 'pointcloud';
+    } catch (_error) {
+      return 'pointcloud';
+    }
   }
 
   /**

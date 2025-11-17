@@ -462,15 +462,48 @@ describe('Viewer', () => {
       expect(viewer.getPointClouds()).toEqual([]);
     });
 
-    it('should throw error when loading (not yet implemented)', async () => {
+    it('should extract name from URL correctly', () => {
       const viewer = new Viewer({
         container,
         renderer,
         scene,
       });
 
-      await expect(viewer.load('test.json')).rejects.toThrow(
-        'Point cloud loading not yet implemented',
+      // Test various URL formats
+      expect((viewer as any).extractNameFromUrl('/data/lion_takanawa/')).toBe('lion_takanawa');
+      expect((viewer as any).extractNameFromUrl('http://example.com/cloud.js')).toBe('cloud');
+      expect((viewer as any).extractNameFromUrl('/path/to/metadata.json')).toBe('metadata');
+      expect((viewer as any).extractNameFromUrl('/')).toBe('pointcloud');
+      expect((viewer as any).extractNameFromUrl('')).toBe('pointcloud');
+    });
+
+    it('should validate URL parameter', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Test empty URL
+      await expect(viewer.load('')).rejects.toThrow('Invalid URL');
+
+      // Test invalid URL type
+      await expect(viewer.load(null as any)).rejects.toThrow('Invalid URL');
+    });
+
+    it('should reject loading same point cloud twice', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Manually add a point cloud to simulate it's already loaded
+      const mockCloud = {} as IPointCloudOctree;
+      (viewer as any).pointClouds.set('test', mockCloud);
+
+      await expect(viewer.load('test.json', 'test')).rejects.toThrow(
+        'Point cloud "test" is already loaded',
       );
     });
 
