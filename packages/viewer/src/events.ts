@@ -2,7 +2,11 @@
  * Viewer event definitions
  */
 
-import type { IPointCloudOctree } from '@better-potree/core';
+import type {
+  IPointCloudOctree,
+  IPointCloudOctreeNode,
+  IWorkerDecodeResponse,
+} from '@better-potree/core';
 import type * as THREE from 'three';
 
 /**
@@ -25,6 +29,24 @@ export interface ViewerEvents {
   'pointcloud-removed': {
     pointCloud: IPointCloudOctree;
     name: string;
+  };
+
+  /**
+   * Fired when a node is successfully loaded
+   */
+  'node-loaded': {
+    pointCloud: IPointCloudOctree;
+    node: IPointCloudOctreeNode;
+    data: IWorkerDecodeResponse;
+  };
+
+  /**
+   * Fired when a node fails to load
+   */
+  'node-load-failed': {
+    node: IPointCloudOctreeNode;
+    error: Error;
+    retries: number;
   };
 
   /**

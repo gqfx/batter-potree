@@ -917,5 +917,139 @@ describe('Viewer', () => {
 
       expect(viewer.getRenderer()).toBe(renderer);
     });
+
+    it('should get scheduler', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+      expect(scheduler).toBeDefined();
+      expect(scheduler.isRunning()).toBe(false);
+    });
+
+    it('should get streaming system', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+      expect(streamingSystem).toBeDefined();
+      expect(streamingSystem.getStats()).toBeDefined();
+    });
+  });
+
+  describe('systems integration', () => {
+    it('should initialize scheduler with streaming system', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+      expect(scheduler.hasSystem('bp:streaming')).toBe(true);
+    });
+
+    it('should start scheduler when animation starts', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+
+      viewer.startAnimation();
+
+      expect(scheduler.isRunning()).toBe(true);
+
+      viewer.stopAnimation();
+    });
+
+    it('should stop scheduler when animation stops', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+
+      viewer.startAnimation();
+      viewer.stopAnimation();
+
+      expect(scheduler.isRunning()).toBe(false);
+    });
+
+    it('should update systems during animation', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+      const updateSpy = vi.spyOn(scheduler, 'update');
+
+      viewer.startAnimation();
+
+      // Wait for next frame
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      viewer.stopAnimation();
+
+      expect(updateSpy).toHaveBeenCalled();
+      // First call might be 0, but subsequent calls should have positive deltaTime
+      const callsWithPositiveDelta = updateSpy.mock.calls.filter((call) => call[0] > 0);
+      expect(callsWithPositiveDelta.length).toBeGreaterThan(0);
+    });
+
+    it('should dispose scheduler on viewer destroy', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+      const disposeSpy = vi.spyOn(scheduler, 'dispose');
+
+      viewer.destroy();
+
+      expect(disposeSpy).toHaveBeenCalled();
+    });
+
+    it('should have profiling enabled by default', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+      expect(scheduler.stats).toBeDefined();
+    });
+
+    it('should track streaming system stats', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+      const stats = streamingSystem.getStats();
+
+      expect(stats.pendingRequests).toBe(0);
+      expect(stats.activeLoads).toBe(0);
+      expect(stats.completedLoads).toBe(0);
+      expect(stats.failedLoads).toBe(0);
+      expect(stats.totalBytesLoaded).toBe(0);
+    });
   });
 });

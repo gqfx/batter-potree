@@ -3,7 +3,7 @@
  */
 
 import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
-import { TypedEventEmitter } from '@better-potree/core';
+import { StreamingSystem, SystemScheduler, TypedEventEmitter } from '@better-potree/core';
 import * as THREE from 'three';
 import type { ViewerEvents } from './events.js';
 
@@ -78,6 +78,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   private edlConfig: EDLConfig;
   private backgroundColor: THREE.Color;
 
+  // Systems
+  private scheduler: SystemScheduler;
+  private streamingSystem: StreamingSystem;
+
   // Animation
   private animationId: number | null;
   private lastTimestamp: number;
@@ -109,6 +113,26 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       strength: config.edlStrength ?? 0.4,
     };
     this.backgroundColor = new THREE.Color(config.backgroundColor ?? 0x000000);
+
+    // Initialize systems
+    this.scheduler = new SystemScheduler({
+      enableProfiling: true,
+      errorHandler: (error, systemName) => {
+        console.error(`[Viewer] System "${systemName}" error:`, error);
+      },
+    });
+
+    this.streamingSystem = new StreamingSystem({
+      maxConcurrentLoads: 8,
+      maxRetries: 3,
+      maxRequestsPerFrame: 10,
+    });
+
+    // Add StreamingSystem to scheduler
+    this.scheduler.addSystem(this.streamingSystem);
+
+    // Set up load completion callback
+    this.setupStreamingCallbacks();
 
     // Animation state
     this.animationId = null;
@@ -144,6 +168,53 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
     this.renderer.setSize(width, height);
+  }
+
+  /**
+   * Setup streaming system callbacks
+   *
+   * Configures callbacks for node loading events to integrate
+   * StreamingSystem with the rendering pipeline.
+   */
+  private setupStreamingCallbacks(): void {
+    // Handle successful node loading
+    this.streamingSystem.setOnLoadComplete((event) => {
+      const { octree, node, data } = event;
+
+      // TODO: Phase 4 - Update rendering system with loaded node data
+      // For now, we just log the event
+      console.debug(
+        `[Viewer] Node loaded: ${node.name} (${data.numPoints} points) in ${event.loadTime.toFixed(2)}ms`,
+      );
+
+      // Emit node-loaded event for external listeners
+      this.emit('node-loaded', {
+        pointCloud: octree,
+        node,
+        data,
+      });
+
+      // Trigger a render update
+      if (!this.isAnimating) {
+        this.render();
+      }
+    });
+
+    // Handle failed node loading
+    this.streamingSystem.setOnLoadFailed((event) => {
+      const { node, error, retries } = event;
+      console.error(
+        `[Viewer] Node load failed: ${node.name} after ${retries} retries:`,
+        error,
+      );
+
+      // Emit node-load-failed event for external listeners
+      this.emit('node-load-failed', {
+        node,
+        error,
+        retries,
+      });
+    });
   }
 
   /**
@@ -418,6 +489,43 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   }
 
   /**
+   * Get the system scheduler
+   *
+   * Provides access to the scheduler for advanced usage, such as
+   * adding custom systems or inspecting system performance.
+   *
+   * @returns System scheduler instance
+   *
+   * @example
+   * ```typescript
+   * const scheduler = viewer.getScheduler();
+   * console.log('Scheduler stats:', scheduler.stats);
+   * ```
+   */
+  getScheduler(): SystemScheduler {
+    return this.scheduler;
+  }
+
+  /**
+   * Get the streaming system
+   *
+   * Provides access to the streaming system for monitoring
+   * load progress and statistics.
+   *
+   * @returns StreamingSystem instance
+   *
+   * @example
+   * ```typescript
+   * const streaming = viewer.getStreamingSystem();
+   * const stats = streaming.getStats();
+   * console.log(`Loading: ${stats.activeLoads}/${stats.pendingRequests}`);
+   * ```
+   */
+  getStreamingSystem(): StreamingSystem {
+    return this.streamingSystem;
+  }
+
+  /**
    * Render a single frame
    */
   render(): void {
@@ -434,6 +542,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
     this.isAnimating = true;
     this.lastTimestamp = performance.now();
+
+    // Start the scheduler
+    this.scheduler.start();
+
     this.animate(this.lastTimestamp);
   }
 
@@ -446,6 +558,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       this.animationId = null;
     }
     this.isAnimating = false;
+
+    // Stop the scheduler
+    this.scheduler.stop();
   }
 
   /**
@@ -458,11 +573,14 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
     this.animationId = requestAnimationFrame((ts) => this.animate(ts));
 
-    const deltaTime = timestamp - this.lastTimestamp;
+    const deltaTime = (timestamp - this.lastTimestamp) / 1000; // Convert to seconds
     this.lastTimestamp = timestamp;
 
     // Update event
     this.emit('update', { deltaTime, timestamp });
+
+    // Update all systems through scheduler
+    this.scheduler.update(deltaTime);
 
     // Update point clouds (LOD, visibility, etc.)
     // This will be implemented when PointCloud has update logic
@@ -487,6 +605,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     for (const name of Array.from(this.pointClouds.keys())) {
       this.remove(name);
     }
+
+    // Dispose scheduler and all systems
+    this.scheduler.dispose();
 
     // Cleanup renderer
     this.renderer.dispose();
