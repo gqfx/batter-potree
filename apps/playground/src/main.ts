@@ -199,13 +199,22 @@ function createControlsPanel() {
       <h3>点云加载</h3>
 
       <div class="control-group">
+        <button id="load-local-folder" style="width: 100%; margin-bottom: 8px;">
+          📁 选择本地文件夹
+        </button>
+      </div>
+
+      <div class="control-group">
         <input
           type="text"
           id="pointcloud-url"
-          placeholder="点云 URL (cloud.js 或 metadata.json)"
+          placeholder="或输入点云 URL (cloud.js 或 metadata.json)"
           style="width: 100%; margin-bottom: 8px;"
         />
-        <button id="load-pointcloud">加载点云</button>
+        <button id="load-pointcloud">加载远程点云</button>
+      </div>
+
+      <div class="info-text" id="load-status" style="display: none; margin-top: 8px; padding: 8px; background: rgba(0,255,0,0.1); border-radius: 4px;">
       </div>
 
       <div class="info-text">
@@ -274,6 +283,137 @@ function createControlsPanel() {
     controls.setPivot(new THREE.Vector3(0, 0, 0));
   });
 
+  // 加载本地文件夹
+  const loadFolderButton = document.getElementById('load-local-folder');
+  const loadStatus = document.getElementById('load-status');
+
+  loadFolderButton?.addEventListener('click', async () => {
+    try {
+      // 检查浏览器是否支持 File System Access API
+      if (!('showDirectoryPicker' in window)) {
+        alert('您的浏览器不支持本地文件夹选择功能。\n请使用 Chrome 86+、Edge 86+ 或其他支持 File System Access API 的浏览器。');
+        return;
+      }
+
+      // 显示加载状态
+      if (loadStatus) {
+        loadStatus.style.display = 'block';
+        loadStatus.innerHTML = '正在选择文件夹...';
+      }
+
+      // 打开文件夹选择器
+      const directoryHandle = await (window as any).showDirectoryPicker({
+        mode: 'read',
+        startIn: 'documents',
+      });
+
+      console.log('已选择文件夹:', directoryHandle.name);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `正在扫描文件夹: ${directoryHandle.name}...`;
+      }
+
+      // 查找 metadata.json 或 cloud.js
+      let metadataFile: File | null = null;
+      let metadataFileName = '';
+
+      for await (const entry of (directoryHandle as any).values()) {
+        if (entry.kind === 'file') {
+          const name = entry.name.toLowerCase();
+          if (name === 'metadata.json' || name === 'cloud.js') {
+            const fileHandle = entry;
+            metadataFile = await fileHandle.getFile();
+            metadataFileName = entry.name;
+            break;
+          }
+        }
+      }
+
+      if (!metadataFile) {
+        throw new Error('在所选文件夹中未找到 metadata.json 或 cloud.js 文件');
+      }
+
+      console.log('找到元数据文件:', metadataFileName);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `正在加载: ${metadataFileName}...`;
+      }
+
+      // 读取元数据文件内容
+      const metadataText = await metadataFile.text();
+      let metadata: any;
+
+      if (metadataFileName.toLowerCase() === 'metadata.json') {
+        // Potree 2.0 格式
+        metadata = JSON.parse(metadataText);
+      } else {
+        // Potree 1.x 格式 (cloud.js)
+        // 移除 "var Potree = {...}" 包装
+        const jsonMatch = metadataText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('无法解析 cloud.js 文件');
+        }
+        metadata = JSON.parse(jsonMatch[0]);
+      }
+
+      console.log('元数据解析成功:', metadata);
+
+      // 创建本地文件读取函数
+      const loadLocalFile = async (relativePath: string): Promise<ArrayBuffer> => {
+        // 移除开头的 './' 或 '/'
+        const cleanPath = relativePath.replace(/^\.?\//, '');
+
+        // 分割路径
+        const pathParts = cleanPath.split('/');
+
+        // 遍历文件夹层级
+        let currentHandle = directoryHandle;
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+        }
+
+        // 获取文件
+        const fileName = pathParts[pathParts.length - 1];
+        const fileHandle = await currentHandle.getFileHandle(fileName);
+        const file = await fileHandle.getFile();
+
+        return await file.arrayBuffer();
+      };
+
+      // 使用自定义加载函数加载点云
+      // 注意：这里需要修改 PotreeLoader 以支持自定义文件加载函数
+      console.log('点云元数据加载成功！');
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `
+          ✅ 成功加载: ${directoryHandle.name}<br>
+          元数据文件: ${metadataFileName}<br>
+          版本: ${metadata.version || 'Unknown'}<br>
+          点数: ${metadata.points ? metadata.points.toLocaleString() : 'Unknown'}
+        `;
+        loadStatus.style.background = 'rgba(0,255,0,0.1)';
+      }
+
+      // TODO: 将点云添加到场景
+      // 这需要等待 PotreeLoader 支持自定义文件加载函数
+      alert(`点云元数据加载成功！\n文件夹: ${directoryHandle.name}\n元数据: ${metadataFileName}\n\n(完整渲染功能将在后续实现)`);
+
+    } catch (error) {
+      console.error('加载本地文件夹失败:', error);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `❌ 加载失败: ${error instanceof Error ? error.message : String(error)}`;
+        loadStatus.style.background = 'rgba(255,0,0,0.1)';
+      }
+
+      if ((error as Error).name !== 'AbortError') {
+        // 用户取消不需要弹窗
+        alert(`加载失败: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  });
+
+  // 加载远程 URL
   const loadButton = document.getElementById('load-pointcloud');
   const urlInput = document.getElementById('pointcloud-url') as HTMLInputElement;
   loadButton?.addEventListener('click', async () => {
@@ -284,9 +424,19 @@ function createControlsPanel() {
     }
 
     try {
+      if (loadStatus) {
+        loadStatus.style.display = 'block';
+        loadStatus.innerHTML = `正在加载: ${url}...`;
+        loadStatus.style.background = 'rgba(0,255,0,0.1)';
+      }
+
       console.log('正在加载点云:', url);
       const pointCloud = await loader.load(url);
       console.log('点云加载成功:', pointCloud);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `✅ 成功加载远程点云<br>URL: ${url}`;
+      }
 
       // TODO: 将点云添加到场景
       // 这需要等待 rendering-three 包实现 PointCloudObject3D
@@ -294,6 +444,12 @@ function createControlsPanel() {
       alert('点云元数据加载成功！\n(渲染功能将在后续实现)');
     } catch (error) {
       console.error('加载点云失败:', error);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `❌ 加载失败: ${error instanceof Error ? error.message : String(error)}`;
+        loadStatus.style.background = 'rgba(255,0,0,0.1)';
+      }
+
       alert(`加载失败: ${error instanceof Error ? error.message : String(error)}`);
     }
   });
