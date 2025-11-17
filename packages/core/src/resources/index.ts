@@ -4,10 +4,7 @@
  * @module resources
  */
 
-// 资源管理器将在后续任务中添加
-// export * from './ResourceManager';
-// export * from './WorkerPool';
-// export * from './ObjectPools';
-
-// Placeholder export to make this a valid module
-export const __RESOURCES_MODULE__ = true;
+export { LRUCache } from './LRUCache.js';
+export { ResourceManager } from './ResourceManager.js';
+export type { ResourceManagerOptions } from './ResourceManager.js';
+export type { Resource, ResourceStats } from './types.js';
