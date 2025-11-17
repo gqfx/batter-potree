@@ -22,6 +22,16 @@ import { parseAttributes } from './parseAttributes.js';
 import { Version } from './Version.js';
 
 /**
+ * Custom file loader function type
+ *
+ * Used for loading files from non-standard sources (e.g., local file system)
+ *
+ * @param path - Relative path to the file
+ * @returns Promise resolving to file content as ArrayBuffer
+ */
+export type CustomFileLoader = (path: string) => Promise<ArrayBuffer>;
+
+/**
  * Potree loader configuration
  */
 export interface PotreeLoaderConfig {
@@ -31,6 +41,24 @@ export interface PotreeLoaderConfig {
   readonly baseUrl?: string;
   /** Whether to automatically load hierarchy */
   readonly autoLoadHierarchy?: boolean;
+  /**
+   * Custom file loader function for non-HTTP sources
+   *
+   * When provided, this function will be used instead of fetch() to load files.
+   * Useful for loading from local file system or other custom sources.
+   *
+   * @example
+   * ```ts
+   * const loader = new PotreeLoader({
+   *   customFileLoader: async (path) => {
+   *     const fileHandle = await getFileHandle(path);
+   *     const file = await fileHandle.getFile();
+   *     return await file.arrayBuffer();
+   *   }
+   * });
+   * ```
+   */
+  readonly customFileLoader?: CustomFileLoader;
 }
 
 /**
@@ -55,7 +83,12 @@ interface HierarchyNode {
  * loads the hierarchy information.
  */
 export class PotreeLoader implements ILoader<IPointCloudOctree> {
-  private readonly config: Required<PotreeLoaderConfig>;
+  private readonly config: {
+    readonly fetchOptions: RequestInit;
+    readonly baseUrl: string;
+    readonly autoLoadHierarchy: boolean;
+    readonly customFileLoader?: CustomFileLoader;
+  };
 
   /**
    * Create a new PotreeLoader instance
@@ -68,6 +101,28 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       baseUrl: config.baseUrl ?? '',
       autoLoadHierarchy: config.autoLoadHierarchy ?? true,
     };
+
+    // Only add customFileLoader if provided
+    if (config.customFileLoader) {
+      (this.config as any).customFileLoader = config.customFileLoader;
+    }
+  }
+
+  /**
+   * Normalize file path by removing leading './' or '/'
+   *
+   * @param path - Path to normalize
+   * @returns Normalized path
+   *
+   * @example
+   * ```ts
+   * normalizePath('./data/r.bin')  // 'data/r.bin'
+   * normalizePath('/data/r.bin')   // 'data/r.bin'
+   * normalizePath('data/r.bin')    // 'data/r.bin'
+   * ```
+   */
+  private normalizePath(path: string): string {
+    return path.replace(/^\.?\//, '');
   }
 
   /**
@@ -114,12 +169,22 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
    * @throws {Error} If fetch fails or JSON is invalid
    */
   private async loadMetadata(url: string): Promise<IPotreeMetadata> {
-    const response = await fetch(url, this.config.fetchOptions);
-    if (!response.ok) {
-      throw new Error(`Failed to load metadata from ${url}: ${response.statusText}`);
-    }
+    let text: string;
 
-    let text = await response.text();
+    if (this.config.customFileLoader) {
+      // Use custom file loader with normalized path
+      const normalizedPath = this.normalizePath(url);
+      const buffer = await this.config.customFileLoader(normalizedPath);
+      const decoder = new TextDecoder('utf-8');
+      text = decoder.decode(buffer);
+    } else {
+      // Use standard fetch
+      const response = await fetch(url, this.config.fetchOptions);
+      if (!response.ok) {
+        throw new Error(`Failed to load metadata from ${url}: ${response.statusText}`);
+      }
+      text = await response.text();
+    }
 
     // Remove JSONP callback if present (for cloud.js format)
     if (text.startsWith('Potree.') || text.startsWith('var ')) {
@@ -248,13 +313,22 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     const hierarchyUrl = `${baseUrl}hierarchy.bin`;
 
     try {
-      const response = await fetch(hierarchyUrl, this.config.fetchOptions);
-      if (!response.ok) {
-        console.warn(`Failed to load hierarchy from ${hierarchyUrl}`);
-        return;
+      let buffer: ArrayBuffer;
+
+      if (this.config.customFileLoader) {
+        // Use custom file loader with normalized path
+        const normalizedPath = this.normalizePath(hierarchyUrl);
+        buffer = await this.config.customFileLoader(normalizedPath);
+      } else {
+        // Use standard fetch
+        const response = await fetch(hierarchyUrl, this.config.fetchOptions);
+        if (!response.ok) {
+          console.warn(`Failed to load hierarchy from ${hierarchyUrl}`);
+          return;
+        }
+        buffer = await response.arrayBuffer();
       }
 
-      const buffer = await response.arrayBuffer();
       const nodes = this.parseHierarchyBinary(buffer, metadata.hierarchyStepSize ?? 5);
 
       // Build tree structure from flat hierarchy

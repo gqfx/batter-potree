@@ -5,8 +5,9 @@
  */
 
 import './style.css';
-import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
-import { EarthControls, PotreeLoader, ViewerAPI } from '@better-potree/viewer';
+import { ThreeJsRenderer, ThreeScene, PointCloudMaterial } from '@better-potree/rendering-three';
+import { EarthControls, PotreeLoader, ViewerAPI, PointCloudColorMode } from '@better-potree/viewer';
+import type { IPointCloudOctree, IPotreeMetadata } from '@better-potree/core';
 import * as THREE from 'three';
 
 console.log('Better Potree Playground - 初始化中...');
@@ -339,29 +340,12 @@ function createControlsPanel() {
         loadStatus.innerHTML = `正在加载: ${metadataFileName}...`;
       }
 
-      // 读取元数据文件内容
-      const metadataText = await metadataFile.text();
-      let metadata: any;
-
-      if (metadataFileName.toLowerCase() === 'metadata.json') {
-        // Potree 2.0 格式
-        metadata = JSON.parse(metadataText);
-      } else {
-        // Potree 1.x 格式 (cloud.js)
-        // 移除 "var Potree = {...}" 包装
-        const jsonMatch = metadataText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-          throw new Error('无法解析 cloud.js 文件');
-        }
-        metadata = JSON.parse(jsonMatch[0]);
-      }
-
-      console.log('元数据解析成功:', metadata);
-
       // 创建本地文件读取函数
       const loadLocalFile = async (relativePath: string): Promise<ArrayBuffer> => {
         // 移除开头的 './' 或 '/'
         const cleanPath = relativePath.replace(/^\.?\//, '');
+
+        console.log('加载本地文件:', cleanPath);
 
         // 分割路径
         const pathParts = cleanPath.split('/');
@@ -380,23 +364,162 @@ function createControlsPanel() {
         return await file.arrayBuffer();
       };
 
-      // 使用自定义加载函数加载点云
-      // 注意：这里需要修改 PotreeLoader 以支持自定义文件加载函数
-      console.log('点云元数据加载成功！');
+      // 使用自定义加载函数创建 loader
+      const customLoader = new PotreeLoader({
+        customFileLoader: loadLocalFile,
+        autoLoadHierarchy: true,
+      });
 
       if (loadStatus) {
+        loadStatus.innerHTML = `正在解析点云结构...`;
+      }
+
+      // 加载点云 octree
+      const octree: IPointCloudOctree = await customLoader.load(metadataFileName);
+
+      console.log('点云结构加载成功:', octree);
+      console.log('根节点:', octree.root);
+      console.log('点属性:', octree.pointAttributes);
+
+      if (loadStatus) {
+        loadStatus.innerHTML = `正在加载根节点点数据...`;
+      }
+
+      // 加载根节点的点数据
+      if (!octree.root) {
+        throw new Error('点云没有根节点');
+      }
+
+      // 从 octree.url 中获取 octreeDir (PotreeLoader 已经构建好了完整路径)
+      // octree.url 格式类似 "data/" 或完整路径
+      // 我们需要从 metadata 中获取 octreeDir
+      let octreeDir = 'data'; // 默认值
+
+      // 重新读取元数据来获取 octreeDir
+      const metadataText = await metadataFile.text();
+      let metadata: IPotreeMetadata;
+
+      if (metadataFileName.toLowerCase() === 'metadata.json') {
+        metadata = JSON.parse(metadataText);
+      } else {
+        // cloud.js 格式
+        const jsonMatch = metadataText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          metadata = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('无法解析元数据');
+        }
+      }
+
+      if (metadata.octreeDir) {
+        octreeDir = metadata.octreeDir;
+      }
+
+      const rootNodePath = `${octreeDir}/r.bin`;
+
+      console.log('加载根节点数据:', rootNodePath);
+
+      // 加载根节点二进制数据
+      const rootData = await loadLocalFile(rootNodePath);
+
+      console.log('根节点数据大小:', rootData.byteLength, 'bytes');
+
+      // 简单解析二进制数据（基础实现，仅用于演示）
+      // 注意：完整实现应该使用 BinaryDecoderWorker
+      const view = new DataView(rootData);
+      const numPoints = octree.root.numPoints;
+
+      console.log('点数:', numPoints);
+
+      // 假设是 Potree 2.0 格式，带有 position(xyz, int32) + color(rgb, uint16)
+      // 实际格式需要根据 pointAttributes 来确定
+      const positions = new Float32Array(numPoints * 3);
+      const colors = new Uint8Array(numPoints * 3);
+
+      // 获取点属性的字节大小
+      const pointByteSize = octree.pointAttributes.byteSize;
+
+      console.log('点字节大小:', pointByteSize);
+
+      // 解析每个点（简化版本）
+      let offset = 0;
+      for (let i = 0; i < numPoints; i++) {
+        // 读取位置 (假设是 int32 * 3)
+        const x = view.getInt32(offset, true);
+        const y = view.getInt32(offset + 4, true);
+        const z = view.getInt32(offset + 8, true);
+
+        // 转换到实际坐标
+        const scale = octree.scale;
+        const bbox = octree.boundingBox;
+        positions[i * 3] = bbox.min.x + x * scale;
+        positions[i * 3 + 1] = bbox.min.y + y * scale;
+        positions[i * 3 + 2] = bbox.min.z + z * scale;
+
+        // 读取颜色 (假设是 uint16 * 3)
+        const r = view.getUint16(offset + 12, true);
+        const g = view.getUint16(offset + 14, true);
+        const b = view.getUint16(offset + 16, true);
+
+        // 转换到 0-255
+        colors[i * 3] = (r / 65535) * 255;
+        colors[i * 3 + 1] = (g / 65535) * 255;
+        colors[i * 3 + 2] = (b / 65535) * 255;
+
+        offset += pointByteSize;
+      }
+
+      console.log('点数据解析完成');
+
+      // 创建 BufferGeometry
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3, true));
+
+      // 创建点云材质
+      const material = new PointCloudMaterial({
+        size: viewer.getPointSize(),
+        colorMode: PointCloudColorMode.RGB,
+      });
+
+      // 创建点云对象
+      const points = new THREE.Points(geometry, material);
+      points.name = `PointCloud_${directoryHandle.name}`;
+
+      // 添加到场景
+      scene.add(points);
+
+      console.log('点云已添加到场景');
+
+      // 调整相机以适应点云边界
+      const boundingBox = octree.boundingBox;
+      const center = boundingBox.getCenter(new THREE.Vector3());
+      const size = boundingBox.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      camera.position.copy(center);
+      camera.position.z += maxDim * 2;
+      camera.lookAt(center);
+      controls.setPivot(center);
+
+      console.log('相机已调整到点云位置');
+
+      // 隐藏网格和坐标轴（可选）
+      gridHelper.visible = false;
+      axesHelper.visible = false;
+
+      // 更新加载状态
+      if (loadStatus) {
         loadStatus.innerHTML = `
-          ✅ 成功加载: ${directoryHandle.name}<br>
-          元数据文件: ${metadataFileName}<br>
-          版本: ${metadata.version || 'Unknown'}<br>
-          点数: ${metadata.points ? metadata.points.toLocaleString() : 'Unknown'}
+          ✅ 成功加载并显示点云<br>
+          文件夹: ${directoryHandle.name}<br>
+          元数据: ${metadataFileName}<br>
+          版本: ${octree.version}<br>
+          点数: ${numPoints.toLocaleString()}<br>
+          包围盒: (${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})
         `;
         loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
-
-      // TODO: 将点云添加到场景
-      // 这需要等待 PotreeLoader 支持自定义文件加载函数
-      alert(`点云元数据加载成功！\n文件夹: ${directoryHandle.name}\n元数据: ${metadataFileName}\n\n(完整渲染功能将在后续实现)`);
 
     } catch (error) {
       console.error('加载本地文件夹失败:', error);

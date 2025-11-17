@@ -11,3 +11,6 @@ export * from './tools/index.js';
 export * from './ui/index.js';
 export * from './Viewer.js';
 export * from './ViewerAPI.js';
+
+// Re-export commonly used types from core
+export { PointCloudColorMode } from '@better-potree/core';
