@@ -521,6 +521,11 @@ describe('Viewer', () => {
       const mockCloud = {} as IPointCloudOctree;
       (viewer as any).pointClouds.set('test', mockCloud);
 
+      // Also add to traversal system to match real behavior
+      const traversalSystem = viewer.getTraversalSystem();
+      const addSpy = vi.spyOn(traversalSystem, 'addPointCloud');
+      const removeSpy = vi.spyOn(traversalSystem, 'removePointCloud');
+
       viewer.remove('test');
 
       expect(viewer.getPointClouds()).toEqual([]);
@@ -528,6 +533,7 @@ describe('Viewer', () => {
         pointCloud: mockCloud,
         name: 'test',
       });
+      expect(removeSpy).toHaveBeenCalledWith('test');
     });
 
     it('should remove point cloud by reference', () => {
@@ -540,9 +546,13 @@ describe('Viewer', () => {
       const mockCloud = {} as IPointCloudOctree;
       (viewer as any).pointClouds.set('test', mockCloud);
 
+      const traversalSystem = viewer.getTraversalSystem();
+      const removeSpy = vi.spyOn(traversalSystem, 'removePointCloud');
+
       viewer.remove(mockCloud);
 
       expect(viewer.getPointClouds()).toEqual([]);
+      expect(removeSpy).toHaveBeenCalledWith('test');
     });
 
     it('should warn when removing non-existent point cloud', () => {
@@ -941,6 +951,18 @@ describe('Viewer', () => {
       expect(streamingSystem).toBeDefined();
       expect(streamingSystem.getStats()).toBeDefined();
     });
+
+    it('should get traversal system', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const traversalSystem = viewer.getTraversalSystem();
+      expect(traversalSystem).toBeDefined();
+      expect(traversalSystem.getLastResult()).toBeDefined();
+    });
   });
 
   describe('systems integration', () => {
@@ -953,6 +975,95 @@ describe('Viewer', () => {
 
       const scheduler = viewer.getScheduler();
       expect(scheduler.hasSystem('bp:streaming')).toBe(true);
+    });
+
+    it('should initialize scheduler with traversal system', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scheduler = viewer.getScheduler();
+      expect(scheduler.hasSystem('bp:traversal')).toBe(true);
+    });
+
+    it('should initialize traversal system with camera', () => {
+      const camera = new THREE.PerspectiveCamera();
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+        camera,
+      });
+
+      const traversalSystem = viewer.getTraversalSystem();
+      expect(traversalSystem).toBeDefined();
+      // Verify camera is set by checking if system is ready to traverse
+      expect((traversalSystem as any).camera).toBe(camera);
+    });
+
+    it('should initialize traversal system with point budget', () => {
+      const pointBudget = 500_000;
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+        pointBudget,
+      });
+
+      const traversalSystem = viewer.getTraversalSystem();
+      expect((traversalSystem as any).config.pointBudget).toBe(pointBudget);
+    });
+
+    it('should initialize traversal system with screen size', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const traversalSystem = viewer.getTraversalSystem();
+      expect((traversalSystem as any).config.screenWidth).toBe(800);
+      expect((traversalSystem as any).config.screenHeight).toBe(600);
+    });
+
+    it('should update traversal system screen size on resize', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Mock clientWidth/clientHeight (JSDOM doesn't update these from CSS)
+      Object.defineProperty(container, 'clientWidth', {
+        configurable: true,
+        value: 1024,
+      });
+      Object.defineProperty(container, 'clientHeight', {
+        configurable: true,
+        value: 768,
+      });
+
+      // Trigger resize
+      window.dispatchEvent(new Event('resize'));
+
+      const traversalSystem = viewer.getTraversalSystem();
+      expect((traversalSystem as any).config.screenWidth).toBe(1024);
+      expect((traversalSystem as any).config.screenHeight).toBe(768);
+    });
+
+    it('should update traversal system point budget', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      viewer.setPointBudget(2_000_000);
+
+      const traversalSystem = viewer.getTraversalSystem();
+      expect((traversalSystem as any).config.pointBudget).toBe(2_000_000);
     });
 
     it('should start scheduler when animation starts', () => {

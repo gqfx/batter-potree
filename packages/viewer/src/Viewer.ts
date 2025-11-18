@@ -3,7 +3,12 @@
  */
 
 import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
-import { StreamingSystem, SystemScheduler, TypedEventEmitter } from '@better-potree/core';
+import {
+  StreamingSystem,
+  SystemScheduler,
+  TraversalSystem,
+  TypedEventEmitter,
+} from '@better-potree/core';
 import * as THREE from 'three';
 import type { ViewerEvents } from './events.js';
 
@@ -81,6 +86,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   // Systems
   private scheduler: SystemScheduler;
   private streamingSystem: StreamingSystem;
+  private traversalSystem: TraversalSystem;
 
   // Animation
   private animationId: number | null;
@@ -128,8 +134,21 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       maxRequestsPerFrame: 10,
     });
 
-    // Add StreamingSystem to scheduler
+    // Create TraversalSystem
+    this.traversalSystem = new TraversalSystem({
+      pointBudget: this.pointBudget,
+      minScreenSize: 1.0,
+      maxLevel: 30,
+      screenWidth: this.container.clientWidth,
+      screenHeight: this.container.clientHeight,
+    });
+
+    // Add systems to scheduler
     this.scheduler.addSystem(this.streamingSystem);
+    this.scheduler.addSystem(this.traversalSystem);
+
+    // Set camera for TraversalSystem
+    this.traversalSystem.setCamera(this.camera);
 
     // Set up load completion callback
     this.setupStreamingCallbacks();
@@ -203,10 +222,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Handle failed node loading
     this.streamingSystem.setOnLoadFailed((event) => {
       const { node, error, retries } = event;
-      console.error(
-        `[Viewer] Node load failed: ${node.name} after ${retries} retries:`,
-        error,
-      );
+      console.error(`[Viewer] Node load failed: ${node.name} after ${retries} retries:`, error);
 
       // Emit node-load-failed event for external listeners
       this.emit('node-load-failed', {
@@ -230,6 +246,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       this.camera.aspect = width / height;
       this.camera.updateProjectionMatrix();
     }
+
+    // Update TraversalSystem screen size for LOD calculations
+    this.traversalSystem.setScreenSize(width, height);
   }
 
   /**
@@ -285,10 +304,8 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       // 3. Store in point clouds map
       this.pointClouds.set(cloudName, octree);
 
-      // 4. Add root node to scene (if it exists)
-      // TODO: Create visual representation of the root node
-      // For now, we just store the octree structure
-      // In Phase 4, we'll integrate with StreamingSystem and ThreeRenderSystem
+      // 4. Add to TraversalSystem for LOD traversal
+      this.traversalSystem.addPointCloud(cloudName, octree);
 
       // 5. Emit loaded event
       this.emit('pointcloud-loaded', {
@@ -352,9 +369,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       return;
     }
 
-    // Remove from scene (will be implemented when PointCloud has scene representation)
-    // this.scene.remove(cloud.sceneNode);
+    // Remove from TraversalSystem
+    this.traversalSystem.removePointCloud(name);
 
+    // Remove from point clouds map
     this.pointClouds.delete(name);
 
     this.emit('pointcloud-removed', { pointCloud: cloud, name });
@@ -391,6 +409,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
    */
   setPointBudget(budget: number): void {
     this.pointBudget = Math.max(100_000, budget);
+
+    // Update TraversalSystem point budget for LOD calculations
+    this.traversalSystem.setPointBudget(this.pointBudget);
+
     this.emit('point-budget-changed', { budget: this.pointBudget });
   }
 
@@ -523,6 +545,25 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
    */
   getStreamingSystem(): StreamingSystem {
     return this.streamingSystem;
+  }
+
+  /**
+   * Get the traversal system
+   *
+   * Provides access to the traversal system for monitoring
+   * LOD traversal results and statistics.
+   *
+   * @returns TraversalSystem instance
+   *
+   * @example
+   * ```typescript
+   * const traversal = viewer.getTraversalSystem();
+   * const result = traversal.getLastResult();
+   * console.log(`Visible nodes: ${result.visibleNodes.length}, Points: ${result.totalPoints}`);
+   * ```
+   */
+  getTraversalSystem(): TraversalSystem {
+    return this.traversalSystem;
   }
 
   /**
