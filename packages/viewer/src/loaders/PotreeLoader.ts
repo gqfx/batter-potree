@@ -233,10 +233,24 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       : boundingBox.clone();
 
     // Determine octree directory
-    let octreeDir = metadata.octreeDir || 'data';
-    if (!octreeDir.endsWith('/')) {
+    // For local file systems without explicit octreeDir in metadata,
+    // try current directory first (empty string)
+    let octreeDir = metadata.octreeDir || '';
+
+    // Only default to 'data' for remote URLs when octreeDir is not specified
+    if (!octreeDir && !this.config.customFileLoader) {
+      octreeDir = 'data';
+    }
+
+    if (octreeDir && !octreeDir.endsWith('/')) {
       octreeDir += '/';
     }
+
+    console.log('[parseMetadata] Octree directory configuration:', {
+      metadataOctreeDir: metadata.octreeDir,
+      resolvedOctreeDir: octreeDir,
+      hasCustomFileLoader: !!this.config.customFileLoader,
+    });
 
     // Construct full URL
     let fullUrl = baseUrl;
@@ -247,6 +261,12 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       fullUrl += '/';
     }
     fullUrl += octreeDir;
+
+    console.log('[parseMetadata] Constructed fullUrl:', {
+      baseUrl,
+      octreeDir,
+      fullUrl,
+    });
 
     // Create root node
     const root = this.createRootNode(boundingBox, metadata);
@@ -310,7 +330,14 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     metadata: IPotreeMetadata,
   ): Promise<void> {
     // Potree 2.0 uses a binary hierarchy file
+    // baseUrl already includes octreeDir (usually 'data/'), so just append the filename
     const hierarchyUrl = `${baseUrl}hierarchy.bin`;
+
+    console.log('[loadHierarchy] Attempting to load hierarchy:', {
+      baseUrl,
+      hierarchyUrl,
+      hasCustomFileLoader: !!this.config.customFileLoader,
+    });
 
     try {
       let buffer: ArrayBuffer;
@@ -318,9 +345,12 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       if (this.config.customFileLoader) {
         // Use custom file loader with normalized path
         const normalizedPath = this.normalizePath(hierarchyUrl);
+        console.log('[loadHierarchy] Using custom file loader with normalized path:', normalizedPath);
         buffer = await this.config.customFileLoader(normalizedPath);
+        console.log('[loadHierarchy] Successfully loaded hierarchy buffer, size:', buffer.byteLength);
       } else {
         // Use standard fetch
+        console.log('[loadHierarchy] Using standard fetch');
         const response = await fetch(hierarchyUrl, this.config.fetchOptions);
         if (!response.ok) {
           console.warn(`Failed to load hierarchy from ${hierarchyUrl}`);
@@ -330,11 +360,18 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       }
 
       const nodes = this.parseHierarchyBinary(buffer, metadata.hierarchyStepSize ?? 5);
+      console.log('[loadHierarchy] Parsed', nodes.length, 'nodes from hierarchy');
 
       // Build tree structure from flat hierarchy
       this.buildTreeFromHierarchy(root, nodes);
+      console.log('[loadHierarchy] Successfully built tree from hierarchy');
     } catch (error) {
       console.warn('Failed to load hierarchy:', error);
+      console.error('[loadHierarchy] Error details:', {
+        errorName: (error as Error).name,
+        errorMessage: (error as Error).message,
+        stack: (error as Error).stack,
+      });
     }
   }
 

@@ -45,7 +45,9 @@ export interface IPointAttributes {
 export interface IPotreeAttributeMetadata {
   name: string;
   size: number;
-  elements: number;
+  /** Number of elements (Potree 1.x uses 'elements', Potree 2.0 uses 'numElements') */
+  elements?: number;
+  numElements?: number;
   elementSize: number;
   type: string;
   description?: string;
@@ -99,6 +101,8 @@ export interface IPointCloudOctree {
   projection: string | null;
   version: string;
   scale: number;
+  /** Transform matrix (added at runtime by scene) */
+  matrixWorld?: THREE.Matrix4;
 }
 
 /**

@@ -291,11 +291,14 @@ export class ClassificationScheme {
   export(): Record<number, ClassificationConfig> {
     const result: Record<number, ClassificationConfig> = {};
     for (const [classId, config] of this.classifications) {
-      result[classId] = {
+      const exported: ClassificationConfig = {
         color: config.color.clone(),
         visible: config.visible,
-        name: config.name,
       };
+      if (config.name !== undefined) {
+        exported.name = config.name;
+      }
+      result[classId] = exported;
     }
     return result;
   }
@@ -309,11 +312,14 @@ export class ClassificationScheme {
     this.classifications.clear();
 
     for (const [classId, classConfig] of Object.entries(config)) {
-      this.classifications.set(Number(classId), {
+      const imported: ClassificationConfig = {
         color: classConfig.color.clone(),
         visible: classConfig.visible,
-        name: classConfig.name ?? undefined,
-      });
+      };
+      if (classConfig.name !== undefined) {
+        imported.name = classConfig.name;
+      }
+      this.classifications.set(Number(classId), imported);
     }
 
     this.needsUpdate = true;

@@ -15,9 +15,18 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
   const replacements: Record<string, string> = {
     COLOR_PACKED: 'rgba',
     RGBA: 'rgba',
+    RGB: 'rgb',
     INTENSITY: 'intensity',
     CLASSIFICATION: 'classification',
     GPS_TIME: 'gps-time',
+    'gps-time': 'gps-time',
+    position: 'POSITION_CARTESIAN',
+    'return number': 'return_number',
+    'number of returns': 'number_of_returns',
+    'classification flags': 'classification_flags',
+    'user data': 'user_data',
+    'scan angle': 'scan_angle',
+    'point source id': 'point_source_id',
   };
 
   const replaceOldNames = (old: string): string => {
@@ -61,14 +70,26 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
     }
   } else {
     // Potree 2.0+ format
-    if (Array.isArray(cloudjs.pointAttributes)) {
+    // Try both 'attributes' (new format) and 'pointAttributes' (old format)
+    console.log('[parseAttributes] Checking for attributes in cloudjs:', {
+      hasAttributes: 'attributes' in cloudjs,
+      hasPointAttributes: 'pointAttributes' in cloudjs,
+      attributesValue: (cloudjs as any).attributes,
+      pointAttributesValue: cloudjs.pointAttributes,
+    });
+
+    const attributeSource = (cloudjs as any).attributes || cloudjs.pointAttributes;
+
+    if (Array.isArray(attributeSource)) {
+      console.log('[parseAttributes] Found attribute source with', attributeSource.length, 'attributes');
       // For Potree 2.0+, should be IPotreeAttributeMetadata[]
-      const attrs = cloudjs.pointAttributes.filter(
+      const attrs = attributeSource.filter(
         (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr,
       );
       pointAttributes.push(...attrs);
+      console.log('[parseAttributes] Parsed', attrs.length, 'valid attributes');
     } else {
-      console.warn('Invalid pointAttributes format for Potree 2.0+:', cloudjs.pointAttributes);
+      console.warn('Invalid pointAttributes format for Potree 2.0+:', attributeSource);
     }
   }
 
@@ -90,10 +111,16 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
   for (const jsAttribute of pointAttributes) {
     const name = replaceOldNames(jsAttribute.name);
     const type = typeConversion[jsAttribute.type];
-    const numElements = jsAttribute.elements;
+    // metadata.json uses 'numElements', but some formats use 'elements'
+    const numElements = jsAttribute.numElements ?? jsAttribute.elements;
 
     if (!type) {
       console.warn(`Unknown attribute type: ${jsAttribute.type}`);
+      continue;
+    }
+
+    if (numElements === undefined) {
+      console.warn(`Attribute ${name} missing numElements/elements field`);
       continue;
     }
 

@@ -6,3 +6,5 @@
 
 export * from './ClipTool.js';
 export * from './MeasurementTool.js';
+export * from './VolumeTool.js';
+export * from './ProfileTool.js';

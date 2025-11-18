@@ -381,7 +381,7 @@ export class TraversalSystem implements ISystem {
     // 检查点云变换变化
     for (const [id, octree] of this.pointClouds) {
       const lastTransform = this.lastOctreeTransforms.get(id);
-      if (!lastTransform || !this.matricesEqual(octree.matrixWorld, lastTransform)) {
+      if (octree.matrixWorld && (!lastTransform || !this.matricesEqual(octree.matrixWorld, lastTransform))) {
         return true;
       }
     }
@@ -412,7 +412,9 @@ export class TraversalSystem implements ISystem {
     // 更新点云变换
     this.lastOctreeTransforms.clear();
     for (const [id, octree] of this.pointClouds) {
-      this.lastOctreeTransforms.set(id, octree.matrixWorld.clone());
+      if (octree.matrixWorld) {
+        this.lastOctreeTransforms.set(id, octree.matrixWorld.clone());
+      }
     }
   }
 
@@ -430,7 +432,7 @@ export class TraversalSystem implements ISystem {
     const be = b.elements;
 
     for (let i = 0; i < 16; i++) {
-      if (Math.abs(ae[i] - be[i]) > this.transformChangeThreshold) {
+      if (Math.abs(ae[i]! - be[i]!) > this.transformChangeThreshold) {
         return false;
       }
     }

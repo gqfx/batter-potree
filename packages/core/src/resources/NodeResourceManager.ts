@@ -22,7 +22,7 @@
  * ```
  */
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import type { IPointCloudOctreeNode } from '../types/potree.js';
 
 /**
@@ -143,7 +143,9 @@ export class NodeResourceManager {
   constructor(options: NodeResourceManagerOptions = {}) {
     this.memoryLimit = options.memoryLimit ?? 500 * 1024 * 1024;
     this.cleanupThreshold = options.cleanupThreshold ?? 0.9;
-    this.onNodeEvicted = options.onNodeEvicted;
+    if (options.onNodeEvicted) {
+      this.onNodeEvicted = options.onNodeEvicted;
+    }
   }
 
   /**
@@ -262,7 +264,7 @@ export class NodeResourceManager {
 
     // 重置节点状态
     entry.node.loaded = false;
-    entry.node.geometry = undefined;
+    delete entry.node.geometry;
 
     // 更新统计
     this.totalMemory -= entry.size;
@@ -357,10 +359,10 @@ export class NodeResourceManager {
    * 清空所有资源
    */
   clear(): void {
-    for (const [id, entry] of this.entries) {
+    for (const [_id, entry] of this.entries) {
       entry.geometry.dispose();
       entry.node.loaded = false;
-      entry.node.geometry = undefined;
+      delete entry.node.geometry;
     }
 
     this.entries.clear();

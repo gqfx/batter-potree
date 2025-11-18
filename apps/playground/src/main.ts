@@ -86,18 +86,26 @@ const axesHelper = new THREE.AxesHelper(5);
 scene.add(axesHelper);
 
 // 更新信息面板
+let lastUpdateTime = performance.now();
+let currentFPS = 60;
+
 function updateInfo() {
   if (!infoPanel) return;
 
-  const fps = Math.round(1000 / (performance.now() - lastTime));
-  lastTime = performance.now();
+  // 计算 FPS
+  const now = performance.now();
+  const delta = now - lastUpdateTime;
+  if (delta > 0) {
+    currentFPS = Math.round(1000 / delta);
+  }
+  lastUpdateTime = now;
 
   infoPanel.innerHTML = `
     <div class="info-section">
       <h2>Better Potree Playground</h2>
       <div class="info-item">
         <span class="label">FPS:</span>
-        <span class="value">${fps}</span>
+        <span class="value">${currentFPS}</span>
       </div>
       <div class="info-item">
         <span class="label">点预算:</span>
@@ -402,6 +410,14 @@ function createControlsPanel() {
         loadStatus.innerHTML = `正在扫描文件夹: ${directoryHandle.name}...`;
       }
 
+      // 列出文件夹中的所有内容
+      console.log('[文件夹扫描] 开始扫描文件夹结构...');
+      const entries: { name: string; kind: string }[] = [];
+      for await (const entry of (directoryHandle as any).values()) {
+        entries.push({ name: entry.name, kind: entry.kind });
+      }
+      console.log('[文件夹扫描] 找到以下文件和文件夹:', entries);
+
       // 查找 metadata.json 或 cloud.js
       let metadataFile: File | null = null;
       let metadataFileName = '';
@@ -413,6 +429,7 @@ function createControlsPanel() {
             const fileHandle = entry;
             metadataFile = await fileHandle.getFile();
             metadataFileName = entry.name;
+            console.log('[文件夹扫描] 找到元数据文件:', metadataFileName);
             break;
           }
         }
@@ -433,23 +450,40 @@ function createControlsPanel() {
         // 移除开头的 './' 或 '/'
         const cleanPath = relativePath.replace(/^\.?\//, '');
 
-        console.log('加载本地文件:', cleanPath);
+        console.log('[文件加载] 请求加载文件:', {
+          原始路径: relativePath,
+          清理后路径: cleanPath,
+        });
 
         // 分割路径
         const pathParts = cleanPath.split('/');
+        console.log('[文件加载] 路径分段:', pathParts);
 
         // 遍历文件夹层级
         let currentHandle = directoryHandle;
-        for (let i = 0; i < pathParts.length - 1; i++) {
-          currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+        try {
+          for (let i = 0; i < pathParts.length - 1; i++) {
+            console.log(`[文件加载] 进入子文件夹: ${pathParts[i]}`);
+            currentHandle = await currentHandle.getDirectoryHandle(pathParts[i]);
+          }
+
+          // 获取文件
+          const fileName = pathParts[pathParts.length - 1];
+          console.log('[文件加载] 读取文件:', fileName);
+          const fileHandle = await currentHandle.getFileHandle(fileName);
+          const file = await fileHandle.getFile();
+          const buffer = await file.arrayBuffer();
+          console.log('[文件加载] 文件读取成功，大小:', buffer.byteLength, 'bytes');
+
+          return buffer;
+        } catch (error) {
+          console.error('[文件加载] 文件读取失败:', {
+            路径: cleanPath,
+            路径分段: pathParts,
+            错误: error,
+          });
+          throw error;
         }
-
-        // 获取文件
-        const fileName = pathParts[pathParts.length - 1];
-        const fileHandle = await currentHandle.getFileHandle(fileName);
-        const file = await fileHandle.getFile();
-
-        return await file.arrayBuffer();
       };
 
       // 使用自定义加载函数创建 loader
@@ -605,37 +639,31 @@ function onWindowResize() {
 
 window.addEventListener('resize', onWindowResize);
 
-// 渲染循环
-let lastTime = performance.now();
+// 使用 Viewer 内置的动画循环
 let frameCount = 0;
 
-function animate() {
-  requestAnimationFrame(animate);
-
-  const currentTime = performance.now();
-  const delta = (currentTime - lastTime) / 1000; // 转换为秒
-
+// 监听 Viewer 的 update 事件来更新控制器和 UI
+viewer.on('update', ({ deltaTime }) => {
   // 更新控制器
-  controls.update(delta);
-
-  // 渲染场景
-  viewer.render();
+  controls.update(deltaTime);
 
   // 每 30 帧更新一次信息面板
   frameCount++;
   if (frameCount % 30 === 0) {
     updateInfo();
   }
-
-  lastTime = currentTime;
-}
+});
 
 // 初始化
 createControlsPanel();
 updateInfo();
-animate();
+
+// 启动 Viewer 内置的动画循环
+// 这会启动系统调度器，包括 TraversalSystem 和 StreamingSystem
+viewer.startAnimation();
 
 console.log('✅ Better Potree Playground 初始化完成');
 console.log('📦 Viewer:', viewer);
 console.log('🎮 Controls:', controls);
 console.log('📥 Loader:', loader);
+console.log('🎬 动画循环已启动，系统调度器运行中...');
