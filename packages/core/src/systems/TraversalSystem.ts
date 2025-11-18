@@ -241,6 +241,23 @@ export class TraversalSystem implements ISystem {
   }
 
   /**
+   * 检查点云是否存在
+   *
+   * @param id - 点云 ID
+   * @returns 是否存在
+   *
+   * @example
+   * ```ts
+   * if (traversalSystem.hasPointCloud('myCloud')) {
+   *   console.log('Cloud exists');
+   * }
+   * ```
+   */
+  hasPointCloud(id: string): boolean {
+    return this.pointClouds.has(id);
+  }
+
+  /**
    * 获取最后的遍历结果
    *
    * @returns 遍历结果

@@ -32,6 +32,26 @@ export interface ViewerEvents {
   };
 
   /**
+   * Fired when a point cloud's visibility changes
+   */
+  'pointcloud-visibility-changed': {
+    pointCloud: IPointCloudOctree;
+    name: string;
+    visible: boolean;
+  };
+
+  /**
+   * Fired when a point cloud's transform changes
+   */
+  'pointcloud-transform-changed': {
+    pointCloud: IPointCloudOctree;
+    name: string;
+    position: THREE.Vector3;
+    rotation: THREE.Euler;
+    scale: THREE.Vector3;
+  };
+
+  /**
    * Fired when a node is successfully loaded
    */
   'node-loaded': {

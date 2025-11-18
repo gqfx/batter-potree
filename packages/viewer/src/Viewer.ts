@@ -766,6 +766,194 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     return this.pointClouds.get(name);
   }
 
+  /**
+   * Get all point cloud names
+   *
+   * @returns Array of point cloud names
+   *
+   * @example
+   * ```typescript
+   * const names = viewer.getPointCloudNames();
+   * console.log('Loaded clouds:', names);
+   * ```
+   */
+  getPointCloudNames(): string[] {
+    return Array.from(this.pointClouds.keys());
+  }
+
+  /**
+   * Check if a point cloud is loaded
+   *
+   * @param name - Point cloud name
+   * @returns True if point cloud exists
+   *
+   * @example
+   * ```typescript
+   * if (viewer.hasPointCloud('myCloud')) {
+   *   console.log('myCloud is loaded');
+   * }
+   * ```
+   */
+  hasPointCloud(name: string): boolean {
+    return this.pointClouds.has(name);
+  }
+
+  /**
+   * Set visibility for a point cloud
+   *
+   * When a point cloud is hidden, it will not be traversed or rendered,
+   * but it remains loaded in memory.
+   *
+   * @param name - Point cloud name or reference
+   * @param visible - Visibility flag
+   *
+   * @example
+   * ```typescript
+   * viewer.setPointCloudVisible('myCloud', false); // Hide
+   * viewer.setPointCloudVisible('myCloud', true);  // Show
+   * ```
+   */
+  setPointCloudVisible(name: string | IPointCloudOctree, visible: boolean): void {
+    const cloudName = typeof name === 'string' ? name : this.getPointCloudName(name);
+    const cloud = this.pointClouds.get(cloudName);
+
+    if (!cloud) {
+      console.warn(`Point cloud "${cloudName}" not found`);
+      return;
+    }
+
+    // Update point cloud scene visibility
+    const scene = this.pointCloudScenes.get(cloudName);
+    if (scene) {
+      scene.visible = visible;
+    }
+
+    // Update traversal system
+    if (visible) {
+      // Re-add to traversal if not already present
+      if (!this.traversalSystem.hasPointCloud(cloudName)) {
+        this.traversalSystem.addPointCloud(cloudName, cloud);
+      }
+    } else {
+      // Remove from traversal to stop LOD updates
+      this.traversalSystem.removePointCloud(cloudName);
+    }
+
+    this.emit('pointcloud-visibility-changed', {
+      pointCloud: cloud,
+      name: cloudName,
+      visible,
+    });
+  }
+
+  /**
+   * Get visibility of a point cloud
+   *
+   * @param name - Point cloud name or reference
+   * @returns True if visible, false if hidden or not found
+   *
+   * @example
+   * ```typescript
+   * const isVisible = viewer.isPointCloudVisible('myCloud');
+   * ```
+   */
+  isPointCloudVisible(name: string | IPointCloudOctree): boolean {
+    const cloudName = typeof name === 'string' ? name : this.getPointCloudName(name);
+    const scene = this.pointCloudScenes.get(cloudName);
+    return scene?.visible ?? false;
+  }
+
+  /**
+   * Set transform for a point cloud
+   *
+   * Allows independent positioning, rotation, and scaling of each point cloud.
+   * The transform is applied to the PointCloudScene.
+   *
+   * @param name - Point cloud name or reference
+   * @param position - Position vector (optional)
+   * @param rotation - Rotation euler angles in radians (optional)
+   * @param scale - Scale vector (optional)
+   *
+   * @example
+   * ```typescript
+   * // Move cloud to new position
+   * viewer.setPointCloudTransform('cloud1', { x: 10, y: 0, z: 5 });
+   *
+   * // Rotate cloud 90 degrees around Y axis
+   * viewer.setPointCloudTransform('cloud2', undefined, { x: 0, y: Math.PI / 2, z: 0 });
+   *
+   * // Scale cloud
+   * viewer.setPointCloudTransform('cloud3', undefined, undefined, { x: 2, y: 2, z: 2 });
+   *
+   * // Combined transform
+   * viewer.setPointCloudTransform('cloud4',
+   *   { x: 10, y: 0, z: 0 },
+   *   { x: 0, y: Math.PI / 4, z: 0 },
+   *   { x: 1.5, y: 1.5, z: 1.5 }
+   * );
+   * ```
+   */
+  setPointCloudTransform(
+    name: string | IPointCloudOctree,
+    position?: { x: number; y: number; z: number },
+    rotation?: { x: number; y: number; z: number },
+    scale?: { x: number; y: number; z: number }
+  ): void {
+    const cloudName = typeof name === 'string' ? name : this.getPointCloudName(name);
+    const scene = this.pointCloudScenes.get(cloudName);
+
+    if (!scene) {
+      console.warn(`Point cloud scene "${cloudName}" not found`);
+      return;
+    }
+
+    // Apply transform to PointCloudScene
+    if (position) {
+      scene.position.set(position.x, position.y, position.z);
+    }
+
+    if (rotation) {
+      scene.rotation.set(rotation.x, rotation.y, rotation.z);
+    }
+
+    if (scale) {
+      scene.scale.set(scale.x, scale.y, scale.z);
+    }
+
+    // Update matrix
+    scene.updateMatrix();
+    scene.updateMatrixWorld(true);
+
+    const cloud = this.pointClouds.get(cloudName);
+    if (cloud) {
+      this.emit('pointcloud-transform-changed', {
+        pointCloud: cloud,
+        name: cloudName,
+        position: scene.position.clone(),
+        rotation: scene.rotation.clone(),
+        scale: scene.scale.clone(),
+      });
+    }
+  }
+
+  /**
+   * Reset transform for a point cloud to identity
+   *
+   * @param name - Point cloud name or reference
+   *
+   * @example
+   * ```typescript
+   * viewer.resetPointCloudTransform('myCloud');
+   * ```
+   */
+  resetPointCloudTransform(name: string | IPointCloudOctree): void {
+    this.setPointCloudTransform(
+      name,
+      { x: 0, y: 0, z: 0 },
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 1, z: 1 }
+    );
+  }
 
   /**
    * Get point cloud scene by name

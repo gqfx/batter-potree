@@ -611,6 +611,271 @@ describe('Viewer', () => {
       expect(clouds).toContain(cloud1);
       expect(clouds).toContain(cloud2);
     });
+
+    it('should get all point cloud names', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const cloud1 = {} as IPointCloudOctree;
+      const cloud2 = {} as IPointCloudOctree;
+      (viewer as any).pointClouds.set('cloud1', cloud1);
+      (viewer as any).pointClouds.set('cloud2', cloud2);
+
+      const names = viewer.getPointCloudNames();
+      expect(names).toEqual(['cloud1', 'cloud2']);
+    });
+
+    it('should check if point cloud exists', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const cloud1 = {} as IPointCloudOctree;
+      (viewer as any).pointClouds.set('cloud1', cloud1);
+
+      expect(viewer.hasPointCloud('cloud1')).toBe(true);
+      expect(viewer.hasPointCloud('cloud2')).toBe(false);
+    });
+
+    it('should set point cloud visibility', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const listener = vi.fn();
+      viewer.on('pointcloud-visibility-changed', listener);
+
+      const mockCloud = {} as IPointCloudOctree;
+      const mockScene = { visible: true } as any;
+      (viewer as any).pointClouds.set('test', mockCloud);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      const traversalSystem = viewer.getTraversalSystem();
+      const addSpy = vi.spyOn(traversalSystem, 'addPointCloud');
+      const removeSpy = vi.spyOn(traversalSystem, 'removePointCloud');
+      const hasSpy = vi.spyOn(traversalSystem, 'hasPointCloud').mockReturnValue(true);
+
+      // Hide point cloud
+      viewer.setPointCloudVisible('test', false);
+
+      expect(mockScene.visible).toBe(false);
+      expect(removeSpy).toHaveBeenCalledWith('test');
+      expect(listener).toHaveBeenCalledWith({
+        pointCloud: mockCloud,
+        name: 'test',
+        visible: false,
+      });
+
+      // Show point cloud
+      hasSpy.mockReturnValue(false);
+      viewer.setPointCloudVisible('test', true);
+
+      expect(mockScene.visible).toBe(true);
+      expect(addSpy).toHaveBeenCalledWith('test', mockCloud);
+    });
+
+    it('should get point cloud visibility', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockScene = { visible: true } as any;
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      expect(viewer.isPointCloudVisible('test')).toBe(true);
+
+      mockScene.visible = false;
+      expect(viewer.isPointCloudVisible('test')).toBe(false);
+    });
+
+    it('should return false for non-existent point cloud visibility', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      expect(viewer.isPointCloudVisible('nonexistent')).toBe(false);
+    });
+
+    it('should set point cloud transform - position', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const listener = vi.fn();
+      viewer.on('pointcloud-transform-changed', listener);
+
+      const mockCloud = {} as IPointCloudOctree;
+      const mockScene = {
+        position: new THREE.Vector3(),
+        rotation: new THREE.Euler(),
+        scale: new THREE.Vector3(1, 1, 1),
+        updateMatrix: vi.fn(),
+        updateMatrixWorld: vi.fn(),
+      } as any;
+      (viewer as any).pointClouds.set('test', mockCloud);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      viewer.setPointCloudTransform('test', { x: 10, y: 5, z: 2 });
+
+      expect(mockScene.position.x).toBe(10);
+      expect(mockScene.position.y).toBe(5);
+      expect(mockScene.position.z).toBe(2);
+      expect(mockScene.updateMatrix).toHaveBeenCalled();
+      expect(mockScene.updateMatrixWorld).toHaveBeenCalledWith(true);
+      expect(listener).toHaveBeenCalled();
+    });
+
+    it('should set point cloud transform - rotation', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockScene = {
+        position: new THREE.Vector3(),
+        rotation: new THREE.Euler(),
+        scale: new THREE.Vector3(1, 1, 1),
+        updateMatrix: vi.fn(),
+        updateMatrixWorld: vi.fn(),
+      } as any;
+      (viewer as any).pointClouds.set('test', {} as IPointCloudOctree);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      viewer.setPointCloudTransform('test', undefined, { x: 0, y: Math.PI / 2, z: 0 });
+
+      expect(mockScene.rotation.x).toBe(0);
+      expect(mockScene.rotation.y).toBe(Math.PI / 2);
+      expect(mockScene.rotation.z).toBe(0);
+    });
+
+    it('should set point cloud transform - scale', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockScene = {
+        position: new THREE.Vector3(),
+        rotation: new THREE.Euler(),
+        scale: new THREE.Vector3(1, 1, 1),
+        updateMatrix: vi.fn(),
+        updateMatrixWorld: vi.fn(),
+      } as any;
+      (viewer as any).pointClouds.set('test', {} as IPointCloudOctree);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      viewer.setPointCloudTransform('test', undefined, undefined, { x: 2, y: 2, z: 2 });
+
+      expect(mockScene.scale.x).toBe(2);
+      expect(mockScene.scale.y).toBe(2);
+      expect(mockScene.scale.z).toBe(2);
+    });
+
+    it('should set combined transform', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockScene = {
+        position: new THREE.Vector3(),
+        rotation: new THREE.Euler(),
+        scale: new THREE.Vector3(1, 1, 1),
+        updateMatrix: vi.fn(),
+        updateMatrixWorld: vi.fn(),
+      } as any;
+      (viewer as any).pointClouds.set('test', {} as IPointCloudOctree);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      viewer.setPointCloudTransform(
+        'test',
+        { x: 10, y: 5, z: 2 },
+        { x: 0, y: Math.PI / 2, z: 0 },
+        { x: 2, y: 2, z: 2 }
+      );
+
+      expect(mockScene.position.x).toBe(10);
+      expect(mockScene.rotation.y).toBe(Math.PI / 2);
+      expect(mockScene.scale.x).toBe(2);
+    });
+
+    it('should reset point cloud transform', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockScene = {
+        position: new THREE.Vector3(10, 10, 10),
+        rotation: new THREE.Euler(1, 1, 1),
+        scale: new THREE.Vector3(2, 2, 2),
+        updateMatrix: vi.fn(),
+        updateMatrixWorld: vi.fn(),
+      } as any;
+      (viewer as any).pointClouds.set('test', {} as IPointCloudOctree);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      viewer.resetPointCloudTransform('test');
+
+      expect(mockScene.position.x).toBe(0);
+      expect(mockScene.position.y).toBe(0);
+      expect(mockScene.position.z).toBe(0);
+      expect(mockScene.rotation.x).toBe(0);
+      expect(mockScene.rotation.y).toBe(0);
+      expect(mockScene.rotation.z).toBe(0);
+      expect(mockScene.scale.x).toBe(1);
+      expect(mockScene.scale.y).toBe(1);
+      expect(mockScene.scale.z).toBe(1);
+    });
+
+    it('should warn when setting transform for non-existent scene', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      viewer.setPointCloudTransform('nonexistent', { x: 10, y: 0, z: 0 });
+
+      expect(consoleSpy).toHaveBeenCalledWith('Point cloud scene "nonexistent" not found');
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should warn when setting visibility for non-existent cloud', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      viewer.setPointCloudVisible('nonexistent', true);
+
+      expect(consoleSpy).toHaveBeenCalledWith('Point cloud "nonexistent" not found');
+
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('point cloud scenes', () => {
