@@ -4,11 +4,15 @@
 
 import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
 import {
+  PointCloudColorMode,
+  PointShape,
+  PointSizeType,
   StreamingSystem,
   SystemScheduler,
   TraversalSystem,
   TypedEventEmitter,
 } from '@better-potree/core';
+import { PointCloudMaterial, PointCloudScene } from '@better-potree/rendering-three';
 import * as THREE from 'three';
 import type { ViewerEvents } from './events.js';
 
@@ -75,6 +79,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   // Scene objects
   private camera: THREE.Camera;
   private pointClouds: Map<string, IPointCloudOctree>;
+  private pointCloudScenes: Map<string, PointCloudScene>;
   // clipVolumes will be implemented later
 
   // Configuration
@@ -106,8 +111,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Create or use provided camera
     this.camera = config.camera || this.createDefaultCamera(config);
 
-    // Initialize point clouds
+    // Initialize point clouds and scenes
     this.pointClouds = new Map();
+    this.pointCloudScenes = new Map();
     // clipVolumes will be implemented later when ClipVolume class is ready
 
     // Configuration
@@ -189,6 +195,32 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     this.renderer.setSize(width, height);
   }
 
+
+  /**
+   * Create material for point cloud rendering
+   *
+   * @returns Configured PointCloudMaterial instance
+   *
+   * @example
+   * ```typescript
+   * const material = viewer.createMaterial();
+   * ```
+   */
+  private createMaterial(): PointCloudMaterial {
+    const material = new PointCloudMaterial({
+      size: this.pointSize,
+      colorMode: PointCloudColorMode.RGB,
+      sizeType: PointSizeType.ADAPTIVE,
+      shape: PointShape.CIRCLE,
+      enableGPULOD: true,
+    });
+    
+    // Update screen size after creation
+    material.updateScreenSize(this.container.clientWidth, this.container.clientHeight);
+    
+    return material;
+  }
+
   /**
    * Setup streaming system callbacks
    *
@@ -249,6 +281,13 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
     // Update TraversalSystem screen size for LOD calculations
     this.traversalSystem.setScreenSize(width, height);
+
+    // Update all point cloud material screen sizes
+    for (const pointCloudScene of this.pointCloudScenes.values()) {
+      if (pointCloudScene.material && typeof pointCloudScene.material.updateScreenSize === 'function') {
+        pointCloudScene.material.updateScreenSize(width, height);
+      }
+    }
   }
 
   /**
@@ -304,10 +343,32 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       // 3. Store in point clouds map
       this.pointClouds.set(cloudName, octree);
 
-      // 4. Add to TraversalSystem for LOD traversal
+      // 4. Create PointCloudScene with material
+      const material = this.createMaterial();
+      const pointCloudScene = new PointCloudScene({
+        materialConfig: {
+          size: material.size,
+          colorMode: material.colorMode,
+          sizeType: material.sizeType,
+          shape: material.shape,
+          enableGPULOD: true,
+        },
+        octreeSpacing: octree.spacing,
+      });
+
+      // 5. Add to Three.js scene
+      const threeScene = this.scene.getThreeScene?.();
+      if (threeScene) {
+        threeScene.add(pointCloudScene);
+      }
+
+      // 6. Store in point cloud scenes map
+      this.pointCloudScenes.set(cloudName, pointCloudScene);
+
+      // 7. Add to TraversalSystem for LOD traversal
       this.traversalSystem.addPointCloud(cloudName, octree);
 
-      // 5. Emit loaded event
+      // 8. Emit loaded event
       this.emit('pointcloud-loaded', {
         pointCloud: octree,
         name: cloudName,
@@ -317,6 +378,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     } catch (error) {
       // Clean up on error
       this.pointClouds.delete(cloudName);
+      this.pointCloudScenes.delete(cloudName);
 
       // Re-throw with more context
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -372,6 +434,17 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Remove from TraversalSystem
     this.traversalSystem.removePointCloud(name);
 
+    // Remove from Three.js scene and dispose
+    const pointCloudScene = this.pointCloudScenes.get(name);
+    if (pointCloudScene) {
+      const threeScene = this.scene.getThreeScene?.();
+      if (threeScene) {
+        threeScene.remove(pointCloudScene);
+      }
+      pointCloudScene.dispose();
+      this.pointCloudScenes.delete(name);
+    }
+
     // Remove from point clouds map
     this.pointClouds.delete(name);
 
@@ -404,6 +477,40 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     return this.pointClouds.get(name);
   }
 
+
+  /**
+   * Get point cloud scene by name
+   *
+   * @param name - Name of the point cloud
+   * @returns PointCloudScene or undefined if not found
+   *
+   * @example
+   * ```typescript
+   * const scene = viewer.getPointCloudScene('myCloud');
+   * if (scene) {
+   *   console.log('Node count:', scene.nodeCount);
+   * }
+   * ```
+   */
+  getPointCloudScene(name: string): PointCloudScene | undefined {
+    return this.pointCloudScenes.get(name);
+  }
+
+  /**
+   * Get all point cloud scenes
+   *
+   * @returns Array of all PointCloudScene instances
+   *
+   * @example
+   * ```typescript
+   * const scenes = viewer.getPointCloudScenes();
+   * console.log('Total scenes:', scenes.length);
+   * ```
+   */
+  getPointCloudScenes(): PointCloudScene[] {
+    return Array.from(this.pointCloudScenes.values());
+  }
+
   /**
    * Set point budget (max points rendered per frame)
    */
@@ -429,10 +536,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   setPointSize(size: number): void {
     this.pointSize = Math.max(0.1, size);
 
-    // Update all point clouds (will be implemented when PointCloud has material)
-    // for (const cloud of this.pointClouds.values()) {
-    //   cloud.material.size = this.pointSize;
-    // }
+    // Update all point cloud materials
+    for (const pointCloudScene of this.pointCloudScenes.values()) {
+      pointCloudScene.material.size = this.pointSize;
+    }
 
     this.emit('point-size-changed', { size: this.pointSize });
   }

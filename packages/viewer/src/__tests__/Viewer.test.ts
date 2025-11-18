@@ -613,6 +613,101 @@ describe('Viewer', () => {
     });
   });
 
+  describe('point cloud scenes', () => {
+    it('should return empty array initially', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      expect(viewer.getPointCloudScenes()).toEqual([]);
+    });
+
+    it('should get point cloud scene by name', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockScene = {} as any;
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      expect(viewer.getPointCloudScene('test')).toBe(mockScene);
+    });
+
+    it('should return undefined for non-existent scene', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      expect(viewer.getPointCloudScene('nonexistent')).toBeUndefined();
+    });
+
+    it('should return all point cloud scenes', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const scene1 = {} as any;
+      const scene2 = {} as any;
+      (viewer as any).pointCloudScenes.set('scene1', scene1);
+      (viewer as any).pointCloudScenes.set('scene2', scene2);
+
+      const scenes = viewer.getPointCloudScenes();
+      expect(scenes).toHaveLength(2);
+      expect(scenes).toContain(scene1);
+      expect(scenes).toContain(scene2);
+    });
+
+    it('should update material size when setPointSize is called', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockMaterial = { size: 1.0 };
+      const mockScene = { material: mockMaterial } as any;
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      viewer.setPointSize(2.5);
+
+      expect(mockMaterial.size).toBe(2.5);
+    });
+
+    it('should update material screen size on resize', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const updateScreenSizeSpy = vi.fn();
+      const mockMaterial = { updateScreenSize: updateScreenSizeSpy };
+      const mockScene = { material: mockMaterial } as any;
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      Object.defineProperty(container, 'clientWidth', {
+        configurable: true,
+        value: 1024,
+      });
+      Object.defineProperty(container, 'clientHeight', {
+        configurable: true,
+        value: 768,
+      });
+
+      window.dispatchEvent(new Event('resize'));
+
+      expect(updateScreenSizeSpy).toHaveBeenCalledWith(1024, 768);
+    });
+  });
+
   describe('rendering', () => {
     it('should render a frame', () => {
       const viewer = new Viewer({
