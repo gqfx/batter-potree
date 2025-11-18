@@ -21,6 +21,38 @@ export enum MaterialType {
 }
 
 /**
+ * 裁剪任务类型
+ *
+ * 定义裁剪框的行为模式
+ */
+export enum ClipTask {
+  /** 不裁剪 */
+  NONE = 0,
+
+  /** 高亮显示裁剪框内的点 */
+  HIGHLIGHT = 1,
+
+  /** 只显示裁剪框内的点 */
+  SHOW_INSIDE = 2,
+
+  /** 只显示裁剪框外的点 */
+  SHOW_OUTSIDE = 3,
+}
+
+/**
+ * 裁剪方法
+ *
+ * 定义多个裁剪框的组合逻辑
+ */
+export enum ClipMethod {
+  /** 点在任意裁剪框内即满足条件（OR 逻辑） */
+  INSIDE_ANY = 0,
+
+  /** 点在所有裁剪框内才满足条件（AND 逻辑） */
+  INSIDE_ALL = 1,
+}
+
+/**
  * GPU 缓冲区描述符
  *
  * 描述如何创建和使用 GPU 缓冲区

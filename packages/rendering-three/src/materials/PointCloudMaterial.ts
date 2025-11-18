@@ -3,7 +3,13 @@
  * @module @better-potree/rendering-three/materials
  */
 
-import { PointCloudColorMode, PointShape, PointSizeType } from '@better-potree/core';
+import {
+  ClipMethod,
+  ClipTask,
+  PointCloudColorMode,
+  PointShape,
+  PointSizeType,
+} from '@better-potree/core';
 import * as THREE from 'three';
 import { getPointCloudFragmentShader, getPointCloudVertexShader } from '../shaders/index.js';
 
@@ -45,6 +51,12 @@ export interface PointCloudMaterialConfig {
   level?: number;
   /** VN start index for GPU LOD */
   vnStart?: number;
+  /** Clip task - what to do with points inside/outside clip boxes */
+  clipTask?: ClipTask;
+  /** Clip method - how to combine multiple clip boxes (AND/OR) */
+  clipMethod?: ClipMethod;
+  /** Clip boxes - array of 4x4 transformation matrices */
+  clipBoxes?: THREE.Matrix4[];
 }
 
 /**
@@ -74,6 +86,9 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
     const octreeSize = config.octreeSize ?? 1.0;
     const level = config.level ?? 0;
     const vnStart = config.vnStart ?? 0;
+    const clipTask = config.clipTask ?? ClipTask.NONE;
+    const clipMethod = config.clipMethod ?? ClipMethod.INSIDE_ANY;
+    const clipBoxes = config.clipBoxes ?? [];
 
     // Create default textures if not provided
     const gradient = config.gradient ?? PointCloudMaterial.createDefaultGradient();
@@ -138,6 +153,11 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       defines.USE_EDL = true;
     }
 
+    // ClipBox defines
+    if (clipBoxes.length > 0) {
+      defines.num_clipboxes = clipBoxes.length;
+    }
+
     // Create uniforms
     const uniforms = {
       // Screen uniforms
@@ -176,6 +196,15 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       // Texture uniforms
       gradient: { value: gradient },
       classificationLUT: { value: classificationLUT },
+
+      // Clipping uniforms
+      clipTask: { value: clipTask },
+      clipMethod: { value: clipMethod },
+      ...(clipBoxes.length > 0 && {
+        clipBoxes: {
+          value: clipBoxes.map((m) => m.elements),
+        },
+      }),
     };
 
     // Call parent constructor
@@ -347,6 +376,97 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       if (this.uniforms.uVisibilityTextureHeight) {
         this.uniforms.uVisibilityTextureHeight.value = texture.image?.height ?? 1;
       }
+    }
+  }
+
+  /**
+   * Set clip boxes for point cloud clipping
+   *
+   * Updates the clip boxes used for clipping. This will trigger a shader recompile
+   * if the number of clip boxes changes.
+   *
+   * @param clipBoxes - Array of transformation matrices for clip boxes (max 8)
+   *
+   * @example
+   * ```typescript
+   * const box = new THREE.Matrix4();
+   * box.makeTranslation(0, 0, 0);
+   * box.scale(new THREE.Vector3(10, 10, 10));
+   * material.setClipBoxes([box]);
+   * ```
+   */
+  public setClipBoxes(clipBoxes: THREE.Matrix4[]): void {
+    if (!this.defines) {
+      this.defines = {};
+    }
+
+    const oldCount = this.defines.num_clipboxes ?? 0;
+    const newCount = clipBoxes.length;
+
+    // Update define if count changed
+    if (newCount !== oldCount) {
+      if (newCount > 0) {
+        this.defines.num_clipboxes = newCount;
+      } else {
+        delete this.defines.num_clipboxes;
+      }
+      this.needsUpdate = true; // Trigger shader recompile
+    }
+
+    // Update uniforms
+    if (this.uniforms) {
+      if (newCount > 0) {
+        if (!this.uniforms.clipBoxes) {
+          this.uniforms.clipBoxes = { value: [] };
+        }
+        this.uniforms.clipBoxes.value = clipBoxes.map((m) => m.elements);
+      } else if (this.uniforms.clipBoxes) {
+        delete this.uniforms.clipBoxes;
+      }
+    }
+  }
+
+  /**
+   * Set clip task
+   *
+   * Determines how points inside/outside clip boxes are handled.
+   *
+   * @param task - The clip task (NONE, HIGHLIGHT, SHOW_INSIDE, SHOW_OUTSIDE)
+   *
+   * @example
+   * ```typescript
+   * // Highlight points inside clip boxes
+   * material.setClipTask(ClipTask.HIGHLIGHT);
+   *
+   * // Only show points inside clip boxes
+   * material.setClipTask(ClipTask.SHOW_INSIDE);
+   * ```
+   */
+  public setClipTask(task: ClipTask): void {
+    if (this.uniforms?.clipTask) {
+      this.uniforms.clipTask.value = task;
+    }
+  }
+
+  /**
+   * Set clip method
+   *
+   * Determines how multiple clip boxes are combined.
+   *
+   * @param method - The clip method (INSIDE_ANY for OR, INSIDE_ALL for AND)
+   *
+   * @example
+   * ```typescript
+   * // Show points inside ANY clip box (OR logic)
+   * material.setClipMethod(ClipMethod.INSIDE_ANY);
+   *
+   * // Show points inside ALL clip boxes (AND logic)
+   * material.setClipMethod(ClipMethod.INSIDE_ALL);
+   * ```
+   */
+  public setClipMethod(method: ClipMethod): void {
+    if (this.uniforms?.clipMethod) {
+      this.uniforms.clipMethod.value = method;
     }
   }
 

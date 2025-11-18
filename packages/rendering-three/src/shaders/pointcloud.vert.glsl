@@ -56,6 +56,21 @@ uniform vec2 intensityRange;
 uniform sampler2D gradient;
 uniform sampler2D classificationLUT;
 
+// Uniforms - clipping
+#define CLIPTASK_NONE 0
+#define CLIPTASK_HIGHLIGHT 1
+#define CLIPTASK_SHOW_INSIDE 2
+#define CLIPTASK_SHOW_OUTSIDE 3
+
+#define CLIPMETHOD_INSIDE_ANY 0
+#define CLIPMETHOD_INSIDE_ALL 1
+
+uniform int clipTask;
+uniform int clipMethod;
+#if defined(num_clipboxes) && num_clipboxes > 0
+  uniform mat4 clipBoxes[num_clipboxes];
+#endif
+
 // Varyings - outputs to fragment shader
 out vec3 vColor;
 out float vLogDepth;
@@ -259,6 +274,61 @@ float getPointSize() {
   return pointSize;
 }
 
+/**
+ * Apply clipping logic based on clipTask and clipMethod
+ *
+ * Checks if the point is inside any/all clip boxes and applies
+ * the appropriate action (highlight, show inside, show outside).
+ * Points that should be clipped are moved outside the view frustum.
+ */
+void doClipping() {
+  int clipVolumesCount = 0;
+  int insideCount = 0;
+
+  #if defined(num_clipboxes) && num_clipboxes > 0
+    for (int i = 0; i < num_clipboxes; i++) {
+      // Transform point position to clip box local space
+      vec4 clipPosition = clipBoxes[i] * modelMatrix * vec4(position, 1.0);
+
+      // Check if point is inside the box (box is centered at origin, size 1x1x1)
+      bool inside = -0.5 <= clipPosition.x && clipPosition.x <= 0.5;
+      inside = inside && -0.5 <= clipPosition.y && clipPosition.y <= 0.5;
+      inside = inside && -0.5 <= clipPosition.z && clipPosition.z <= 0.5;
+
+      insideCount = insideCount + (inside ? 1 : 0);
+      clipVolumesCount++;
+    }
+  #endif
+
+  bool insideAny = insideCount > 0;
+  bool insideAll = (clipVolumesCount > 0) && (clipVolumesCount == insideCount);
+
+  // Apply clipping based on clipMethod and clipTask
+  if (clipMethod == CLIPMETHOD_INSIDE_ANY) {
+    if (insideAny && clipTask == CLIPTASK_HIGHLIGHT) {
+      // Highlight points inside any box (add red tint)
+      vColor.r = min(vColor.r + 0.5, 1.0);
+    } else if (!insideAny && clipTask == CLIPTASK_SHOW_INSIDE) {
+      // Clip points outside all boxes
+      gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    } else if (insideAny && clipTask == CLIPTASK_SHOW_OUTSIDE) {
+      // Clip points inside any box
+      gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    }
+  } else if (clipMethod == CLIPMETHOD_INSIDE_ALL) {
+    if (insideAll && clipTask == CLIPTASK_HIGHLIGHT) {
+      // Highlight points inside all boxes (add red tint)
+      vColor.r = min(vColor.r + 0.5, 1.0);
+    } else if (!insideAll && clipTask == CLIPTASK_SHOW_INSIDE) {
+      // Clip points not inside all boxes
+      gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    } else if (insideAll && clipTask == CLIPTASK_SHOW_OUTSIDE) {
+      // Clip points inside all boxes
+      gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    }
+  }
+}
+
 void main() {
   // Calculate view position
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -273,4 +343,7 @@ void main() {
 
   // Calculate color
   vColor = getColor();
+
+  // Apply clipping (must be after color calculation for HIGHLIGHT mode)
+  doClipping();
 }
