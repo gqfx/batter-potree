@@ -103,6 +103,8 @@ export interface IPointCloudOctree {
   scale: number;
   /** Transform matrix (added at runtime by scene) */
   matrixWorld?: THREE.Matrix4;
+  /** Custom file loader for non-HTTP sources (e.g., local file system) */
+  customFileLoader?: (path: string) => Promise<ArrayBuffer>;
 }
 
 /**

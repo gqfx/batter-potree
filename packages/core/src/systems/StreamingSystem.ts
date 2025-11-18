@@ -375,7 +375,7 @@ export class StreamingSystem implements ISystem {
     const startTime = performance.now();
 
     // 异步加载数据
-    this.fetchNodeData(nodeUrl, request.abortController.signal)
+    this.fetchNodeData(request.octree, nodeUrl, request.abortController.signal)
       .then((arrayBuffer) => {
         if (request.abortController.signal.aborted) {
           return;
@@ -400,11 +400,29 @@ export class StreamingSystem implements ISystem {
   /**
    * 获取节点数据
    *
+   * @param octree - 点云八叉树（可能包含自定义加载器）
    * @param url - 节点数据 URL
    * @param signal - 取消信号
    * @returns ArrayBuffer
    */
-  private async fetchNodeData(url: string, signal: AbortSignal): Promise<ArrayBuffer> {
+  private async fetchNodeData(
+    octree: IPointCloudOctree,
+    url: string,
+    signal: AbortSignal,
+  ): Promise<ArrayBuffer> {
+    // 如果 octree 提供了自定义文件加载器，使用它
+    if (octree.customFileLoader) {
+      // 检查是否被取消
+      if (signal.aborted) {
+        throw new Error('Fetch aborted');
+      }
+
+      // 移除 URL 的开头部分，只保留相对路径
+      const relativePath = url.replace(/^\/?/, '');
+      return octree.customFileLoader(relativePath);
+    }
+
+    // 否则使用标准 fetch
     const response = await fetch(url, { signal });
     if (!response.ok) {
       throw new Error(`Failed to fetch node data: ${response.statusText}`);

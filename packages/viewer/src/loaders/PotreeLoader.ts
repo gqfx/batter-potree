@@ -292,6 +292,11 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       scale: metadata.scale,
     };
 
+    // Attach custom file loader if present
+    if (this.config.customFileLoader) {
+      octree.customFileLoader = this.config.customFileLoader;
+    }
+
     return octree;
   }
 
