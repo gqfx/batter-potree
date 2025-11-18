@@ -25,6 +25,7 @@
 import * as THREE from 'three';
 import type { IPointCloudOctree, IPointCloudOctreeNode } from '../types/potree.js';
 import type { ISystem, SystemStage } from '../types/system.js';
+import { ClipMethod, ClipTask } from '../types/rendering.js';
 import { BinaryHeap } from '../utils/BinaryHeap.js';
 
 /**
@@ -41,6 +42,12 @@ export interface TraversalSystemConfig {
   readonly screenWidth?: number;
   /** 屏幕高度 */
   readonly screenHeight?: number;
+  /** 裁剪框数组 (4x4 变换矩阵) */
+  readonly clipBoxes?: readonly THREE.Matrix4[];
+  /** 裁剪任务 */
+  readonly clipTask?: ClipTask;
+  /** 裁剪方法 */
+  readonly clipMethod?: ClipMethod;
 }
 
 /**
@@ -124,6 +131,9 @@ export class TraversalSystem implements ISystem {
       minScreenSize: config.minScreenSize ?? 100,
       screenWidth: config.screenWidth ?? 1920,
       screenHeight: config.screenHeight ?? 1080,
+      clipBoxes: config.clipBoxes ?? [],
+      clipTask: config.clipTask ?? ClipTask.NONE,
+      clipMethod: config.clipMethod ?? ClipMethod.INSIDE_ANY,
     };
   }
 
@@ -153,6 +163,41 @@ export class TraversalSystem implements ISystem {
    */
   setScreenSize(width: number, height: number): void {
     this.config = { ...this.config, screenWidth: width, screenHeight: height };
+  }
+
+  /**
+   * 设置裁剪框
+   *
+   * @param clipBoxes - 裁剪框矩阵数组
+   *
+   * @example
+   * ```typescript
+   * const box = new THREE.Matrix4();
+   * box.makeTranslation(0, 0, 0);
+   * box.scale(new THREE.Vector3(10, 10, 10));
+   * traversalSystem.setClipBoxes([box]);
+   * ```
+   */
+  setClipBoxes(clipBoxes: readonly THREE.Matrix4[]): void {
+    this.config = { ...this.config, clipBoxes };
+  }
+
+  /**
+   * 设置裁剪任务
+   *
+   * @param task - 裁剪任务类型
+   */
+  setClipTask(task: ClipTask): void {
+    this.config = { ...this.config, clipTask: task };
+  }
+
+  /**
+   * 设置裁剪方法
+   *
+   * @param method - 裁剪方法（AND/OR）
+   */
+  setClipMethod(method: ClipMethod): void {
+    this.config = { ...this.config, clipMethod: method };
   }
 
   /**
@@ -298,6 +343,11 @@ export class TraversalSystem implements ISystem {
 
       // 视锥剔除
       if (!this.frustum.intersectsBox(node.boundingBox)) {
+        continue;
+      }
+
+      // 裁剪框检查
+      if (!this.shouldRenderNodeWithClipping(node.boundingBox)) {
         continue;
       }
 
@@ -482,5 +532,88 @@ export class TraversalSystem implements ISystem {
 
     // 默认权重
     return 1;
+  }
+
+  /**
+   * 检查包围盒是否与裁剪框相交
+   *
+   * 如果没有裁剪框或 clipTask 为 NONE，返回 true（不裁剪）
+   * 否则根据 clipTask 和 clipMethod 判断是否应该渲染此节点
+   *
+   * @param boundingBox - 节点包围盒
+   * @returns true 表示节点应该渲染，false 表示应该跳过
+   */
+  private shouldRenderNodeWithClipping(boundingBox: THREE.Box3): boolean {
+    // 如果没有裁剪框或裁剪任务为 NONE，不裁剪
+    if (this.config.clipBoxes.length === 0 || this.config.clipTask === ClipTask.NONE) {
+      return true;
+    }
+
+    // 对于 HIGHLIGHT 模式，不影响 LOD 遍历（所有节点都应该渲染）
+    if (this.config.clipTask === ClipTask.HIGHLIGHT) {
+      return true;
+    }
+
+    // 计算包围盒的 8 个顶点
+    const min = boundingBox.min;
+    const max = boundingBox.max;
+    const vertices = [
+      new THREE.Vector3(min.x, min.y, min.z),
+      new THREE.Vector3(min.x, min.y, max.z),
+      new THREE.Vector3(min.x, max.y, min.z),
+      new THREE.Vector3(min.x, max.y, max.z),
+      new THREE.Vector3(max.x, min.y, min.z),
+      new THREE.Vector3(max.x, min.y, max.z),
+      new THREE.Vector3(max.x, max.y, min.z),
+      new THREE.Vector3(max.x, max.y, max.z),
+    ];
+
+    // 对每个裁剪框检查包围盒是否相交
+    let intersectCount = 0;
+    const v = new THREE.Vector3();
+
+    for (const clipBox of this.config.clipBoxes) {
+      // 检查包围盒的任意顶点是否在裁剪框内
+      let anyVertexInside = false;
+
+      for (const vertex of vertices) {
+        // 将顶点转换到裁剪框的局部空间
+        v.copy(vertex).applyMatrix4(clipBox);
+
+        // 检查是否在单位立方体内（-0.5 到 0.5）
+        if (v.x >= -0.5 && v.x <= 0.5 && v.y >= -0.5 && v.y <= 0.5 && v.z >= -0.5 && v.z <= 0.5) {
+          anyVertexInside = true;
+          break;
+        }
+      }
+
+      if (anyVertexInside) {
+        intersectCount++;
+      }
+    }
+
+    const intersectsAny = intersectCount > 0;
+    const intersectsAll = intersectCount === this.config.clipBoxes.length;
+
+    // 根据 clipMethod 和 clipTask 决定是否渲染
+    if (this.config.clipMethod === ClipMethod.INSIDE_ANY) {
+      if (this.config.clipTask === ClipTask.SHOW_INSIDE) {
+        // 只显示与任意裁剪框相交的节点
+        return intersectsAny;
+      } else if (this.config.clipTask === ClipTask.SHOW_OUTSIDE) {
+        // 只显示不与任何裁剪框相交的节点
+        return !intersectsAny;
+      }
+    } else if (this.config.clipMethod === ClipMethod.INSIDE_ALL) {
+      if (this.config.clipTask === ClipTask.SHOW_INSIDE) {
+        // 只显示与所有裁剪框相交的节点
+        return intersectsAll;
+      } else if (this.config.clipTask === ClipTask.SHOW_OUTSIDE) {
+        // 只显示不与所有裁剪框相交的节点
+        return !intersectsAll;
+      }
+    }
+
+    return true;
   }
 }
