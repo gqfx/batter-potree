@@ -1258,4 +1258,211 @@ describe('Viewer', () => {
       expect(stats.totalBytesLoaded).toBe(0);
     });
   });
+
+  describe('TraversalSystem and StreamingSystem integration', () => {
+    it('should connect traversal and streaming systems', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const traversalSystem = viewer.getTraversalSystem();
+      const streamingSystem = viewer.getStreamingSystem();
+
+      expect(traversalSystem).toBeDefined();
+      expect(streamingSystem).toBeDefined();
+    });
+
+    it('should request loading for unloaded visible nodes during animation', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+      const requestLoadSpy = vi.spyOn(streamingSystem, 'requestLoad');
+
+      // Manually add a mock point cloud with an unloaded root node
+      const mockOctree = {
+        root: {
+          name: 'r',
+          level: 0,
+          loaded: false,
+          loading: false,
+          numPoints: 1000,
+          boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+          children: [null, null, null, null, null, null, null, null],
+        },
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+      } as any;
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const traversalSystem = viewer.getTraversalSystem();
+      traversalSystem.addPointCloud('test', mockOctree);
+
+      // Start animation to trigger update
+      viewer.startAnimation();
+
+      // Wait for a few frames
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      viewer.stopAnimation();
+
+      // Verify that requestLoad was called for the unloaded node
+      expect(requestLoadSpy).toHaveBeenCalled();
+    });
+
+    it('should not request loading for already loaded nodes', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+      const requestLoadSpy = vi.spyOn(streamingSystem, 'requestLoad');
+
+      // Manually add a mock point cloud with a loaded root node
+      const mockOctree = {
+        root: {
+          name: 'r',
+          level: 0,
+          loaded: true,  // Already loaded
+          loading: false,
+          numPoints: 1000,
+          boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+          children: [null, null, null, null, null, null, null, null],
+        },
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+      } as any;
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const traversalSystem = viewer.getTraversalSystem();
+      traversalSystem.addPointCloud('test', mockOctree);
+
+      // Start animation to trigger update
+      viewer.startAnimation();
+
+      // Wait for a few frames
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      viewer.stopAnimation();
+
+      // Verify that requestLoad was NOT called for already loaded nodes
+      expect(requestLoadSpy).not.toHaveBeenCalled();
+    });
+
+    it('should not request loading for nodes currently loading', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+      const requestLoadSpy = vi.spyOn(streamingSystem, 'requestLoad');
+
+      // Manually add a mock point cloud with a loading root node
+      const mockOctree = {
+        root: {
+          name: 'r',
+          level: 0,
+          loaded: false,
+          loading: true,  // Currently loading
+          numPoints: 1000,
+          boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+          children: [null, null, null, null, null, null, null, null],
+        },
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+      } as any;
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const traversalSystem = viewer.getTraversalSystem();
+      traversalSystem.addPointCloud('test', mockOctree);
+
+      // Start animation to trigger update
+      viewer.startAnimation();
+
+      // Wait for a few frames
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      viewer.stopAnimation();
+
+      // Verify that requestLoad was NOT called for nodes currently loading
+      expect(requestLoadSpy).not.toHaveBeenCalled();
+    });
+
+    it('should update PointCloudScene visibility based on traversal result', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Manually add a mock point cloud
+      const mockOctree = {
+        root: {
+          name: 'r',
+          level: 0,
+          loaded: true,
+          loading: false,
+          numPoints: 1000,
+          boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+          children: [null, null, null, null, null, null, null, null],
+        },
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1)),
+      } as any;
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      // Manually add a mock PointCloudScene
+      const mockScene = {
+        updateVisibility: vi.fn(),
+      } as any;
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      const traversalSystem = viewer.getTraversalSystem();
+      traversalSystem.addPointCloud('test', mockOctree);
+
+      // Start animation to trigger update
+      viewer.startAnimation();
+
+      // Wait for a few frames
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      viewer.stopAnimation();
+
+      // Verify that updateVisibility was called on PointCloudScene
+      expect(mockScene.updateVisibility).toHaveBeenCalled();
+    });
+
+    it('should calculate load priority based on traversal priority', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Test calculateLoadPriority via private method access
+      const visibleNode = {
+        distance: 10,
+        screenSize: 100,
+        node: { level: 2 },
+        priority: 0.8,
+      };
+
+      const priority = (viewer as any).calculateLoadPriority(visibleNode);
+
+      expect(priority).toBe(0.8);
+    });
+  });
 });

@@ -232,11 +232,20 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     this.streamingSystem.setOnLoadComplete((event) => {
       const { octree, node, data } = event;
 
-      // TODO: Phase 4 - Update rendering system with loaded node data
-      // For now, we just log the event
       console.debug(
         `[Viewer] Node loaded: ${node.name} (${data.numPoints} points) in ${event.loadTime.toFixed(2)}ms`,
       );
+
+      // Find the point cloud scene for this octree
+      const cloudName = this.getPointCloudNameByOctree(octree);
+      if (cloudName) {
+        const scene = this.pointCloudScenes.get(cloudName);
+        if (scene) {
+          // TODO: Phase 4 - Create geometry from data and add to scene
+          // For now we just track that the node is loaded
+          // scene.addNode(node.name, geometry, { level: node.level, numPoints: node.numPoints });
+        }
+      }
 
       // Emit node-loaded event for external listeners
       this.emit('node-loaded', {
@@ -373,6 +382,11 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         pointCloud: octree,
         name: cloudName,
       });
+
+      // 9. Request loading root node immediately
+      if (octree.root && !octree.root.loaded && !octree.root.loading) {
+        this.streamingSystem.requestLoad(octree, octree.root, 1.0);
+      }
 
       return octree;
     } catch (error) {
@@ -730,8 +744,8 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Update all systems through scheduler
     this.scheduler.update(deltaTime);
 
-    // Update point clouds (LOD, visibility, etc.)
-    // This will be implemented when PointCloud has update logic
+    // Update visible nodes and trigger streaming loads
+    this.updateVisibleNodes();
 
     // Render
     this.render();
@@ -741,6 +755,101 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   }
 
   /**
+   * Update visible nodes and trigger streaming loads
+   *
+   * Connects TraversalSystem with StreamingSystem:
+   * 1. Gets visible nodes from TraversalSystem traversal result
+   * 2. Updates visibility textures on octrees
+   * 3. Requests loading of unloaded nodes via StreamingSystem
+   * 4. Updates PointCloudScene visibility
+   */
+  private updateVisibleNodes(): void {
+    // Get traversal result from last update
+    const result = this.traversalSystem.getLastResult();
+
+    // Group visible nodes by point cloud
+    const nodesByCloud = new Map<string, Array<typeof result.visibleNodes[number]>>();
+
+    for (const visibleNode of result.visibleNodes) {
+      const cloudName = this.getPointCloudNameByOctree(visibleNode.octree);
+      if (!cloudName) continue;
+
+      if (!nodesByCloud.has(cloudName)) {
+        nodesByCloud.set(cloudName, []);
+      }
+      nodesByCloud.get(cloudName)!.push(visibleNode);
+    }
+
+    // Process each point cloud
+    for (const [cloudName, visibleNodes] of nodesByCloud) {
+      const octree = this.pointClouds.get(cloudName);
+      if (!octree) continue;
+
+      // Update visibility texture (if octree supports it)
+      // TODO: Phase 4 - implement updateVisibilityTexture on octree
+      // octree.updateVisibilityTexture?.(visibleNodes.map(vn => vn.node));
+
+      // Request loading for unloaded nodes
+      for (const visibleNode of visibleNodes) {
+        const node = visibleNode.node;
+
+        // Only load if not already loaded and not currently loading
+        if (!node.loaded && !node.loading) {
+          // Calculate priority based on traversal priority
+          const priority = this.calculateLoadPriority(visibleNode);
+
+          // Request load from StreamingSystem
+          this.streamingSystem.requestLoad(octree, node, priority);
+        }
+      }
+
+      // Update PointCloudScene visibility
+      const scene = this.pointCloudScenes.get(cloudName);
+      if (scene) {
+        const visibleNodeIds = new Set(visibleNodes.map((vn) => vn.node.name));
+        scene.updateVisibility(visibleNodeIds);
+      }
+    }
+  }
+
+  /**
+   * Calculate load priority for a node
+   *
+   * Priority is based on:
+   * - Distance to camera (closer = higher priority)
+   * - Screen size (larger = higher priority)
+   * - Node level (lower level = higher priority)
+   *
+   * @param visibleNode - Visible node info from TraversalSystem
+   * @returns Priority value (higher = more important)
+   */
+  private calculateLoadPriority(visibleNode: {
+    readonly distance: number;
+    readonly screenSize: number;
+    readonly node: { readonly level: number };
+    readonly priority: number;
+  }): number {
+    // Use the priority already calculated by TraversalSystem
+    // This ensures consistency between traversal and streaming
+    return visibleNode.priority;
+  }
+
+  /**
+   * Get point cloud name by octree reference
+   *
+   * @param octree - Octree to search for
+   * @returns Cloud name or undefined
+   */
+  private getPointCloudNameByOctree(octree: IPointCloudOctree): string | undefined {
+    for (const [name, cloud] of this.pointClouds.entries()) {
+      if (cloud === octree) {
+        return name;
+      }
+    }
+    return undefined;
+  }
+
+    /**
    * Destroy the viewer and cleanup resources
    */
   destroy(): void {
