@@ -3,10 +3,12 @@
  * Three.js rendering implementation for better-potree
  */
 
+// Effects
+export * from './effects/index.js';
 // Helpers
 export * from './helpers/index.js';
 // Materials
-export * from './materials/PointCloudMaterial.js';
+export * from './materials/index.js';
 // Objects
 export * from './objects/PointCloudObject3D.js';
 // Scene
