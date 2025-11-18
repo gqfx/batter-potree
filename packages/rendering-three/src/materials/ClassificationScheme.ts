@@ -312,7 +312,7 @@ export class ClassificationScheme {
       this.classifications.set(Number(classId), {
         color: classConfig.color.clone(),
         visible: classConfig.visible,
-        name: classConfig.name,
+        name: classConfig.name ?? undefined,
       });
     }
 

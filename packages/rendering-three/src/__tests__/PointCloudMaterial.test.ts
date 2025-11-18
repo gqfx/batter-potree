@@ -471,4 +471,129 @@ describe('PointCloudMaterial', () => {
       expect(material.uniforms?.classificationLUT).toBeDefined();
     });
   });
+
+  describe('Shadow Mapping', () => {
+    it('should create material without shadow maps by default', () => {
+      const material = new PointCloudMaterial();
+
+      expect(material.defines?.num_shadowmaps).toBeUndefined();
+      expect(material.uniforms?.uShadowMap).toBeUndefined();
+    });
+
+    it('should create material with shadow maps', () => {
+      const shadowMap = new THREE.Texture();
+      const shadowWorldView = new THREE.Matrix4();
+      const shadowProj = new THREE.Matrix4();
+
+      const material = new PointCloudMaterial({
+        shadowMaps: [shadowMap],
+        shadowWorldView: [shadowWorldView],
+        shadowProj: [shadowProj],
+      });
+
+      expect(material.defines?.num_shadowmaps).toBe(1);
+      expect(material.uniforms?.uShadowMap).toBeDefined();
+      expect(material.uniforms?.uShadowWorldView).toBeDefined();
+      expect(material.uniforms?.uShadowProj).toBeDefined();
+    });
+
+    it('should update shadow maps dynamically', () => {
+      const material = new PointCloudMaterial();
+
+      const shadowMap = new THREE.Texture();
+      const shadowWorldView = new THREE.Matrix4();
+      const shadowProj = new THREE.Matrix4();
+
+      material.setShadowMaps([shadowMap], [shadowWorldView], [shadowProj]);
+
+      expect(material.defines?.num_shadowmaps).toBe(1);
+      expect(material.uniforms?.uShadowMap?.value).toEqual([shadowMap]);
+    });
+
+    it('should support multiple shadow maps', () => {
+      const shadowMap1 = new THREE.Texture();
+      const shadowMap2 = new THREE.Texture();
+      const shadowWorldView1 = new THREE.Matrix4();
+      const shadowWorldView2 = new THREE.Matrix4();
+      const shadowProj1 = new THREE.Matrix4();
+      const shadowProj2 = new THREE.Matrix4();
+
+      const material = new PointCloudMaterial({
+        shadowMaps: [shadowMap1, shadowMap2],
+        shadowWorldView: [shadowWorldView1, shadowWorldView2],
+        shadowProj: [shadowProj1, shadowProj2],
+      });
+
+      expect(material.defines?.num_shadowmaps).toBe(2);
+      expect(material.uniforms?.uShadowMap?.value).toHaveLength(2);
+    });
+
+    it('should clear shadow maps when set to empty array', () => {
+      const shadowMap = new THREE.Texture();
+      const shadowWorldView = new THREE.Matrix4();
+      const shadowProj = new THREE.Matrix4();
+
+      const material = new PointCloudMaterial({
+        shadowMaps: [shadowMap],
+        shadowWorldView: [shadowWorldView],
+        shadowProj: [shadowProj],
+      });
+
+      material.setShadowMaps([], [], []);
+
+      expect(material.defines?.num_shadowmaps).toBeUndefined();
+      expect(material.uniforms?.uShadowMap).toBeUndefined();
+    });
+
+    it('should set shadow color', () => {
+      const material = new PointCloudMaterial();
+
+      const color = new THREE.Color(0.5, 0.5, 0.5);
+      material.setShadowColor(color);
+
+      expect(material.uniforms?.uShadowColor).toBeDefined();
+      expect(material.uniforms?.uShadowColor?.value.x).toBe(0.5);
+      expect(material.uniforms?.uShadowColor?.value.y).toBe(0.5);
+      expect(material.uniforms?.uShadowColor?.value.z).toBe(0.5);
+    });
+
+    it('should create material with custom shadow color', () => {
+      const shadowColor = new THREE.Color(0.3, 0.3, 0.3);
+      const material = new PointCloudMaterial({
+        shadowColor,
+        shadowMaps: [new THREE.Texture()],
+        shadowWorldView: [new THREE.Matrix4()],
+        shadowProj: [new THREE.Matrix4()],
+      });
+
+      expect(material.uniforms?.uShadowColor).toBeDefined();
+      expect(material.uniforms?.uShadowColor?.value.x).toBe(0.3);
+      expect(material.uniforms?.uShadowColor?.value.y).toBe(0.3);
+      expect(material.uniforms?.uShadowColor?.value.z).toBe(0.3);
+    });
+
+    it('should trigger shader recompile when shadow map count changes', () => {
+      const material = new PointCloudMaterial();
+
+      const shadowMap = new THREE.Texture();
+      const shadowWorldView = new THREE.Matrix4();
+      const shadowProj = new THREE.Matrix4();
+
+      // First set: count changes from 0 to 1, defines should be updated
+      material.setShadowMaps([shadowMap], [shadowWorldView], [shadowProj]);
+      expect(material.defines?.num_shadowmaps).toBe(1);
+
+      // Second set: count stays 1, defines should still be 1
+      material.setShadowMaps([shadowMap], [shadowWorldView], [shadowProj]);
+      expect(material.defines?.num_shadowmaps).toBe(1);
+
+      // Third set: count changes to 2, defines should be updated
+      material.setShadowMaps(
+        [shadowMap, shadowMap],
+        [shadowWorldView, shadowWorldView],
+        [shadowProj, shadowProj],
+      );
+      expect(material.defines?.num_shadowmaps).toBe(2);
+    });
+  });
 });

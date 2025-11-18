@@ -71,12 +71,25 @@ uniform int clipMethod;
   uniform mat4 clipBoxes[num_clipboxes];
 #endif
 
+// Uniforms - shadow mapping
+#if defined(num_shadowmaps) && num_shadowmaps > 0
+  uniform sampler2D uShadowMap[num_shadowmaps];
+  uniform mat4 uShadowWorldView[num_shadowmaps];
+  uniform mat4 uShadowProj[num_shadowmaps];
+  uniform vec3 uShadowColor;
+#endif
+
 // Varyings - outputs to fragment shader
 out vec3 vColor;
 out float vLogDepth;
 out vec3 vViewPosition;
 out float vRadius;
 out float vPointSize;
+
+#if defined(num_shadowmaps) && num_shadowmaps > 0
+  out vec3 vShadowCoord[num_shadowmaps];
+  out float vDistanceToLight[num_shadowmaps];
+#endif
 
 // Color calculation functions
 vec3 getRGB() {
@@ -346,4 +359,21 @@ void main() {
 
   // Apply clipping (must be after color calculation for HIGHLIGHT mode)
   doClipping();
+
+  // Calculate shadow coordinates
+  #if defined(num_shadowmaps) && num_shadowmaps > 0
+    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+    for (int i = 0; i < num_shadowmaps; i++) {
+      // Transform to light space
+      vec4 shadowViewPos = uShadowWorldView[i] * worldPosition;
+      vDistanceToLight[i] = abs(shadowViewPos.z);
+
+      // Project to shadow map space
+      vec4 shadowProjPos = uShadowProj[i] * shadowViewPos;
+      vec3 shadowNDC = shadowProjPos.xyz / shadowProjPos.w;
+
+      // Convert NDC [-1,1] to texture coordinates [0,1]
+      vShadowCoord[i] = shadowNDC * 0.5 + 0.5;
+    }
+  #endif
 }

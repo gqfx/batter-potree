@@ -57,6 +57,14 @@ export interface PointCloudMaterialConfig {
   clipMethod?: ClipMethod;
   /** Clip boxes - array of 4x4 transformation matrices */
   clipBoxes?: THREE.Matrix4[];
+  /** Shadow maps - array of shadow map textures */
+  shadowMaps?: THREE.Texture[];
+  /** Shadow world-view matrices - transform from world to light view space */
+  shadowWorldView?: THREE.Matrix4[];
+  /** Shadow projection matrices - transform from light view to clip space */
+  shadowProj?: THREE.Matrix4[];
+  /** Shadow color - color to use for shadowed areas (default: black) */
+  shadowColor?: THREE.Color;
 }
 
 /**
@@ -89,6 +97,10 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
     const clipTask = config.clipTask ?? ClipTask.NONE;
     const clipMethod = config.clipMethod ?? ClipMethod.INSIDE_ANY;
     const clipBoxes = config.clipBoxes ?? [];
+    const shadowMaps = config.shadowMaps ?? [];
+    const shadowWorldView = config.shadowWorldView ?? [];
+    const shadowProj = config.shadowProj ?? [];
+    const shadowColor = config.shadowColor ?? new THREE.Color(0, 0, 0);
 
     // Create default textures if not provided
     const gradient = config.gradient ?? PointCloudMaterial.createDefaultGradient();
@@ -170,6 +182,11 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       defines.num_clipboxes = clipBoxes.length;
     }
 
+    // Shadow map defines
+    if (shadowMaps.length > 0) {
+      defines.num_shadowmaps = shadowMaps.length;
+    }
+
     // Create uniforms
     const uniforms = {
       // Screen uniforms
@@ -216,6 +233,14 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
         clipBoxes: {
           value: clipBoxes.map((m) => m.elements),
         },
+      }),
+
+      // Shadow mapping uniforms
+      ...(shadowMaps.length > 0 && {
+        uShadowMap: { value: shadowMaps },
+        uShadowWorldView: { value: shadowWorldView.map((m) => m.elements) },
+        uShadowProj: { value: shadowProj.map((m) => m.elements) },
+        uShadowColor: { value: new THREE.Vector3(shadowColor.r, shadowColor.g, shadowColor.b) },
       }),
     };
 
@@ -479,6 +504,100 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
   public setClipMethod(method: ClipMethod): void {
     if (this.uniforms?.clipMethod) {
       this.uniforms.clipMethod.value = method;
+    }
+  }
+
+  /**
+   * Set shadow maps for shadow mapping
+   *
+   * Updates the shadow maps, view matrices, and projection matrices.
+   * This will trigger a shader recompile if the number of shadow maps changes.
+   *
+   * @param shadowMaps - Array of shadow map textures
+   * @param shadowWorldView - Array of world-to-light-view transformation matrices
+   * @param shadowProj - Array of light-view-to-clip projection matrices
+   *
+   * @example
+   * ```typescript
+   * const shadowMap = new THREE.WebGLRenderTarget(1024, 1024);
+   * const lightView = new THREE.Matrix4().lookAt(
+   *   new THREE.Vector3(10, 10, 10),
+   *   new THREE.Vector3(0, 0, 0),
+   *   new THREE.Vector3(0, 1, 0)
+   * );
+   * const lightProj = new THREE.Matrix4().makePerspective(-10, 10, 10, -10, 0.1, 100);
+   * material.setShadowMaps([shadowMap.texture], [lightView], [lightProj]);
+   * ```
+   */
+  public setShadowMaps(
+    shadowMaps: THREE.Texture[],
+    shadowWorldView: THREE.Matrix4[],
+    shadowProj: THREE.Matrix4[],
+  ): void {
+    if (!this.defines) {
+      this.defines = {};
+    }
+
+    const oldCount = this.defines.num_shadowmaps ?? 0;
+    const newCount = shadowMaps.length;
+
+    // Update define if count changed
+    if (newCount !== oldCount) {
+      if (newCount > 0) {
+        this.defines.num_shadowmaps = newCount;
+      } else {
+        delete this.defines.num_shadowmaps;
+      }
+      // Trigger shader recompile
+      this.needsUpdate = true;
+    }
+
+    // Update uniforms
+    if (this.uniforms) {
+      if (newCount > 0) {
+        if (!this.uniforms.uShadowMap) {
+          this.uniforms.uShadowMap = { value: [] };
+        }
+        if (!this.uniforms.uShadowWorldView) {
+          this.uniforms.uShadowWorldView = { value: [] };
+        }
+        if (!this.uniforms.uShadowProj) {
+          this.uniforms.uShadowProj = { value: [] };
+        }
+        this.uniforms.uShadowMap.value = shadowMaps;
+        this.uniforms.uShadowWorldView.value = shadowWorldView.map((m) => m.elements);
+        this.uniforms.uShadowProj.value = shadowProj.map((m) => m.elements);
+      } else {
+        delete this.uniforms.uShadowMap;
+        delete this.uniforms.uShadowWorldView;
+        delete this.uniforms.uShadowProj;
+      }
+    }
+  }
+
+  /**
+   * Set shadow color
+   *
+   * Sets the color to use for shadowed areas. Default is black (0, 0, 0).
+   *
+   * @param color - The shadow color
+   *
+   * @example
+   * ```typescript
+   * // Dark gray shadows
+   * material.setShadowColor(new THREE.Color(0.3, 0.3, 0.3));
+   *
+   * // Blue-tinted shadows
+   * material.setShadowColor(new THREE.Color(0.1, 0.1, 0.3));
+   * ```
+   */
+  public setShadowColor(color: THREE.Color): void {
+    if (this.uniforms?.uShadowColor) {
+      this.uniforms.uShadowColor.value.set(color.r, color.g, color.b);
+    } else if (this.uniforms) {
+      this.uniforms.uShadowColor = {
+        value: new THREE.Vector3(color.r, color.g, color.b),
+      };
     }
   }
 
