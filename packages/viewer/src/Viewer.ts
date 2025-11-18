@@ -2,7 +2,13 @@
  * Main Viewer class - high-level API for better-potree
  */
 
-import type { EDLConfig, IPointCloudOctree, IRenderer, IScene } from '@better-potree/core';
+import type {
+  EDLConfig,
+  IPointCloudOctree,
+  IRenderer,
+  IScene,
+  IWorkerDecodeResponse,
+} from '@better-potree/core';
 import {
   PointCloudColorMode,
   PointShape,
@@ -241,9 +247,20 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       if (cloudName) {
         const scene = this.pointCloudScenes.get(cloudName);
         if (scene) {
-          // TODO: Phase 4 - Create geometry from data and add to scene
-          // For now we just track that the node is loaded
-          // scene.addNode(node.name, geometry, { level: node.level, numPoints: node.numPoints });
+          try {
+            // Create geometry from decoded data
+            const geometry = this.createGeometry(data);
+
+            // Add node to scene with metadata
+            scene.addNode(node.name, geometry, {
+              level: node.level,
+              numPoints: node.numPoints,
+            });
+
+            console.debug(`[Viewer] Geometry created for node: ${node.name}`);
+          } catch (error) {
+            console.error(`[Viewer] Failed to create geometry for node ${node.name}:`, error);
+          }
         }
       }
 
@@ -272,6 +289,182 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         retries,
       });
     });
+  }
+
+  /**
+   * Validate geometry data from Worker decode response
+   *
+   * @param data - Worker decode response
+   * @throws {Error} If positions are missing or invalid
+   *
+   * @example
+   * ```typescript
+   * this.validateGeometryData(data);
+   * ```
+   */
+  private validateGeometryData(data: IWorkerDecodeResponse): void {
+    // Check if we have attributeBuffers
+    if (!data.attributeBuffers || Object.keys(data.attributeBuffers).length === 0) {
+      throw new Error('Geometry data must contain attributeBuffers');
+    }
+
+    // Check for position data (POSITION_CARTESIAN is the standard Potree attribute name)
+    const positionBuffer = data.attributeBuffers['POSITION_CARTESIAN'];
+    if (!positionBuffer || !positionBuffer.buffer) {
+      throw new Error('Geometry data must contain POSITION_CARTESIAN attribute');
+    }
+
+    // Validate position buffer size
+    const positionArray = new Float32Array(positionBuffer.buffer);
+    if (positionArray.length === 0) {
+      throw new Error('Position buffer is empty');
+    }
+
+    // Validate that position buffer size matches numPoints
+    const expectedLength = data.numPoints * 3;
+    if (positionArray.length !== expectedLength) {
+      console.warn(
+        `Position buffer length mismatch: expected ${expectedLength}, got ${positionArray.length}`,
+      );
+    }
+
+    // Validate other attributes if present
+    const validateAttribute = (name: string, componentsPerPoint: number) => {
+      const attr = data.attributeBuffers[name];
+      if (attr && attr.buffer) {
+        const array = new Float32Array(attr.buffer);
+        const expectedLength = data.numPoints * componentsPerPoint;
+        if (array.length !== expectedLength) {
+          console.warn(
+            `${name} buffer length mismatch: expected ${expectedLength}, got ${array.length}`,
+          );
+        }
+      }
+    };
+
+    // Validate common attributes
+    validateAttribute('rgba', 4);
+    validateAttribute('NORMAL', 3);
+    validateAttribute('NORMAL_OCT16', 3);
+    validateAttribute('NORMAL_SPHEREMAPPED', 3);
+  }
+
+  /**
+   * Create THREE.BufferGeometry from Worker decode response
+   *
+   * Converts decoded point cloud data into a THREE.BufferGeometry with
+   * appropriate attributes for rendering.
+   *
+   * @param data - Worker decode response containing attribute buffers
+   * @returns THREE.BufferGeometry with position, color, and other attributes
+   * @throws {Error} If position data is missing or invalid
+   *
+   * @example
+   * ```typescript
+   * const geometry = this.createGeometry(decodeResponse);
+   * scene.addNode(nodeId, geometry, metadata);
+   * ```
+   */
+  private createGeometry(data: IWorkerDecodeResponse): THREE.BufferGeometry {
+    // Validate data first
+    this.validateGeometryData(data);
+
+    const geometry = new THREE.BufferGeometry();
+    const attributeBuffers = data.attributeBuffers;
+
+    // Process each attribute buffer
+    for (const attributeName in attributeBuffers) {
+      const attrData = attributeBuffers[attributeName];
+      if (!attrData) continue;
+
+      const { buffer, attribute } = attrData;
+
+      // Create typed array from buffer
+      const array = new Float32Array(buffer);
+
+      // Map Potree attribute names to THREE.js attribute names and handle special cases
+      if (attributeName === 'POSITION_CARTESIAN') {
+        // Position attribute (required)
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(array, 3));
+      } else if (attributeName === 'rgba') {
+        // Color attribute - convert from Uint8 RGBA to Float32 RGB
+        // Note: Potree stores as Uint8Array, we need to convert to [0,1] range
+        const uint8Array = new Uint8Array(buffer);
+        const numPoints = uint8Array.length / 4;
+        const colorArray = new Float32Array(numPoints * 3);
+        for (let i = 0; i < numPoints; i++) {
+          colorArray[i * 3 + 0] = uint8Array[i * 4 + 0]! / 255; // r
+          colorArray[i * 3 + 1] = uint8Array[i * 4 + 1]! / 255; // g
+          colorArray[i * 3 + 2] = uint8Array[i * 4 + 2]! / 255; // b
+          // Alpha is ignored
+        }
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colorArray, 3));
+      } else if (
+        attributeName === 'NORMAL' ||
+        attributeName === 'NORMAL_OCT16' ||
+        attributeName === 'NORMAL_SPHEREMAPPED'
+      ) {
+        // Normal attributes (all decoded to Float32Array by worker)
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(array, 3));
+      } else if (attributeName === 'intensity' || attributeName === 'INTENSITY') {
+        // Intensity attribute - single component
+        const bufferAttribute = new THREE.Float32BufferAttribute(array, 1);
+
+        // Store additional metadata if available (for potential shader usage)
+        if (attrData.offset !== undefined || attrData.scale !== undefined) {
+          (bufferAttribute as unknown as { potree: unknown }).potree = {
+            offset: attrData.offset,
+            scale: attrData.scale,
+            preciseBuffer: attrData.preciseBuffer,
+          };
+        }
+
+        geometry.setAttribute('intensity', bufferAttribute);
+      } else if (attributeName === 'classification' || attributeName === 'CLASSIFICATION') {
+        // Classification attribute - single component
+        const bufferAttribute = new THREE.Float32BufferAttribute(array, 1);
+
+        if (attrData.offset !== undefined || attrData.scale !== undefined) {
+          (bufferAttribute as unknown as { potree: unknown }).potree = {
+            offset: attrData.offset,
+            scale: attrData.scale,
+            preciseBuffer: attrData.preciseBuffer,
+          };
+        }
+
+        geometry.setAttribute('classification', bufferAttribute);
+      } else if (attributeName === 'INDICES') {
+        // Indices attribute (for GPU LOD traversal)
+        const uint8Array = new Uint8Array(buffer);
+        const bufferAttribute = new THREE.Uint8BufferAttribute(uint8Array, 4);
+        bufferAttribute.normalized = true;
+        geometry.setAttribute('indices', bufferAttribute);
+      } else if (attributeName === 'SPACING') {
+        // Spacing attribute (for adaptive point size)
+        geometry.setAttribute('spacing', new THREE.Float32BufferAttribute(array, 1));
+      } else {
+        // Generic attribute - store as Float32 with single component
+        const bufferAttribute = new THREE.Float32BufferAttribute(array, 1);
+
+        // Store metadata for custom attributes
+        if (attrData.offset !== undefined || attrData.scale !== undefined) {
+          (bufferAttribute as unknown as { potree: unknown }).potree = {
+            offset: attrData.offset,
+            scale: attrData.scale,
+            preciseBuffer: attrData.preciseBuffer,
+            range: attribute.description ? JSON.parse(attribute.description) : undefined,
+          };
+        }
+
+        geometry.setAttribute(attributeName, bufferAttribute);
+      }
+    }
+
+    // Compute bounding box and sphere for frustum culling
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+
+    return geometry;
   }
 
   /**

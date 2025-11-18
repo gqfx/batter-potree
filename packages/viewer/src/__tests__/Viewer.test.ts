@@ -1465,4 +1465,408 @@ describe('Viewer', () => {
       expect(priority).toBe(0.8);
     });
   });
+
+  describe('createGeometry', () => {
+    let viewer: Viewer;
+
+    beforeEach(() => {
+      viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+    });
+
+    it('should create geometry from worker decode response with positions', () => {
+      // Create minimal worker decode response with positions
+      const positions = new Float32Array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+      const positionBuffer = positions.buffer;
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 2,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positionBuffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry).toBeInstanceOf(THREE.BufferGeometry);
+      expect(geometry.attributes.position).toBeDefined();
+      expect(geometry.attributes.position.count).toBe(2);
+      expect(geometry.attributes.position.array).toEqual(positions);
+    });
+
+    it('should create geometry with color attribute from rgba', () => {
+      const positions = new Float32Array([1.0, 2.0, 3.0]);
+      const rgba = new Uint8Array([255, 128, 64, 255]); // 1 point RGBA
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+          rgba: {
+            buffer: rgba.buffer,
+            attribute: {
+              name: 'rgba',
+              type: 0,
+              numElements: 4,
+              byteSize: 4,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.attributes.color).toBeDefined();
+      expect(geometry.attributes.color.count).toBe(1);
+      // Check RGB values are normalized to [0,1]
+      expect(geometry.attributes.color.array[0]).toBeCloseTo(1.0, 5);
+      expect(geometry.attributes.color.array[1]).toBeCloseTo(128 / 255, 5);
+      expect(geometry.attributes.color.array[2]).toBeCloseTo(64 / 255, 5);
+    });
+
+    it('should create geometry with normal attribute', () => {
+      const positions = new Float32Array([1.0, 2.0, 3.0]);
+      const normals = new Float32Array([0.0, 1.0, 0.0]);
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+          NORMAL: {
+            buffer: normals.buffer,
+            attribute: {
+              name: 'NORMAL',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.attributes.normal).toBeDefined();
+      expect(geometry.attributes.normal.count).toBe(1);
+      expect(geometry.attributes.normal.array).toEqual(normals);
+    });
+
+    it('should create geometry with intensity attribute', () => {
+      const positions = new Float32Array([1.0, 2.0, 3.0]);
+      const intensities = new Float32Array([0.5]);
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+          intensity: {
+            buffer: intensities.buffer,
+            attribute: {
+              name: 'intensity',
+              type: 0,
+              numElements: 1,
+              byteSize: 4,
+            },
+            offset: 0,
+            scale: 1.0,
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.attributes.intensity).toBeDefined();
+      expect(geometry.attributes.intensity.count).toBe(1);
+      expect(geometry.attributes.intensity.array).toEqual(intensities);
+      // Check potree metadata is stored
+      expect((geometry.attributes.intensity as any).potree).toBeDefined();
+      expect((geometry.attributes.intensity as any).potree.offset).toBe(0);
+      expect((geometry.attributes.intensity as any).potree.scale).toBe(1.0);
+    });
+
+    it('should create geometry with classification attribute', () => {
+      const positions = new Float32Array([1.0, 2.0, 3.0]);
+      const classification = new Float32Array([2]);
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+          classification: {
+            buffer: classification.buffer,
+            attribute: {
+              name: 'classification',
+              type: 0,
+              numElements: 1,
+              byteSize: 4,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.attributes.classification).toBeDefined();
+      expect(geometry.attributes.classification.count).toBe(1);
+      expect(geometry.attributes.classification.array).toEqual(classification);
+    });
+
+    it('should create geometry with INDICES attribute', () => {
+      const positions = new Float32Array([1.0, 2.0, 3.0]);
+      const indices = new Uint8Array([0, 0, 0, 1]);
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+          INDICES: {
+            buffer: indices.buffer,
+            attribute: {
+              name: 'INDICES',
+              type: 0,
+              numElements: 4,
+              byteSize: 4,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.attributes.indices).toBeDefined();
+      expect(geometry.attributes.indices.count).toBe(1);
+      expect(geometry.attributes.indices.normalized).toBe(true);
+    });
+
+    it('should create geometry with SPACING attribute', () => {
+      const positions = new Float32Array([1.0, 2.0, 3.0]);
+      const spacing = new Float32Array([0.1]);
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+          SPACING: {
+            buffer: spacing.buffer,
+            attribute: {
+              name: 'SPACING',
+              type: 0,
+              numElements: 1,
+              byteSize: 4,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.attributes.spacing).toBeDefined();
+      expect(geometry.attributes.spacing.count).toBe(1);
+      expect(geometry.attributes.spacing.array).toEqual(spacing);
+    });
+
+    it('should compute bounding box and sphere', () => {
+      const positions = new Float32Array([0, 0, 0, 1, 1, 1, -1, -1, -1]);
+
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 3,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [-1, -1, -1] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: positions.buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+        },
+      };
+
+      const geometry = (viewer as any).createGeometry(decodeResponse);
+
+      expect(geometry.boundingBox).toBeDefined();
+      expect(geometry.boundingSphere).toBeDefined();
+      expect(geometry.boundingBox!.min.x).toBe(-1);
+      expect(geometry.boundingBox!.max.x).toBe(1);
+    });
+
+    it('should throw error if attributeBuffers is missing', () => {
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 0,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {},
+      };
+
+      expect(() => (viewer as any).createGeometry(decodeResponse)).toThrow(
+        'Geometry data must contain attributeBuffers',
+      );
+    });
+
+    it('should throw error if POSITION_CARTESIAN is missing', () => {
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 1,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          rgba: {
+            buffer: new Uint8Array([255, 0, 0, 255]).buffer,
+            attribute: {
+              name: 'rgba',
+              type: 0,
+              numElements: 4,
+              byteSize: 4,
+            },
+          },
+        },
+      };
+
+      expect(() => (viewer as any).createGeometry(decodeResponse)).toThrow(
+        'Geometry data must contain POSITION_CARTESIAN attribute',
+      );
+    });
+
+    it('should throw error if position buffer is empty', () => {
+      const decodeResponse: any = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 0,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: new Float32Array([]).buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+        },
+      };
+
+      expect(() => (viewer as any).createGeometry(decodeResponse)).toThrow(
+        'Position buffer is empty',
+      );
+    });
+  });
 });
