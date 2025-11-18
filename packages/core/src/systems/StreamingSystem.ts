@@ -39,6 +39,8 @@ export interface StreamingSystemConfig {
   readonly workerPool?: WorkerPool;
   /** 每帧最大处理请求数 */
   readonly maxRequestsPerFrame?: number;
+  /** 每秒最大下载量 (MB)，0 表示不限制 */
+  readonly downloadBudgetMB?: number;
 }
 
 /**
@@ -115,6 +117,10 @@ export class StreamingSystem implements ISystem {
   private pendingRequests: Map<string, LoadRequest> = new Map();
   private activeLoads: Map<string, LoadRequest> = new Map();
 
+  // 速率限制
+  private downloadedBytesThisSecond = 0;
+  private lastRateLimitReset = Date.now();
+
   // 统计信息
   private stats: {
     completedLoads: number;
@@ -142,6 +148,7 @@ export class StreamingSystem implements ISystem {
       maxConcurrentLoads: config.maxConcurrentLoads ?? 8,
       maxRetries: config.maxRetries ?? 3,
       maxRequestsPerFrame: config.maxRequestsPerFrame ?? 10,
+      downloadBudgetMB: config.downloadBudgetMB ?? 0, // 0 = 不限制
     };
 
     if (config.workerPool !== undefined) {
@@ -167,6 +174,15 @@ export class StreamingSystem implements ISystem {
    */
   setOnLoadFailed(callback: (event: LoadFailedEvent) => void): void {
     this.onLoadFailed = callback;
+  }
+
+  /**
+   * 设置每秒最大下载量
+   *
+   * @param budgetMB - 每秒最大下载量 (MB)，0 表示不限制
+   */
+  setDownloadBudget(budgetMB: number): void {
+    this.config = { ...this.config, downloadBudgetMB: budgetMB };
   }
 
   /**
@@ -298,6 +314,22 @@ export class StreamingSystem implements ISystem {
    * 处理请求队列
    */
   private processQueue(): void {
+    // 重置速率限制计数器（每秒）
+    const now = Date.now();
+    if (now - this.lastRateLimitReset >= 1000) {
+      this.downloadedBytesThisSecond = 0;
+      this.lastRateLimitReset = now;
+    }
+
+    // 检查是否超出下载预算
+    if (this.config.downloadBudgetMB > 0) {
+      const budgetBytes = this.config.downloadBudgetMB * 1024 * 1024;
+      if (this.downloadedBytesThisSecond >= budgetBytes) {
+        // 超出预算，暂停本秒内的加载
+        return;
+      }
+    }
+
     // 检查是否有空闲槽位
     const availableSlots = this.config.maxConcurrentLoads - this.activeLoads.size;
     if (availableSlots <= 0 || this.pendingRequests.size === 0) {
@@ -418,11 +450,16 @@ export class StreamingSystem implements ISystem {
     // 从活动加载中移除
     this.activeLoads.delete(key);
 
-    // 更新统计
+    // 更新统计和速率限制计数器
     const loadTime = performance.now() - startTime;
+    const bytesLoaded = buffer.byteLength;
+
     this.stats.completedLoads++;
-    this.stats.totalBytesLoaded += buffer.byteLength;
+    this.stats.totalBytesLoaded += bytesLoaded;
     this.stats.loadTimes.push(loadTime);
+
+    // 更新速率限制计数器
+    this.downloadedBytesThisSecond += bytesLoaded;
 
     // 保持统计数组大小合理
     if (this.stats.loadTimes.length > 100) {
