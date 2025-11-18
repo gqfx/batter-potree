@@ -628,6 +628,90 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   }
 
   /**
+   * Add an already-loaded point cloud octree to the viewer
+   *
+   * Use this method when you have loaded the octree using a custom loader
+   * (e.g., for local file system access) and want to add it to the viewer.
+   *
+   * @param octree - The loaded point cloud octree
+   * @param name - Optional name for the point cloud (auto-generated if not provided)
+   * @returns The same octree that was passed in
+   * @throws {Error} If a point cloud with the same name already exists
+   *
+   * @example
+   * ```typescript
+   * const viewer = new Viewer({ ... });
+   *
+   * // Load with custom loader
+   * const customLoader = new PotreeLoader({ customFileLoader: myLoader });
+   * const octree = await customLoader.load('metadata.json');
+   *
+   * // Add to viewer
+   * viewer.addPointCloud(octree, 'myCloud');
+   * ```
+   */
+  addPointCloud(octree: IPointCloudOctree, name?: string): IPointCloudOctree {
+    // Determine point cloud name
+    const cloudName = name || this.extractNameFromUrl(octree.url || 'pointcloud');
+
+    // Check if point cloud with this name already exists
+    if (this.pointClouds.has(cloudName)) {
+      throw new Error(`Point cloud "${cloudName}" is already loaded`);
+    }
+
+    try {
+      // 1. Store in point clouds map
+      this.pointClouds.set(cloudName, octree);
+
+      // 2. Create PointCloudScene with material
+      const material = this.createMaterial();
+      const pointCloudScene = new PointCloudScene({
+        materialConfig: {
+          size: material.size,
+          colorMode: material.colorMode,
+          sizeType: material.sizeType,
+          shape: material.shape,
+          enableGPULOD: true,
+        },
+        octreeSpacing: octree.spacing,
+      });
+
+      // 3. Add to Three.js scene
+      const threeScene = this.scene.getThreeScene?.();
+      if (threeScene) {
+        threeScene.add(pointCloudScene);
+      }
+
+      // 4. Store in point cloud scenes map
+      this.pointCloudScenes.set(cloudName, pointCloudScene);
+
+      // 5. Add to TraversalSystem for LOD traversal
+      this.traversalSystem.addPointCloud(cloudName, octree);
+
+      // 6. Emit loaded event
+      this.emit('pointcloud-loaded', {
+        pointCloud: octree,
+        name: cloudName,
+      });
+
+      // 7. Request loading root node immediately
+      if (octree.root && !octree.root.loaded && !octree.root.loading) {
+        this.streamingSystem.requestLoad(octree, octree.root, 1.0);
+      }
+
+      return octree;
+    } catch (error) {
+      // Clean up on error
+      this.pointClouds.delete(cloudName);
+      this.pointCloudScenes.delete(cloudName);
+
+      // Re-throw with more context
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to add point cloud "${cloudName}": ${errorMessage}`);
+    }
+  }
+
+  /**
    * Extract a name from the point cloud URL
    *
    * @param url - Point cloud URL

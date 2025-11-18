@@ -507,9 +507,10 @@ function createControlsPanel() {
         throw new Error('点云没有根节点');
       }
 
-      // TODO: 将 octree 添加到 viewer 中
-      // 目前 Viewer API 还没有实现完整的点云渲染功能
-      // 这需要等待 Phase 4 实现完成后才能使用
+      // 将 octree 添加到 viewer 中以进行渲染
+      console.log('正在将点云添加到 viewer...');
+      viewer.addPointCloud(octree, directoryHandle.name);
+      console.log('点云已添加到 viewer');
 
       // 调整相机以适应点云边界
       const boundingBox = octree.boundingBox;
