@@ -121,6 +121,14 @@ export class TraversalSystem implements ISystem {
     traversalTime: 0,
   };
 
+  // 变换缓存相关
+  private lastCameraPosition = new THREE.Vector3();
+  private lastCameraQuaternion = new THREE.Quaternion();
+  private lastCameraMatrix = new THREE.Matrix4();
+  private lastOctreeTransforms = new Map<string, THREE.Matrix4>();
+  private transformChangeThreshold = 0.001; // 变换变化阈值
+  private transformCacheValid = false;
+
   /**
    * 创建遍历系统
    *
@@ -229,6 +237,7 @@ export class TraversalSystem implements ISystem {
    */
   addPointCloud(id: string, octree: IPointCloudOctree): void {
     this.pointClouds.set(id, octree);
+    this.transformCacheValid = false; // 失效缓存
   }
 
   /**
@@ -238,6 +247,8 @@ export class TraversalSystem implements ISystem {
    */
   removePointCloud(id: string): void {
     this.pointClouds.delete(id);
+    this.lastOctreeTransforms.delete(id);
+    this.transformCacheValid = false; // 失效缓存
   }
 
   /**
@@ -276,6 +287,14 @@ export class TraversalSystem implements ISystem {
       return;
     }
 
+    // 检查变换是否改变
+    const transformChanged = this.checkTransformChanged();
+
+    // 如果变换没有改变且缓存有效，复用上一帧结果
+    if (!transformChanged && this.transformCacheValid) {
+      return;
+    }
+
     const startTime = performance.now();
 
     // 更新视锥体
@@ -307,6 +326,10 @@ export class TraversalSystem implements ISystem {
       traversedNodes,
       traversalTime: endTime - startTime,
     };
+
+    // 更新变换缓存
+    this.updateTransformCache();
+    this.transformCacheValid = true;
   }
 
   /**
@@ -315,6 +338,104 @@ export class TraversalSystem implements ISystem {
   dispose(): void {
     this.pointClouds.clear();
     this.camera = null;
+    this.lastOctreeTransforms.clear();
+    this.transformCacheValid = false;
+  }
+
+  /**
+   * 检查相机和点云变换是否改变
+   *
+   * @returns true 表示变换改变，需要重新遍历
+   *
+   * @internal
+   */
+  private checkTransformChanged(): boolean {
+    if (!this.camera) {
+      return true;
+    }
+
+    // 检查相机位置变化
+    const positionDelta = this.camera.position.distanceTo(this.lastCameraPosition);
+    if (positionDelta > this.transformChangeThreshold) {
+      return true;
+    }
+
+    // 检查相机旋转变化
+    this.camera.updateMatrixWorld();
+    this.camera.getWorldQuaternion(this.lastCameraQuaternion);
+    const angle = this.lastCameraQuaternion.angleTo(this.camera.quaternion);
+    if (angle > this.transformChangeThreshold) {
+      return true;
+    }
+
+    // 检查相机投影矩阵变化
+    const currentCameraMatrix = new THREE.Matrix4();
+    currentCameraMatrix.multiplyMatrices(
+      this.camera.projectionMatrix,
+      this.camera.matrixWorldInverse,
+    );
+    if (!this.matricesEqual(currentCameraMatrix, this.lastCameraMatrix)) {
+      return true;
+    }
+
+    // 检查点云变换变化
+    for (const [id, octree] of this.pointClouds) {
+      const lastTransform = this.lastOctreeTransforms.get(id);
+      if (!lastTransform || !this.matricesEqual(octree.matrixWorld, lastTransform)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 更新变换缓存
+   *
+   * @internal
+   */
+  private updateTransformCache(): void {
+    if (!this.camera) return;
+
+    // 更新相机位置
+    this.lastCameraPosition.copy(this.camera.position);
+
+    // 更新相机旋转
+    this.camera.getWorldQuaternion(this.lastCameraQuaternion);
+
+    // 更新相机矩阵
+    this.lastCameraMatrix.multiplyMatrices(
+      this.camera.projectionMatrix,
+      this.camera.matrixWorldInverse,
+    );
+
+    // 更新点云变换
+    this.lastOctreeTransforms.clear();
+    for (const [id, octree] of this.pointClouds) {
+      this.lastOctreeTransforms.set(id, octree.matrixWorld.clone());
+    }
+  }
+
+  /**
+   * 比较两个矩阵是否相等
+   *
+   * @param a - 矩阵 A
+   * @param b - 矩阵 B
+   * @returns 是否相等
+   *
+   * @internal
+   */
+  private matricesEqual(a: THREE.Matrix4, b: THREE.Matrix4): boolean {
+    const ae = a.elements;
+    const be = b.elements;
+
+    for (let i = 0; i < 16; i++) {
+      if (Math.abs(ae[i] - be[i]) > this.transformChangeThreshold) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
