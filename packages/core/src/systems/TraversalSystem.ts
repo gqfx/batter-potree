@@ -48,6 +48,8 @@ export interface TraversalSystemConfig {
   readonly clipTask?: ClipTask;
   /** 裁剪方法 */
   readonly clipMethod?: ClipMethod;
+  /** 强制加载的深度（前N层始终显示，防止空白屏幕） */
+  readonly forceLoadDepth?: number;
 }
 
 /**
@@ -134,6 +136,7 @@ export class TraversalSystem implements ISystem {
       clipBoxes: config.clipBoxes ?? [],
       clipTask: config.clipTask ?? ClipTask.NONE,
       clipMethod: config.clipMethod ?? ClipMethod.INSIDE_ANY,
+      forceLoadDepth: config.forceLoadDepth ?? 3, // 默认强制加载前3层
     };
   }
 
@@ -198,6 +201,24 @@ export class TraversalSystem implements ISystem {
    */
   setClipMethod(method: ClipMethod): void {
     this.config = { ...this.config, clipMethod: method };
+  }
+
+  /**
+   * 设置强制加载深度
+   *
+   * 前N层节点将始终被显示,不受 LOD 和屏幕大小限制
+   * 这可以防止在远距离观看时出现空白屏幕
+   *
+   * @param depth - 强制加载的层数 (0-10)
+   *
+   * @example
+   * ```typescript
+   * // 强制加载前3层
+   * traversalSystem.setForceLoadDepth(3);
+   * ```
+   */
+  setForceLoadDepth(depth: number): void {
+    this.config = { ...this.config, forceLoadDepth: Math.max(0, Math.min(10, depth)) };
   }
 
   /**
@@ -364,10 +385,12 @@ export class TraversalSystem implements ISystem {
       const screenSize = this.calculateScreenSize(node, distance);
 
       // LOD 判断：是否应该继续细分
+      // 对于前 forceLoadDepth 层，强制细分（如果有子节点）
+      const isForceLoadLevel = node.level < this.config.forceLoadDepth;
       const shouldSubdivide =
         node.level < this.config.maxLevel &&
-        screenSize >= this.config.minScreenSize &&
-        node.children.some((child) => child !== null);
+        node.children.some((child) => child !== null) &&
+        (isForceLoadLevel || screenSize >= this.config.minScreenSize);
 
       if (!shouldSubdivide) {
         // 不再细分，添加当前节点到可见列表
