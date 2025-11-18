@@ -123,6 +123,18 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       case PointCloudColorMode.LEVEL_OF_DETAIL:
         defines.COLOR_TYPE_LEVEL_OF_DETAIL = true;
         break;
+      case PointCloudColorMode.MATCAP:
+        defines.COLOR_TYPE_MATCAP = true;
+        break;
+      case PointCloudColorMode.GPS_TIME:
+        defines.COLOR_TYPE_GPS_TIME = true;
+        break;
+      case PointCloudColorMode.POINT_INDEX:
+        defines.COLOR_TYPE_POINT_INDEX = true;
+        break;
+      case PointCloudColorMode.COMPOSITE:
+        defines.COLOR_TYPE_COMPOSITE = true;
+        break;
     }
 
     // Point size type defines
@@ -483,6 +495,10 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
     delete this.defines.COLOR_TYPE_RETURN_NUMBER;
     delete this.defines.COLOR_TYPE_NORMAL;
     delete this.defines.COLOR_TYPE_LEVEL_OF_DETAIL;
+    delete this.defines.COLOR_TYPE_MATCAP;
+    delete this.defines.COLOR_TYPE_GPS_TIME;
+    delete this.defines.COLOR_TYPE_POINT_INDEX;
+    delete this.defines.COLOR_TYPE_COMPOSITE;
 
     // Set new define
     switch (this._colorMode) {
@@ -506,6 +522,18 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
         break;
       case PointCloudColorMode.LEVEL_OF_DETAIL:
         this.defines.COLOR_TYPE_LEVEL_OF_DETAIL = true;
+        break;
+      case PointCloudColorMode.MATCAP:
+        this.defines.COLOR_TYPE_MATCAP = true;
+        break;
+      case PointCloudColorMode.GPS_TIME:
+        this.defines.COLOR_TYPE_GPS_TIME = true;
+        break;
+      case PointCloudColorMode.POINT_INDEX:
+        this.defines.COLOR_TYPE_POINT_INDEX = true;
+        break;
+      case PointCloudColorMode.COMPOSITE:
+        this.defines.COLOR_TYPE_COMPOSITE = true;
         break;
     }
   }

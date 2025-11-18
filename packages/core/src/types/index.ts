@@ -208,6 +208,14 @@ export enum PointCloudColorMode {
   RETURN_NUMBER = 'RETURN_NUMBER',
   SOURCE_ID = 'SOURCE_ID',
   NORMAL = 'NORMAL',
+  /** Matcap 材质(使用球形环境贴图) */
+  MATCAP = 'MATCAP',
+  /** GPS 时间着色 */
+  GPS_TIME = 'GPS_TIME',
+  /** 点索引着色 */
+  POINT_INDEX = 'POINT_INDEX',
+  /** 复合着色(RGB + Intensity 等权重混合) */
+  COMPOSITE = 'COMPOSITE',
 }
 
 /**
