@@ -14,6 +14,16 @@ import * as THREE from 'three';
 import { getPointCloudFragmentShader, getPointCloudVertexShader } from '../shaders/index.js';
 
 /**
+ * Attribute filter configuration
+ */
+export interface AttributeFilterConfig {
+  /** Enable filter */
+  readonly enabled: boolean;
+  /** Filter range [min, max] */
+  readonly range: readonly [number, number];
+}
+
+/**
  * Point cloud material configuration
  */
 export interface PointCloudMaterialConfig {
@@ -65,6 +75,14 @@ export interface PointCloudMaterialConfig {
   shadowProj?: THREE.Matrix4[];
   /** Shadow color - color to use for shadowed areas (default: black) */
   shadowColor?: THREE.Color;
+  /** GPS time filter range [min, max] (disabled by default) */
+  filterGPSTimeRange?: [number, number];
+  /** Return number filter range [min, max] (disabled by default) */
+  filterReturnNumberRange?: [number, number];
+  /** Number of returns filter range [min, max] (disabled by default) */
+  filterNumberOfReturnsRange?: [number, number];
+  /** Point source ID filter range [min, max] (disabled by default) */
+  filterPointSourceIDRange?: [number, number];
 }
 
 /**
@@ -101,6 +119,12 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
     const shadowWorldView = config.shadowWorldView ?? [];
     const shadowProj = config.shadowProj ?? [];
     const shadowColor = config.shadowColor ?? new THREE.Color(0, 0, 0);
+
+    // Initialize attribute filters
+    const filterGPSTimeRange = config.filterGPSTimeRange;
+    const filterReturnNumberRange = config.filterReturnNumberRange;
+    const filterNumberOfReturnsRange = config.filterNumberOfReturnsRange;
+    const filterPointSourceIDRange = config.filterPointSourceIDRange;
 
     // Create default textures if not provided
     const gradient = config.gradient ?? PointCloudMaterial.createDefaultGradient();
@@ -187,6 +211,20 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       defines.num_shadowmaps = shadowMaps.length;
     }
 
+    // Attribute filter defines
+    if (filterGPSTimeRange) {
+      defines.clip_gps_enabled = true;
+    }
+    if (filterReturnNumberRange) {
+      defines.clip_return_number_enabled = true;
+    }
+    if (filterNumberOfReturnsRange) {
+      defines.clip_number_of_returns_enabled = true;
+    }
+    if (filterPointSourceIDRange) {
+      defines.clip_point_source_id_enabled = true;
+    }
+
     // Create uniforms
     const uniforms = {
       // Screen uniforms
@@ -241,6 +279,20 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
         uShadowWorldView: { value: shadowWorldView.map((m) => m.elements) },
         uShadowProj: { value: shadowProj.map((m) => m.elements) },
         uShadowColor: { value: new THREE.Vector3(shadowColor.r, shadowColor.g, shadowColor.b) },
+      }),
+
+      // Attribute filter uniforms
+      ...(filterGPSTimeRange && {
+        uFilterGPSTimeRange: { value: new THREE.Vector2(filterGPSTimeRange[0], filterGPSTimeRange[1]) },
+      }),
+      ...(filterReturnNumberRange && {
+        uFilterReturnNumberRange: { value: new THREE.Vector2(filterReturnNumberRange[0], filterReturnNumberRange[1]) },
+      }),
+      ...(filterNumberOfReturnsRange && {
+        uFilterNumberOfReturnsRange: { value: new THREE.Vector2(filterNumberOfReturnsRange[0], filterNumberOfReturnsRange[1]) },
+      }),
+      ...(filterPointSourceIDRange && {
+        uFilterPointSourceIDRange: { value: new THREE.Vector2(filterPointSourceIDRange[0], filterPointSourceIDRange[1]) },
       }),
     };
 
@@ -600,6 +652,192 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       };
     }
   }
+
+
+  /**
+ * Set GPS time filter range
+ *
+ * Filters points based on GPS time. Points outside the range will not be rendered.
+ * Set to null to disable filtering.
+ *
+ * @param range - GPS time range [min, max] or null to disable
+ *
+ * @example
+ * ```typescript
+ * // Filter points with GPS time between 1000 and 2000
+ * material.setFilterGPSTimeRange([1000, 2000]);
+ *
+ * // Disable GPS time filtering
+ * material.setFilterGPSTimeRange(null);
+ * ```
+ */
+public setFilterGPSTimeRange(range: [number, number] | null): void {
+  if (!this.defines) {
+    this.defines = {};
+  }
+
+  const wasEnabled = !!this.defines.clip_gps_enabled;
+  const isEnabled = range !== null;
+
+  if (wasEnabled !== isEnabled) {
+    if (isEnabled) {
+      this.defines.clip_gps_enabled = true;
+    } else {
+      delete this.defines.clip_gps_enabled;
+    }
+    this.needsUpdate = true;
+  }
+
+  if (this.uniforms) {
+    if (range) {
+      if (!this.uniforms.uFilterGPSTimeRange) {
+        this.uniforms.uFilterGPSTimeRange = { value: new THREE.Vector2() };
+      }
+      this.uniforms.uFilterGPSTimeRange.value.set(range[0], range[1]);
+    } else if (this.uniforms.uFilterGPSTimeRange) {
+      delete this.uniforms.uFilterGPSTimeRange;
+    }
+  }
+}
+
+/**
+ * Set return number filter range
+ *
+ * Filters points based on return number. Points outside the range will not be rendered.
+ * Set to null to disable filtering.
+ *
+ * @param range - Return number range [min, max] or null to disable
+ *
+ * @example
+ * ```typescript
+ * // Show only first returns
+ * material.setFilterReturnNumberRange([1, 1]);
+ *
+ * // Disable return number filtering
+ * material.setFilterReturnNumberRange(null);
+ * ```
+ */
+public setFilterReturnNumberRange(range: [number, number] | null): void {
+  if (!this.defines) {
+    this.defines = {};
+  }
+
+  const wasEnabled = !!this.defines.clip_return_number_enabled;
+  const isEnabled = range !== null;
+
+  if (wasEnabled !== isEnabled) {
+    if (isEnabled) {
+      this.defines.clip_return_number_enabled = true;
+    } else {
+      delete this.defines.clip_return_number_enabled;
+    }
+    this.needsUpdate = true;
+  }
+
+  if (this.uniforms) {
+    if (range) {
+      if (!this.uniforms.uFilterReturnNumberRange) {
+        this.uniforms.uFilterReturnNumberRange = { value: new THREE.Vector2() };
+      }
+      this.uniforms.uFilterReturnNumberRange.value.set(range[0], range[1]);
+    } else if (this.uniforms.uFilterReturnNumberRange) {
+      delete this.uniforms.uFilterReturnNumberRange;
+    }
+  }
+}
+
+/**
+ * Set number of returns filter range
+ *
+ * Filters points based on number of returns. Points outside the range will not be rendered.
+ * Set to null to disable filtering.
+ *
+ * @param range - Number of returns range [min, max] or null to disable
+ *
+ * @example
+ * ```typescript
+ * // Show only points with 2 or more returns
+ * material.setFilterNumberOfReturnsRange([2, 15]);
+ *
+ * // Disable number of returns filtering
+ * material.setFilterNumberOfReturnsRange(null);
+ * ```
+ */
+public setFilterNumberOfReturnsRange(range: [number, number] | null): void {
+  if (!this.defines) {
+    this.defines = {};
+  }
+
+  const wasEnabled = !!this.defines.clip_number_of_returns_enabled;
+  const isEnabled = range !== null;
+
+  if (wasEnabled !== isEnabled) {
+    if (isEnabled) {
+      this.defines.clip_number_of_returns_enabled = true;
+    } else {
+      delete this.defines.clip_number_of_returns_enabled;
+    }
+    this.needsUpdate = true;
+  }
+
+  if (this.uniforms) {
+    if (range) {
+      if (!this.uniforms.uFilterNumberOfReturnsRange) {
+        this.uniforms.uFilterNumberOfReturnsRange = { value: new THREE.Vector2() };
+      }
+      this.uniforms.uFilterNumberOfReturnsRange.value.set(range[0], range[1]);
+    } else if (this.uniforms.uFilterNumberOfReturnsRange) {
+      delete this.uniforms.uFilterNumberOfReturnsRange;
+    }
+  }
+}
+
+/**
+ * Set point source ID filter range
+ *
+ * Filters points based on point source ID. Points outside the range will not be rendered.
+ * Set to null to disable filtering.
+ *
+ * @param range - Point source ID range [min, max] or null to disable
+ *
+ * @example
+ * ```typescript
+ * // Show only points from sources 1-5
+ * material.setFilterPointSourceIDRange([1, 5]);
+ *
+ * // Disable point source ID filtering
+ * material.setFilterPointSourceIDRange(null);
+ * ```
+ */
+public setFilterPointSourceIDRange(range: [number, number] | null): void {
+  if (!this.defines) {
+    this.defines = {};
+  }
+
+  const wasEnabled = !!this.defines.clip_point_source_id_enabled;
+  const isEnabled = range !== null;
+
+  if (wasEnabled !== isEnabled) {
+    if (isEnabled) {
+      this.defines.clip_point_source_id_enabled = true;
+    } else {
+      delete this.defines.clip_point_source_id_enabled;
+    }
+    this.needsUpdate = true;
+  }
+
+  if (this.uniforms) {
+    if (range) {
+      if (!this.uniforms.uFilterPointSourceIDRange) {
+        this.uniforms.uFilterPointSourceIDRange = { value: new THREE.Vector3() };
+      }
+      this.uniforms.uFilterPointSourceIDRange.value.set(range[0], range[1]);
+    } else if (this.uniforms.uFilterPointSourceIDRange) {
+      delete this.uniforms.uFilterPointSourceIDRange;
+    }
+  }
+}
+
 
   private _updateColorModeDefines(): void {
     if (!this.defines) {

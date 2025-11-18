@@ -12,6 +12,8 @@ in float classification;
 in float returnNumber;
 in float numberOfReturns;
 in vec3 normal;
+in float gpsTime;
+in float pointSourceID;
 
 // Uniforms - matrices
 uniform mat4 modelMatrix;
@@ -77,6 +79,20 @@ uniform int clipMethod;
   uniform mat4 uShadowWorldView[num_shadowmaps];
   uniform mat4 uShadowProj[num_shadowmaps];
   uniform vec3 uShadowColor;
+#endif
+
+// Uniforms - attribute filters
+#if defined(clip_gps_enabled)
+  uniform vec2 uFilterGPSTimeRange;
+#endif
+#if defined(clip_return_number_enabled)
+  uniform vec2 uFilterReturnNumberRange;
+#endif
+#if defined(clip_number_of_returns_enabled)
+  uniform vec2 uFilterNumberOfReturnsRange;
+#endif
+#if defined(clip_point_source_id_enabled)
+  uniform vec2 uFilterPointSourceIDRange;
 #endif
 
 // Varyings - outputs to fragment shader
@@ -295,6 +311,41 @@ float getPointSize() {
  * Points that should be clipped are moved outside the view frustum.
  */
 void doClipping() {
+  // Apply attribute filters first
+  // Points that fail any filter are moved outside the view frustum
+
+#if defined(clip_gps_enabled)
+  // GPS time filter
+  if (gpsTime < uFilterGPSTimeRange.x || gpsTime > uFilterGPSTimeRange.y) {
+    gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    return;
+  }
+#endif
+
+#if defined(clip_return_number_enabled)
+  // Return number filter
+  if (returnNumber < uFilterReturnNumberRange.x || returnNumber > uFilterReturnNumberRange.y) {
+    gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    return;
+  }
+#endif
+
+#if defined(clip_number_of_returns_enabled)
+  // Number of returns filter
+  if (numberOfReturns < uFilterNumberOfReturnsRange.x || numberOfReturns > uFilterNumberOfReturnsRange.y) {
+    gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    return;
+  }
+#endif
+
+#if defined(clip_point_source_id_enabled)
+  // Point source ID filter
+  if (pointSourceID < uFilterPointSourceIDRange.x || pointSourceID > uFilterPointSourceIDRange.y) {
+    gl_Position = vec4(100.0, 100.0, 100.0, 1.0);
+    return;
+  }
+#endif
+
   int clipVolumesCount = 0;
   int insideCount = 0;
 
