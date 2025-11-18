@@ -116,10 +116,50 @@ void main() {
   #endif
 
   #ifdef PARABOLOID_POINT_SHAPE
+    // Calculate distance from point center
+    float r = length(vec2(u, v));
+
+    // Discard fragments outside the circle
+    if (r > 1.0) {
+      discard;
+    }
+
+    // Calculate paraboloid surface depth offset
+    // wi represents the z-offset on the paraboloid surface
     float wi = 0.0 - (u * u + v * v);
+
+    // Adjust view position based on paraboloid surface
     vec4 pos = vec4(vViewPosition, 1.0);
     pos.z += wi * vRadius;
     float linearDepth = -pos.z;
+
+    // Calculate surface normal for the paraboloid
+    // Normal points outward from the paraboloid surface
+    // For paraboloid z = -(x^2 + y^2), gradient is (-2x, -2y, 1)
+    vec3 surfaceNormal = normalize(vec3(-2.0 * u, -2.0 * v, 1.0));
+
+    // Simple lighting calculation (ambient + diffuse)
+    // Light direction in view space (from camera)
+    vec3 lightDir = normalize(vec3(0.0, 0.0, 1.0));
+
+    // Ambient lighting component
+    float ambient = 0.5;
+
+    // Diffuse lighting component (Lambertian)
+    float diffuse = max(0.0, dot(surfaceNormal, lightDir));
+
+    // Combine lighting (ambient + diffuse)
+    float lighting = ambient + diffuse * 0.5;
+
+    // Apply lighting to color
+    color = color * lighting;
+
+    // Smooth edge falloff for better visual quality
+    // Creates soft edges near the point boundary
+    float edgeFalloff = smoothstep(0.9, 0.7, r);
+    color = color * mix(0.8, 1.0, edgeFalloff);
+
+    // Calculate corrected fragment depth
     pos = projectionMatrix * pos;
     pos = pos / pos.w;
     float expDepth = pos.z;
