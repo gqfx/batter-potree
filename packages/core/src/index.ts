@@ -4,6 +4,7 @@
 
 export * from './attributes/PointAttribute.js';
 export * from './attributes/PointAttributes.js';
+export * from './attributes/RangeAccumulator.js';
 export * from './config/index.js';
 export * from './coordinator/index.js';
 export * from './ecs/index.js';
