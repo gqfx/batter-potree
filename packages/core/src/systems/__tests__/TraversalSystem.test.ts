@@ -309,8 +309,20 @@ describe('TraversalSystem', () => {
       system.setPointBudget(5000);
 
       // 创建多个子节点，总点数超过预算
-      const child1 = createMockNode('r0', 1, new THREE.Vector3(-5, -5, -5), new THREE.Vector3(0, 0, 0), 3000);
-      const child2 = createMockNode('r1', 1, new THREE.Vector3(0, -5, -5), new THREE.Vector3(5, 0, 0), 3000);
+      const child1 = createMockNode(
+        'r0',
+        1,
+        new THREE.Vector3(-5, -5, -5),
+        new THREE.Vector3(0, 0, 0),
+        3000,
+      );
+      const child2 = createMockNode(
+        'r1',
+        1,
+        new THREE.Vector3(0, -5, -5),
+        new THREE.Vector3(5, 0, 0),
+        3000,
+      );
 
       mockOctree.root!.children[0] = child1;
       mockOctree.root!.children[1] = child2;
@@ -364,7 +376,13 @@ describe('TraversalSystem', () => {
 
       system.setCamera(orthoCamera);
 
-      const child = createMockNode('r0', 1, new THREE.Vector3(-5, -5, -5), new THREE.Vector3(5, 5, 5), 1000);
+      const child = createMockNode(
+        'r0',
+        1,
+        new THREE.Vector3(-5, -5, -5),
+        new THREE.Vector3(5, 5, 5),
+        1000,
+      );
       mockOctree.root!.children[0] = child;
 
       system.addPointCloud('test', mockOctree);
@@ -405,8 +423,20 @@ describe('TraversalSystem', () => {
     });
 
     it('应该记录遍历统计信息', () => {
-      const child1 = createMockNode('r0', 1, new THREE.Vector3(-5, -5, -5), new THREE.Vector3(0, 0, 0), 1000);
-      const child2 = createMockNode('r1', 1, new THREE.Vector3(0, -5, -5), new THREE.Vector3(5, 0, 0), 1000);
+      const child1 = createMockNode(
+        'r0',
+        1,
+        new THREE.Vector3(-5, -5, -5),
+        new THREE.Vector3(0, 0, 0),
+        1000,
+      );
+      const child2 = createMockNode(
+        'r1',
+        1,
+        new THREE.Vector3(0, -5, -5),
+        new THREE.Vector3(5, 0, 0),
+        1000,
+      );
 
       mockOctree.root!.children[0] = child1;
       mockOctree.root!.children[1] = child2;

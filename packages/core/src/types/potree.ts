@@ -112,6 +112,18 @@ export interface IPointCloudOctreeNode {
   children: (IPointCloudOctreeNode | null)[];
   loaded: boolean;
   loading: boolean;
+
+  /**
+   * Visibility texture offset for GPU LOD traversal
+   * Set during traversal to indicate node position in visibility texture
+   */
+  vnStart?: number;
+
+  /**
+   * Three.js BufferGeometry (cached after loading)
+   * Used for rendering and resource cleanup
+   */
+  geometry?: THREE.BufferGeometry;
 }
 
 // ============================================================================

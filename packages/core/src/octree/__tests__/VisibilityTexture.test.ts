@@ -2,10 +2,10 @@
  * VisibilityTexture tests
  */
 
-import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { VisibilityTexture } from '../VisibilityTexture.js';
+import { describe, expect, it } from 'vitest';
 import { OctreeNode } from '../OctreeNode.js';
+import { VisibilityTexture } from '../VisibilityTexture.js';
 
 describe('VisibilityTexture', () => {
   describe('compute', () => {
@@ -20,10 +20,7 @@ describe('VisibilityTexture', () => {
 
     it('should encode single root node', () => {
       const texture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result = texture.compute([root]);
@@ -41,10 +38,7 @@ describe('VisibilityTexture', () => {
 
     it('should encode parent-child relationships', () => {
       const texture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       // Create children
@@ -82,10 +76,7 @@ describe('VisibilityTexture', () => {
 
     it('should sort nodes by level and name', () => {
       const texture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const child0 = root.createChild(0);
@@ -111,10 +102,7 @@ describe('VisibilityTexture', () => {
 
     it('should handle deep hierarchy', () => {
       const texture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       // Create a chain: r -> r0 -> r00 -> r000
@@ -149,10 +137,7 @@ describe('VisibilityTexture', () => {
   describe('createTexture', () => {
     it('should create valid Three.js DataTexture', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
       const child0 = root.createChild(0);
 
@@ -168,10 +153,7 @@ describe('VisibilityTexture', () => {
 
     it('should calculate correct texture dimensions', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       // Create 10 nodes
@@ -193,10 +175,7 @@ describe('VisibilityTexture', () => {
 
     it('should dispose previous texture when creating new one', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result1 = visTexture.compute([root]);
@@ -215,10 +194,7 @@ describe('VisibilityTexture', () => {
   describe('update', () => {
     it('should reuse texture when dimensions match', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result1 = visTexture.compute([root]);
@@ -234,10 +210,7 @@ describe('VisibilityTexture', () => {
 
     it('should create new texture when dimensions change', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result1 = visTexture.compute([root]);
@@ -261,10 +234,7 @@ describe('VisibilityTexture', () => {
 
     it('should return texture after creation', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result = visTexture.compute([root]);
@@ -277,10 +247,7 @@ describe('VisibilityTexture', () => {
   describe('dispose', () => {
     it('should dispose texture and set to null', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result = visTexture.compute([root]);
@@ -293,10 +260,7 @@ describe('VisibilityTexture', () => {
 
     it('should be safe to call dispose multiple times', () => {
       const visTexture = new VisibilityTexture();
-      const bbox = new THREE.Box3(
-        new THREE.Vector3(-10, -10, -10),
-        new THREE.Vector3(10, 10, 10),
-      );
+      const bbox = new THREE.Box3(new THREE.Vector3(-10, -10, -10), new THREE.Vector3(10, 10, 10));
       const root = new OctreeNode('r', bbox, 1.0, 0);
 
       const result = visTexture.compute([root]);

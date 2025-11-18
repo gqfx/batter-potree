@@ -277,9 +277,7 @@ export class TraversalSystem implements ISystem {
     const cameraPosition = this.camera.position;
 
     // 使用优先级队列（最小堆），权重越小优先级越高
-    const priorityQueue = new BinaryHeap<PriorityQueueElement>(
-      (element) => 1 / element.weight,
-    );
+    const priorityQueue = new BinaryHeap<PriorityQueueElement>((element) => 1 / element.weight);
 
     // 初始化：将根节点加入队列
     const rootWeight = this.computeWeight(octree.root, cameraPosition);

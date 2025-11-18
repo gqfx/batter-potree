@@ -244,24 +244,50 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
       // Find the point cloud scene for this octree
       const cloudName = this.getPointCloudNameByOctree(octree);
-      if (cloudName) {
-        const scene = this.pointCloudScenes.get(cloudName);
-        if (scene) {
-          try {
-            // Create geometry from decoded data
-            const geometry = this.createGeometry(data);
+      if (!cloudName) {
+        console.error('[Viewer] Cannot find point cloud name for octree');
+        return;
+      }
 
-            // Add node to scene with metadata
-            scene.addNode(node.name, geometry, {
-              level: node.level,
-              numPoints: node.numPoints,
-            });
+      const scene = this.pointCloudScenes.get(cloudName);
+      if (!scene) {
+        console.error(`[Viewer] PointCloudScene not found: ${cloudName}`);
+        return;
+      }
 
-            console.debug(`[Viewer] Geometry created for node: ${node.name}`);
-          } catch (error) {
-            console.error(`[Viewer] Failed to create geometry for node ${node.name}:`, error);
-          }
-        }
+      try {
+        // Create geometry from decoded data
+        const geometry = this.createGeometry(data);
+
+        // Calculate pcIndex (index in point clouds map)
+        // For single point cloud, pcIndex is 0
+        // For multiple point clouds, use the index in the map
+        const pcIndex = Array.from(this.pointClouds.keys()).indexOf(cloudName);
+
+        // Prepare node metadata for PointCloudScene
+        const metadata = {
+          level: node.level,
+          vnStart: node.vnStart ?? 0, // Use vnStart from node or 0 if undefined
+          pcIndex: pcIndex >= 0 ? pcIndex : 0,
+          numPoints: data.numPoints,
+        };
+
+        // Add node to PointCloudScene
+        scene.addNode(node.name, geometry, metadata);
+
+        // Update node state
+        node.loaded = true;
+        node.loading = false;
+        node.geometry = geometry; // Cache geometry reference on node
+        node.numPoints = data.numPoints; // Update numPoints from actual data
+
+        console.debug(`[Viewer] Node added to scene: ${node.name}, level=${metadata.level}, vnStart=${metadata.vnStart}, pcIndex=${metadata.pcIndex}`);
+      } catch (error) {
+        console.error(`[Viewer] Failed to create geometry for node ${node.name}:`, error);
+
+        // Update node state on error
+        node.loading = false;
+        node.loaded = false;
       }
 
       // Emit node-loaded event for external listeners
@@ -280,7 +306,15 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Handle failed node loading
     this.streamingSystem.setOnLoadFailed((event) => {
       const { node, error, retries } = event;
-      console.error(`[Viewer] Node load failed: ${node.name} after ${retries} retries:`, error);
+
+      // Update node state
+      node.loading = false;
+      node.loaded = false;
+
+      console.error(
+        `[Viewer] Node load failed: ${node.name} after ${retries} retries:`,
+        error
+      );
 
       // Emit node-load-failed event for external listeners
       this.emit('node-load-failed', {
@@ -627,7 +661,21 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
   /**
    * Remove a point cloud
+   *
+   * Cleans up all resources associated with the point cloud:
+   * - Removes from TraversalSystem
+   * - Disposes all node geometries
+   * - Removes from Three.js scene
+   * - Cleans up PointCloudScene
+   *
    * @param pointCloud - Point cloud to remove or its name
+   *
+   * @example
+   * ```typescript
+   * viewer.remove('myCloud');
+   * // or
+   * viewer.remove(octree);
+   * ```
    */
   remove(pointCloud: IPointCloudOctree | string): void {
     const name = typeof pointCloud === 'string' ? pointCloud : this.getPointCloudName(pointCloud);
@@ -641,7 +689,13 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Remove from TraversalSystem
     this.traversalSystem.removePointCloud(name);
 
-    // Remove from Three.js scene and dispose
+    // Cleanup all node geometries recursively
+    // This traverses the octree and disposes geometry for all loaded nodes
+    if (cloud.root) {
+      this.cleanupNodeGeometry(cloud.root);
+    }
+
+    // Remove from Three.js scene and dispose PointCloudScene
     const pointCloudScene = this.pointCloudScenes.get(name);
     if (pointCloudScene) {
       const threeScene = this.scene.getThreeScene?.();
@@ -656,6 +710,34 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     this.pointClouds.delete(name);
 
     this.emit('pointcloud-removed', { pointCloud: cloud, name });
+  }
+
+  /**
+   * Recursively cleanup node geometry
+   *
+   * Traverses the octree hierarchy and disposes geometry for all loaded nodes.
+   * This ensures proper memory cleanup when removing a point cloud.
+   *
+   * @param node - Root node to start cleanup from
+   *
+   * @internal
+   */
+  private cleanupNodeGeometry(node: any): void {
+    // Dispose geometry if loaded
+    if (node.geometry) {
+      node.geometry.dispose();
+      node.geometry = undefined;
+      node.loaded = false;
+    }
+
+    // Recursively cleanup children
+    if (node.children) {
+      for (const child of node.children) {
+        if (child) {
+          this.cleanupNodeGeometry(child);
+        }
+      }
+    }
   }
 
   /**
@@ -1040,6 +1122,100 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       }
     }
     return undefined;
+  }
+
+  /**
+   * Get the count of loaded nodes across all point clouds
+   *
+   * Traverses all octrees and counts nodes that have been successfully loaded.
+   *
+   * @returns Total number of loaded nodes
+   *
+   * @example
+   * ```typescript
+   * const loadedCount = viewer.getLoadedNodesCount();
+   * console.log(`${loadedCount} nodes loaded`);
+   * ```
+   */
+  getLoadedNodesCount(): number {
+    let count = 0;
+    for (const octree of this.pointClouds.values()) {
+      if (octree.root) {
+        count += this.countLoadedNodes(octree.root);
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Get the total number of points loaded across all point clouds
+   *
+   * Sums up the point count from all loaded nodes.
+   *
+   * @returns Total number of points loaded
+   *
+   * @example
+   * ```typescript
+   * const totalPoints = viewer.getTotalPointsLoaded();
+   * console.log(`${totalPoints} points loaded`);
+   * ```
+   */
+  getTotalPointsLoaded(): number {
+    let total = 0;
+    for (const octree of this.pointClouds.values()) {
+      if (octree.root) {
+        total += this.countLoadedPoints(octree.root);
+      }
+    }
+    return total;
+  }
+
+  /**
+   * Recursively count loaded nodes in an octree
+   *
+   * @param node - Node to start counting from
+   * @returns Number of loaded nodes
+   *
+   * @internal
+   */
+  private countLoadedNodes(node: any): number {
+    let count = node.loaded ? 1 : 0;
+
+    if (node.children) {
+      for (const child of node.children) {
+        if (child) {
+          count += this.countLoadedNodes(child);
+        }
+      }
+    }
+
+    return count;
+  }
+
+  /**
+   * Recursively count loaded points in an octree
+   *
+   * @param node - Node to start counting from
+   * @returns Number of points in loaded nodes
+   *
+   * @internal
+   */
+  private countLoadedPoints(node: any): number {
+    let total = 0;
+
+    if (node.loaded && node.numPoints) {
+      total += node.numPoints;
+    }
+
+    if (node.children) {
+      for (const child of node.children) {
+        if (child) {
+          total += this.countLoadedPoints(child);
+        }
+      }
+    }
+
+    return total;
   }
 
     /**

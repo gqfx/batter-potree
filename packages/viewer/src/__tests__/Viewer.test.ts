@@ -1466,6 +1466,504 @@ describe('Viewer', () => {
     });
   });
 
+  describe('streaming system callbacks', () => {
+    it('should set onLoadComplete callback with correct metadata', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+
+      // Verify callback is set by checking internal state
+      expect((streamingSystem as any).onLoadComplete).toBeDefined();
+    });
+
+    it('should set onLoadFailed callback', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const streamingSystem = viewer.getStreamingSystem();
+
+      // Verify callback is set by checking internal state
+      expect((streamingSystem as any).onLoadFailed).toBeDefined();
+    });
+
+    it('should update node state on successful load', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Create mock octree and scene
+      const mockNode = {
+        name: 'r',
+        level: 0,
+        loaded: false,
+        loading: true,
+        numPoints: 0,
+      };
+
+      const mockOctree = {
+        root: mockNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      const mockScene = {
+        addNode: vi.fn(),
+        material: {},
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+      (viewer as any).pointCloudScenes.set('test', mockScene);
+
+      // Simulate successful load
+      const mockData = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 100,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: new Float32Array([0, 0, 0]).buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+        },
+      };
+
+      // Call onLoadComplete callback directly
+      const streamingSystem = viewer.getStreamingSystem();
+      const callback = (streamingSystem as any).onLoadComplete;
+
+      callback({
+        octree: mockOctree,
+        node: mockNode,
+        data: mockData,
+        loadTime: 10,
+      });
+
+      // Verify node state was updated
+      expect(mockNode.loaded).toBe(true);
+      expect(mockNode.loading).toBe(false);
+      expect(mockNode.numPoints).toBe(100);
+      expect(mockNode.geometry).toBeDefined();
+    });
+
+    it('should calculate correct pcIndex for multiple point clouds', async () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Create two mock point clouds
+      const mockOctree1 = { root: { name: 'r', level: 0 }, url: 'test1/' } as any;
+      const mockOctree2 = { root: { name: 'r', level: 0 }, url: 'test2/' } as any;
+
+      const mockScene1 = { addNode: vi.fn(), material: {} } as any;
+      const mockScene2 = { addNode: vi.fn(), material: {} } as any;
+
+      (viewer as any).pointClouds.set('cloud1', mockOctree1);
+      (viewer as any).pointClouds.set('cloud2', mockOctree2);
+      (viewer as any).pointCloudScenes.set('cloud1', mockScene1);
+      (viewer as any).pointCloudScenes.set('cloud2', mockScene2);
+
+      const mockNode = {
+        name: 'r',
+        level: 0,
+        loaded: false,
+        loading: true,
+      };
+
+      const mockData = {
+        buffer: new ArrayBuffer(0),
+        numPoints: 50,
+        mean: [0, 0, 0] as [number, number, number],
+        tightBoundingBox: {
+          min: [0, 0, 0] as [number, number, number],
+          max: [1, 1, 1] as [number, number, number],
+        },
+        attributeBuffers: {
+          POSITION_CARTESIAN: {
+            buffer: new Float32Array([0, 0, 0]).buffer,
+            attribute: {
+              name: 'POSITION_CARTESIAN',
+              type: 0,
+              numElements: 3,
+              byteSize: 12,
+            },
+          },
+        },
+      };
+
+      // Call onLoadComplete for cloud2
+      const streamingSystem = viewer.getStreamingSystem();
+      const callback = (streamingSystem as any).onLoadComplete;
+
+      callback({
+        octree: mockOctree2,
+        node: mockNode,
+        data: mockData,
+        loadTime: 10,
+      });
+
+      // Verify pcIndex is 1 (second cloud)
+      expect(mockScene2.addNode).toHaveBeenCalledWith(
+        'r',
+        expect.any(THREE.BufferGeometry),
+        expect.objectContaining({
+          pcIndex: 1,
+        })
+      );
+    });
+
+    it('should update node state on load failure', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const mockNode = {
+        name: 'r',
+        level: 0,
+        loaded: false,
+        loading: true,
+      };
+
+      // Call onLoadFailed callback directly
+      const streamingSystem = viewer.getStreamingSystem();
+      const callback = (streamingSystem as any).onLoadFailed;
+
+      callback({
+        node: mockNode,
+        error: new Error('Load failed'),
+        retries: 3,
+      });
+
+      // Verify node state was updated
+      expect(mockNode.loaded).toBe(false);
+      expect(mockNode.loading).toBe(false);
+    });
+
+    it('should emit node-load-failed event', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const listener = vi.fn();
+      viewer.on('node-load-failed', listener);
+
+      const mockNode = {
+        name: 'r',
+        level: 0,
+        loaded: false,
+        loading: true,
+      };
+
+      const error = new Error('Load failed');
+
+      // Call onLoadFailed callback directly
+      const streamingSystem = viewer.getStreamingSystem();
+      const callback = (streamingSystem as any).onLoadFailed;
+
+      callback({
+        node: mockNode,
+        error,
+        retries: 3,
+      });
+
+      expect(listener).toHaveBeenCalledWith({
+        node: mockNode,
+        error,
+        retries: 3,
+      });
+    });
+  });
+
+  describe('resource cleanup', () => {
+    it('should cleanup node geometries on remove', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Create mock octree with loaded nodes
+      const geometry1 = new THREE.BufferGeometry();
+      const geometry2 = new THREE.BufferGeometry();
+      const disposeSpy1 = vi.spyOn(geometry1, 'dispose');
+      const disposeSpy2 = vi.spyOn(geometry2, 'dispose');
+
+      const childNode = {
+        name: 'r0',
+        level: 1,
+        loaded: true,
+        geometry: geometry2,
+        children: [],
+      };
+
+      const rootNode = {
+        name: 'r',
+        level: 0,
+        loaded: true,
+        geometry: geometry1,
+        children: [childNode],
+      };
+
+      const mockOctree = {
+        root: rootNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      // Remove point cloud
+      viewer.remove('test');
+
+      // Verify geometries were disposed
+      expect(disposeSpy1).toHaveBeenCalled();
+      expect(disposeSpy2).toHaveBeenCalled();
+
+      // Verify node states were reset
+      expect(rootNode.geometry).toBeUndefined();
+      expect(rootNode.loaded).toBe(false);
+      expect(childNode.geometry).toBeUndefined();
+      expect(childNode.loaded).toBe(false);
+    });
+
+    it('should handle nodes without geometry during cleanup', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const rootNode = {
+        name: 'r',
+        level: 0,
+        loaded: false,
+        children: [],
+      };
+
+      const mockOctree = {
+        root: rootNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      // Should not throw
+      expect(() => viewer.remove('test')).not.toThrow();
+    });
+  });
+
+  describe('statistics', () => {
+    it('should count loaded nodes across all point clouds', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      // Create mock octree with loaded nodes
+      const childNode = {
+        name: 'r0',
+        level: 1,
+        loaded: true,
+        children: [],
+      };
+
+      const rootNode = {
+        name: 'r',
+        level: 0,
+        loaded: true,
+        children: [childNode],
+      };
+
+      const mockOctree = {
+        root: rootNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const count = viewer.getLoadedNodesCount();
+      expect(count).toBe(2); // root + child
+    });
+
+    it('should not count unloaded nodes', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const childNode = {
+        name: 'r0',
+        level: 1,
+        loaded: false, // Not loaded
+        children: [],
+      };
+
+      const rootNode = {
+        name: 'r',
+        level: 0,
+        loaded: true,
+        children: [childNode],
+      };
+
+      const mockOctree = {
+        root: rootNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const count = viewer.getLoadedNodesCount();
+      expect(count).toBe(1); // Only root
+    });
+
+    it('should sum total points loaded', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const childNode = {
+        name: 'r0',
+        level: 1,
+        loaded: true,
+        numPoints: 500,
+        children: [],
+      };
+
+      const rootNode = {
+        name: 'r',
+        level: 0,
+        loaded: true,
+        numPoints: 1000,
+        children: [childNode],
+      };
+
+      const mockOctree = {
+        root: rootNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const total = viewer.getTotalPointsLoaded();
+      expect(total).toBe(1500); // 1000 + 500
+    });
+
+    it('should handle nodes without numPoints', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const rootNode = {
+        name: 'r',
+        level: 0,
+        loaded: true,
+        // numPoints is undefined
+        children: [],
+      };
+
+      const mockOctree = {
+        root: rootNode,
+        url: 'test/',
+        spacing: 1.0,
+        boundingBox: new THREE.Box3(),
+      } as any;
+
+      (viewer as any).pointClouds.set('test', mockOctree);
+
+      const total = viewer.getTotalPointsLoaded();
+      expect(total).toBe(0); // No points counted
+    });
+
+    it('should count across multiple point clouds', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      const octree1 = {
+        root: {
+          name: 'r',
+          level: 0,
+          loaded: true,
+          numPoints: 1000,
+          children: [],
+        },
+        url: 'test1/',
+      } as any;
+
+      const octree2 = {
+        root: {
+          name: 'r',
+          level: 0,
+          loaded: true,
+          numPoints: 2000,
+          children: [],
+        },
+        url: 'test2/',
+      } as any;
+
+      (viewer as any).pointClouds.set('cloud1', octree1);
+      (viewer as any).pointClouds.set('cloud2', octree2);
+
+      const count = viewer.getLoadedNodesCount();
+      const total = viewer.getTotalPointsLoaded();
+
+      expect(count).toBe(2);
+      expect(total).toBe(3000);
+    });
+
+    it('should return 0 for empty viewer', () => {
+      const viewer = new Viewer({
+        container,
+        renderer,
+        scene,
+      });
+
+      expect(viewer.getLoadedNodesCount()).toBe(0);
+      expect(viewer.getTotalPointsLoaded()).toBe(0);
+    });
+  });
+
   describe('createGeometry', () => {
     let viewer: Viewer;
 

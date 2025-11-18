@@ -21,7 +21,10 @@ export default defineConfig({
     alias: {
       '@better-potree/core': path.resolve(__dirname, '../../packages/core/dist/index.js'),
       '@better-potree/rendering': path.resolve(__dirname, '../../packages/rendering/dist/index.js'),
-      '@better-potree/rendering-three': path.resolve(__dirname, '../../packages/rendering-three/dist/index.js'),
+      '@better-potree/rendering-three': path.resolve(
+        __dirname,
+        '../../packages/rendering-three/dist/index.js',
+      ),
       '@better-potree/viewer': path.resolve(__dirname, '../../packages/viewer/dist/index.js'),
     },
   },
