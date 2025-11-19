@@ -54,34 +54,59 @@ export interface IPotreeAttributeMetadata {
 }
 
 /**
+ * Potree 1.x bounding box format
+ */
+export interface IPotree1xBoundingBox {
+  lx: number;
+  ly: number;
+  lz: number;
+  ux: number;
+  uy: number;
+  uz: number;
+}
+
+/**
+ * Potree 2.0 bounding box format
+ */
+export interface IPotree2xBoundingBox {
+  min: [number, number, number];
+  max: [number, number, number];
+}
+
+/**
+ * Potree 2.0 hierarchy metadata
+ */
+export interface IPotree2xHierarchy {
+  firstChunkSize: number;
+  stepSize: number;
+  depth: number;
+}
+
+/**
  * Potree metadata (cloud.js / metadata.json format)
  */
 export interface IPotreeMetadata {
   version: string;
-  octreeDir: string;
-  boundingBox: {
-    lx: number;
-    ly: number;
-    lz: number;
-    ux: number;
-    uy: number;
-    uz: number;
-  };
-  tightBoundingBox?: {
-    lx: number;
-    ly: number;
-    lz: number;
-    ux: number;
-    uy: number;
-    uz: number;
-  };
+  octreeDir?: string;
+  /** Potree 1.x format */
+  boundingBox: IPotree1xBoundingBox | IPotree2xBoundingBox;
+  /** Potree 1.x format */
+  tightBoundingBox?: IPotree1xBoundingBox | IPotree2xBoundingBox;
   pointAttributes: string | string[] | IPotreeAttributeMetadata[];
   spacing: number;
-  scale: number;
+  /** Potree 1.x: number, Potree 2.0: [number, number, number] */
+  scale: number | [number, number, number];
   points: number;
   projection?: string;
-  hierarchy?: unknown;
+  /** Potree 1.x: unknown, Potree 2.0: IPotree2xHierarchy */
+  hierarchy?: unknown | IPotree2xHierarchy;
   hierarchyStepSize?: number;
+  /** Potree 2.0: offset for coordinates */
+  offset?: [number, number, number];
+  /** Potree 2.0: encoding type */
+  encoding?: string;
+  /** Potree 2.0: attributes array with detailed metadata */
+  attributes?: IPotreeAttributeMetadata[];
 }
 
 // ============================================================================
@@ -130,6 +155,16 @@ export interface IPointCloudOctreeNode {
    * Used for rendering and resource cleanup
    */
   geometry?: THREE.BufferGeometry;
+
+  /**
+   * Byte offset in octree.bin (Potree 2.0)
+   */
+  byteOffset?: number;
+
+  /**
+   * Byte size in octree.bin (Potree 2.0)
+   */
+  byteSize?: number;
 }
 
 // ============================================================================

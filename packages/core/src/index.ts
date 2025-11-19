@@ -7,6 +7,7 @@ export * from './attributes/PointAttributes.js';
 export * from './attributes/RangeAccumulator.js';
 export * from './config/index.js';
 export * from './coordinator/index.js';
+export * from './culling/index.js';
 export * from './ecs/index.js';
 export * from './events/EventEmitter.js';
 export * from './events/types.js';

@@ -15,11 +15,51 @@ import type {
   ILoader,
   IPointCloudOctree,
   IPointCloudOctreeNode,
+  IPotree1xBoundingBox,
+  IPotree2xBoundingBox,
+  IPotree2xHierarchy,
   IPotreeMetadata,
 } from '@better-potree/core';
 import * as THREE from 'three';
 import { parseAttributes } from './parseAttributes.js';
 import { Version } from './Version.js';
+
+/**
+ * Check if bounding box is in Potree 2.0 format (array-based)
+ */
+function isPotree2xBoundingBox(
+  box: IPotree1xBoundingBox | IPotree2xBoundingBox,
+): box is IPotree2xBoundingBox {
+  return 'min' in box && Array.isArray(box.min);
+}
+
+/**
+ * Parse bounding box from either Potree 1.x or 2.0 format
+ */
+function parseBoundingBox(box: IPotree1xBoundingBox | IPotree2xBoundingBox): THREE.Box3 {
+  if (isPotree2xBoundingBox(box)) {
+    return new THREE.Box3(
+      new THREE.Vector3(box.min[0], box.min[1], box.min[2]),
+      new THREE.Vector3(box.max[0], box.max[1], box.max[2]),
+    );
+  } else {
+    return new THREE.Box3(
+      new THREE.Vector3(box.lx, box.ly, box.lz),
+      new THREE.Vector3(box.ux, box.uy, box.uz),
+    );
+  }
+}
+
+/**
+ * Parse scale from either Potree 1.x (number) or 2.0 (array) format
+ * For Potree 2.0, we assume uniform scale and use the first value
+ */
+function parseScale(scale: number | [number, number, number]): number {
+  if (Array.isArray(scale)) {
+    return scale[0]; // Use first scale value for uniform scaling
+  }
+  return scale;
+}
 
 /**
  * Custom file loader function type
@@ -71,6 +111,10 @@ interface HierarchyNode {
   readonly numPoints: number;
   /** Child mask (8 bits for 8 children) */
   readonly childMask: number;
+  /** Byte offset in octree.bin (Potree 2.0) */
+  readonly byteOffset?: number;
+  /** Byte size in octree.bin (Potree 2.0) */
+  readonly byteSize?: number;
 }
 
 /**
@@ -210,35 +254,28 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     // Parse point attributes
     const pointAttributes = parseAttributes(metadata);
 
-    // Parse bounding box
-    const boundingBox = new THREE.Box3(
-      new THREE.Vector3(metadata.boundingBox.lx, metadata.boundingBox.ly, metadata.boundingBox.lz),
-      new THREE.Vector3(metadata.boundingBox.ux, metadata.boundingBox.uy, metadata.boundingBox.uz),
-    );
+    // Parse bounding box (supports both Potree 1.x and 2.0 formats)
+    const boundingBox = parseBoundingBox(metadata.boundingBox);
 
     // Parse tight bounding box (if available)
     const tightBoundingBox = metadata.tightBoundingBox
-      ? new THREE.Box3(
-          new THREE.Vector3(
-            metadata.tightBoundingBox.lx,
-            metadata.tightBoundingBox.ly,
-            metadata.tightBoundingBox.lz,
-          ),
-          new THREE.Vector3(
-            metadata.tightBoundingBox.ux,
-            metadata.tightBoundingBox.uy,
-            metadata.tightBoundingBox.uz,
-          ),
-        )
+      ? parseBoundingBox(metadata.tightBoundingBox)
       : boundingBox.clone();
 
+    // Parse scale (supports both Potree 1.x number and 2.0 array formats)
+    const scale = parseScale(metadata.scale);
+
+    // Determine if this is Potree 2.0 format
+    const version = new Version(metadata.version);
+    const isPotree2 = version.newerThan('1.9');
+
     // Determine octree directory
-    // For local file systems without explicit octreeDir in metadata,
-    // try current directory first (empty string)
+    // For Potree 2.0: octree data is in root directory (no 'data' subdirectory)
+    // For Potree 1.x: octree data is in 'data' subdirectory
     let octreeDir = metadata.octreeDir || '';
 
-    // Only default to 'data' for remote URLs when octreeDir is not specified
-    if (!octreeDir && !this.config.customFileLoader) {
+    // Only default to 'data' for Potree 1.x remote URLs when octreeDir is not specified
+    if (!octreeDir && !this.config.customFileLoader && !isPotree2) {
       octreeDir = 'data';
     }
 
@@ -250,6 +287,8 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       metadataOctreeDir: metadata.octreeDir,
       resolvedOctreeDir: octreeDir,
       hasCustomFileLoader: !!this.config.customFileLoader,
+      isPotree2,
+      version: metadata.version,
     });
 
     // Construct full URL
@@ -273,8 +312,10 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
 
     // Load hierarchy if auto-load is enabled
     if (this.config.autoLoadHierarchy && metadata.hierarchy) {
-      const version = new Version(metadata.version);
-      if (version.newerThan('1.9')) {
+      if (isPotree2) {
+        // Potree 2.0: hierarchy.bin is in root directory, not in octreeDir
+        await this.loadHierarchy2(root, baseUrl, metadata);
+      } else {
         await this.loadHierarchy(root, fullUrl, metadata);
       }
     }
@@ -289,7 +330,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       pointAttributes,
       projection: metadata.projection || null,
       version: metadata.version,
-      scale: metadata.scale,
+      scale,
     };
 
     // Attach custom file loader if present
@@ -324,6 +365,131 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
 
   /**
    * Load hierarchy information for Potree 2.0
+   *
+   * @param root - Root node to populate
+   * @param baseUrl - Base URL for hierarchy files (root directory, not octreeDir)
+   * @param metadata - Metadata with hierarchy info
+   */
+  private async loadHierarchy2(
+    root: IPointCloudOctreeNode,
+    baseUrl: string,
+    metadata: IPotreeMetadata,
+  ): Promise<void> {
+    // Potree 2.0: hierarchy.bin is in root directory
+    let hierarchyUrl = baseUrl;
+    if (hierarchyUrl.endsWith('cloud.js') || hierarchyUrl.endsWith('metadata.json')) {
+      hierarchyUrl = hierarchyUrl.substring(0, hierarchyUrl.lastIndexOf('/'));
+    }
+    if (!hierarchyUrl.endsWith('/')) {
+      hierarchyUrl += '/';
+    }
+    hierarchyUrl += 'hierarchy.bin';
+
+    console.log('[loadHierarchy2] Attempting to load Potree 2.0 hierarchy:', {
+      baseUrl,
+      hierarchyUrl,
+      hasCustomFileLoader: !!this.config.customFileLoader,
+    });
+
+    try {
+      let buffer: ArrayBuffer;
+
+      if (this.config.customFileLoader) {
+        // Use custom file loader with normalized path
+        const normalizedPath = this.normalizePath(hierarchyUrl);
+        console.log('[loadHierarchy2] Using custom file loader with normalized path:', normalizedPath);
+        buffer = await this.config.customFileLoader(normalizedPath);
+        console.log('[loadHierarchy2] Successfully loaded hierarchy buffer, size:', buffer.byteLength);
+      } else {
+        // Use standard fetch
+        console.log('[loadHierarchy2] Using standard fetch');
+        const response = await fetch(hierarchyUrl, this.config.fetchOptions);
+        if (!response.ok) {
+          console.warn(`Failed to load hierarchy from ${hierarchyUrl}`);
+          return;
+        }
+        buffer = await response.arrayBuffer();
+      }
+
+      // Get hierarchy info from metadata
+      const hierarchyInfo = metadata.hierarchy as IPotree2xHierarchy;
+      const stepSize = hierarchyInfo?.stepSize ?? 4;
+
+      const nodes = this.parseHierarchyBinary2(buffer, stepSize);
+      console.log('[loadHierarchy2] Parsed', nodes.length, 'nodes from hierarchy');
+
+      // Build tree structure from flat hierarchy
+      this.buildTreeFromHierarchy(root, nodes);
+      console.log('[loadHierarchy2] Successfully built tree from hierarchy');
+    } catch (error) {
+      console.warn('Failed to load hierarchy:', error);
+      console.error('[loadHierarchy2] Error details:', {
+        errorName: (error as Error).name,
+        errorMessage: (error as Error).message,
+        stack: (error as Error).stack,
+      });
+    }
+  }
+
+  /**
+   * Parse binary hierarchy file (Potree 2.0 format)
+   *
+   * Potree 2.0 hierarchy format:
+   * Each entry is 22 bytes:
+   * - 1 byte: type (0=internal, 1=leaf, 2=proxy)
+   * - 1 byte: childMask (8 bits for 8 children)
+   * - 4 bytes: numPoints (uint32)
+   * - 8 bytes: byteOffset (uint64)
+   * - 8 bytes: byteSize (uint64)
+   *
+   * @param buffer - Binary data
+   * @param _stepSize - Hierarchy step size
+   * @returns Array of hierarchy nodes
+   */
+  private parseHierarchyBinary2(buffer: ArrayBuffer, _stepSize: number): HierarchyNode[] {
+    const view = new DataView(buffer);
+    const nodes: HierarchyNode[] = [];
+
+    // Each entry is 22 bytes
+    const bytesPerNode = 22;
+    const numNodes = Math.floor(buffer.byteLength / bytesPerNode);
+
+    const stack: string[] = ['r'];
+
+    for (let i = 0; i < numNodes && stack.length > 0; i++) {
+      const offset = i * bytesPerNode;
+      const type = view.getUint8(offset);
+      const childMask = view.getUint8(offset + 1);
+      const numPoints = view.getUint32(offset + 2, true);
+      // Read byteOffset as uint64 (we use Number which is safe up to 2^53)
+      const byteOffsetLow = view.getUint32(offset + 6, true);
+      const byteOffsetHigh = view.getUint32(offset + 10, true);
+      const byteOffset = byteOffsetLow + byteOffsetHigh * 0x100000000;
+      // Read byteSize as uint64
+      const byteSizeLow = view.getUint32(offset + 14, true);
+      const byteSizeHigh = view.getUint32(offset + 18, true);
+      const byteSize = byteSizeLow + byteSizeHigh * 0x100000000;
+
+      const name = stack.shift()!;
+      nodes.push({ name, numPoints, childMask, byteOffset, byteSize });
+
+      // Add children to stack based on child mask
+      // type 0 = internal node, type 1 = leaf node, type 2 = proxy (needs separate load)
+      if (type === 0 || type === 1) {
+        for (let childIndex = 0; childIndex < 8; childIndex++) {
+          if ((childMask & (1 << childIndex)) !== 0) {
+            const childName = name + childIndex;
+            stack.push(childName);
+          }
+        }
+      }
+    }
+
+    return nodes;
+  }
+
+  /**
+   * Load hierarchy information for Potree 1.x/early 2.0
    *
    * @param root - Root node to populate
    * @param baseUrl - Base URL for hierarchy files
@@ -431,10 +597,16 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     const nodeMap = new Map<string, IPointCloudOctreeNode>();
     nodeMap.set('r', root);
 
-    // Update root with actual point count if available
+    // Update root with actual point count and byte info if available
     const rootHierarchy = nodes.find((n) => n.name === 'r');
     if (rootHierarchy) {
       root.numPoints = rootHierarchy.numPoints;
+      if (rootHierarchy.byteOffset !== undefined) {
+        root.byteOffset = rootHierarchy.byteOffset;
+      }
+      if (rootHierarchy.byteSize !== undefined) {
+        root.byteSize = rootHierarchy.byteSize;
+      }
     }
 
     // Create child nodes
@@ -446,7 +618,13 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       const parent = nodeMap.get(parentName);
 
       if (parent) {
-        const childNode = this.createChildNode(parent, childIndex, hierarchyNode.numPoints);
+        const childNode = this.createChildNode(
+          parent,
+          childIndex,
+          hierarchyNode.numPoints,
+          hierarchyNode.byteOffset,
+          hierarchyNode.byteSize,
+        );
         parent.children[childIndex] = childNode;
         nodeMap.set(hierarchyNode.name, childNode);
       }
@@ -459,12 +637,16 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
    * @param parent - Parent node
    * @param childIndex - Child index (0-7)
    * @param numPoints - Number of points in child
+   * @param byteOffset - Byte offset in octree.bin (Potree 2.0)
+   * @param byteSize - Byte size in octree.bin (Potree 2.0)
    * @returns New child node
    */
   private createChildNode(
     parent: IPointCloudOctreeNode,
     childIndex: number,
     numPoints: number,
+    byteOffset?: number,
+    byteSize?: number,
   ): IPointCloudOctreeNode {
     // Calculate child bounding box
     const min = parent.boundingBox.min.clone();
@@ -489,7 +671,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       min.z = center.z;
     }
 
-    return {
+    const node: IPointCloudOctreeNode = {
       name: parent.name + childIndex,
       level: parent.level + 1,
       boundingBox: new THREE.Box3(min, max),
@@ -498,5 +680,15 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       loaded: false,
       loading: false,
     };
+
+    // Only set byte offset/size if they are defined
+    if (byteOffset !== undefined) {
+      node.byteOffset = byteOffset;
+    }
+    if (byteSize !== undefined) {
+      node.byteSize = byteSize;
+    }
+
+    return node;
   }
 }

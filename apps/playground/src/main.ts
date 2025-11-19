@@ -31,27 +31,11 @@ const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clien
 camera.position.set(10, 10, 10);
 camera.lookAt(0, 0, 0);
 
-// 创建 Viewer（使用适配器包装renderer）
-// ThreeJsRenderer 实现的是 @better-potree/rendering 的 IRenderer
-// 需要适配到 @better-potree/core 的 IRenderer
-const rendererAdapter = {
-  render: (scene: any, camera: THREE.Camera) => {
-    renderer.renderScene(scene, camera);
-  },
-  setSize: (width: number, height: number) => {
-    renderer.setSize(width, height);
-  },
-  dispose: () => {
-    renderer.dispose();
-  },
-  getDomElement: () => {
-    return renderer.getDomElement();
-  },
-};
-
+// 创建 Viewer
+// ThreeJsRenderer 现在已经实现了正确的 IRenderer 接口（来自 @better-potree/core）
 const viewer = new ViewerAPI({
   container,
-  renderer: rendererAdapter as any,
+  renderer: renderer as any, // ThreeJsRenderer 实现了 IRenderer 接口
   scene,
   camera,
   pointBudget: 1_000_000,
@@ -320,7 +304,8 @@ function createControlsPanel() {
   const loadStatus = document.getElementById('load-status');
 
   loadTestDataButton?.addEventListener('click', async () => {
-    const testDataPath = 'D:/3d_models/pointcloud/inchurch_colorized_las_converted/cloud.js';
+    // 使用代理服务器路径加载测试数据
+    const testDataUrl = '/pointcloud/inchurch_colorized_las_converted/';
 
     try {
       if (loadStatus) {
@@ -329,10 +314,10 @@ function createControlsPanel() {
         loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
 
-      console.log('正在加载测试数据:', testDataPath);
+      console.log('正在加载测试数据:', testDataUrl);
 
       // 使用 viewer.load() API 加载点云
-      const octree = await viewer.load(testDataPath);
+      const octree = await viewer.load(testDataUrl);
 
       console.log('测试数据加载成功:', octree);
 
@@ -358,14 +343,12 @@ function createControlsPanel() {
         const size = octree.boundingBox?.getSize(new THREE.Vector3());
         loadStatus.innerHTML = `
           ✅ 测试数据加载成功<br>
-          路径: ${testDataPath}<br>
+          URL: ${testDataUrl}<br>
           版本: ${octree.version}<br>
           根节点点数: ${numPoints.toLocaleString()}<br>
           ${size ? `包围盒: (${size.x.toFixed(2)}, ${size.y.toFixed(2)}, ${size.z.toFixed(2)})<br>` : ''}
-          <br>
-          ⚠️ 点云渲染功能待实现（Phase 4）
         `;
-        loadStatus.style.background = 'rgba(255,165,0,0.1)';
+        loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
     } catch (error) {
       console.error('加载测试数据失败:', error);

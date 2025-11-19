@@ -27,6 +27,9 @@ import type { IPointCloudOctree, IPointCloudOctreeNode } from '../types/potree.j
 import type { ISystem, SystemStage } from '../types/system.js';
 import { ClipMethod, ClipTask } from '../types/rendering.js';
 import { BinaryHeap } from '../utils/BinaryHeap.js';
+import { EnhancedFrustumCuller } from '../culling/FrustumCuller.js';
+import type { OcclusionQueryManager } from '../culling/OcclusionQuery.js';
+import type { VisibilityTextureManager } from '../culling/VisibilityTexture.js';
 
 /**
  * 遍历系统配置
@@ -50,6 +53,14 @@ export interface TraversalSystemConfig {
   readonly clipMethod?: ClipMethod;
   /** 强制加载的深度（前N层始终显示，防止空白屏幕） */
   readonly forceLoadDepth?: number;
+  /** 是否启用 GPU 可见性剔除 */
+  readonly enableGPUCulling?: boolean;
+  /** 是否启用遮挡查询（Occlusion Query） */
+  readonly enableOcclusionQuery?: boolean;
+  /** 遮挡查询管理器（可选，外部提供） */
+  readonly occlusionQueryManager?: OcclusionQueryManager;
+  /** 可见性纹理管理器（可选，外部提供） */
+  readonly visibilityTextureManager?: VisibilityTextureManager;
 }
 
 /**
@@ -80,6 +91,15 @@ export interface TraversalResult {
   readonly traversedNodes: number;
   /** 遍历耗时（毫秒） */
   readonly traversalTime: number;
+  /** GPU 剔除统计 */
+  readonly gpuCullingStats?: {
+    /** 视锥剔除数量 */
+    frustumCulled: number;
+    /** 遮挡剔除数量 */
+    occlusionCulled: number;
+    /** 视锥剔除率 */
+    frustumCullRate: number;
+  };
 }
 
 /**
@@ -108,11 +128,21 @@ export class TraversalSystem implements ISystem {
   readonly stage: SystemStage = 100; // UPDATE stage
   readonly priority = 0;
 
-  private config: Required<TraversalSystemConfig>;
+  private config: Required<Omit<TraversalSystemConfig, 'occlusionQueryManager' | 'visibilityTextureManager' | 'enableGPUCulling' | 'enableOcclusionQuery'>> & {
+    enableGPUCulling: boolean;
+    enableOcclusionQuery: boolean;
+    occlusionQueryManager: OcclusionQueryManager | undefined;
+    visibilityTextureManager: VisibilityTextureManager | undefined;
+  };
   private camera: THREE.Camera | null = null;
   private frustum: THREE.Frustum = new THREE.Frustum();
   private projScreenMatrix: THREE.Matrix4 = new THREE.Matrix4();
   private pointClouds: Map<string, IPointCloudOctree> = new Map();
+
+  // GPU 可见性剔除相关
+  private frustumCuller: EnhancedFrustumCuller | null = null;
+  private occlusionQueryManager: OcclusionQueryManager | null = null;
+  private visibilityTextureManager: VisibilityTextureManager | null = null;
 
   private lastResult: TraversalResult = {
     visibleNodes: [],
@@ -145,7 +175,19 @@ export class TraversalSystem implements ISystem {
       clipTask: config.clipTask ?? ClipTask.NONE,
       clipMethod: config.clipMethod ?? ClipMethod.INSIDE_ANY,
       forceLoadDepth: config.forceLoadDepth ?? 3, // 默认强制加载前3层
+      enableGPUCulling: config.enableGPUCulling ?? true,
+      enableOcclusionQuery: config.enableOcclusionQuery ?? false,
+      occlusionQueryManager: config.occlusionQueryManager,
+      visibilityTextureManager: config.visibilityTextureManager,
     };
+
+    // 初始化 GPU 剔除管理器
+    if (this.config.occlusionQueryManager) {
+      this.occlusionQueryManager = this.config.occlusionQueryManager;
+    }
+    if (this.config.visibilityTextureManager) {
+      this.visibilityTextureManager = this.config.visibilityTextureManager;
+    }
   }
 
   /**
@@ -155,6 +197,11 @@ export class TraversalSystem implements ISystem {
    */
   setCamera(camera: THREE.Camera): void {
     this.camera = camera;
+
+    // 创建或更新 EnhancedFrustumCuller
+    if (this.config.enableGPUCulling && camera) {
+      this.frustumCuller = new EnhancedFrustumCuller(camera);
+    }
   }
 
   /**
@@ -297,19 +344,31 @@ export class TraversalSystem implements ISystem {
 
     const startTime = performance.now();
 
-    // 更新视锥体
+    // 更新 GPU 剔除管理器
+    if (this.frustumCuller) {
+      this.frustumCuller.update();
+    }
+    if (this.occlusionQueryManager) {
+      this.occlusionQueryManager.update();
+    }
+
+    // 更新视锥体（保留旧逻辑作为降级方案）
     this.updateFrustum();
 
     // 遍历所有点云
     const visibleNodes: VisibleNode[] = [];
     let traversedNodes = 0;
+    let frustumCulled = 0;
+    let occlusionCulled = 0;
 
     for (const octree of this.pointClouds.values()) {
       if (!octree.root) continue;
 
-      const { nodes, traversed } = this.traverseOctree(octree);
+      const { nodes, traversed, stats } = this.traverseOctree(octree);
       visibleNodes.push(...nodes);
       traversedNodes += traversed;
+      frustumCulled += stats.frustumCulled;
+      occlusionCulled += stats.occlusionCulled;
     }
 
     // 按优先级排序（距离近的优先）
@@ -318,13 +377,26 @@ export class TraversalSystem implements ISystem {
     // 应用点预算
     const budgetedNodes = this.applyPointBudget(visibleNodes);
 
+    // 更新可见性纹理
+    if (this.visibilityTextureManager) {
+      this.updateVisibilityTexture(budgetedNodes);
+    }
+
     const endTime = performance.now();
+
+    // 计算剔除率
+    const frustumCullRate = traversedNodes > 0 ? frustumCulled / traversedNodes : 0;
 
     this.lastResult = {
       visibleNodes: budgetedNodes,
       totalPoints: budgetedNodes.reduce((sum, n) => sum + n.node.numPoints, 0),
       traversedNodes,
       traversalTime: endTime - startTime,
+      gpuCullingStats: {
+        frustumCulled,
+        occlusionCulled,
+        frustumCullRate,
+      },
     };
 
     // 更新变换缓存
@@ -340,6 +412,40 @@ export class TraversalSystem implements ISystem {
     this.camera = null;
     this.lastOctreeTransforms.clear();
     this.transformCacheValid = false;
+
+    // 清理 GPU 资源（不销毁，因为它们可能被外部管理）
+    this.frustumCuller = null;
+    // 注意：不销毁 occlusionQueryManager 和 visibilityTextureManager，因为它们是外部提供的
+  }
+
+  /**
+   * 更新可见性纹理
+   *
+   * 将可见节点的信息更新到 GPU 纹理中
+   *
+   * @param visibleNodes - 可见节点列表
+   */
+  private updateVisibilityTexture(visibleNodes: readonly VisibleNode[]): void {
+    if (!this.visibilityTextureManager) {
+      return;
+    }
+
+    // 批量更新可见性
+    const updates = visibleNodes.map((vn) => {
+      // 注册节点（如果尚未注册）
+      const nodeId = `${vn.octree.url}/${vn.node.name}`;
+      this.visibilityTextureManager!.registerNode(nodeId);
+
+      return {
+        nodeId,
+        isVisible: true,
+        distance: vn.distance,
+        screenSize: vn.screenSize,
+      };
+    });
+
+    this.visibilityTextureManager.batchUpdate(updates);
+    this.visibilityTextureManager.update();
   }
 
   /**
@@ -467,17 +573,27 @@ export class TraversalSystem implements ISystem {
    * 遍历单个八叉树
    *
    * @param octree - 八叉树
-   * @returns 可见节点和遍历计数
+   * @returns 可见节点和遍历计数及统计信息
    */
   private traverseOctree(octree: IPointCloudOctree): {
     nodes: VisibleNode[];
     traversed: number;
+    stats: {
+      frustumCulled: number;
+      occlusionCulled: number;
+    };
   } {
     const visibleNodes: VisibleNode[] = [];
     let traversedCount = 0;
+    let frustumCulled = 0;
+    let occlusionCulled = 0;
 
     if (!octree.root || !this.camera) {
-      return { nodes: visibleNodes, traversed: traversedCount };
+      return {
+        nodes: visibleNodes,
+        traversed: traversedCount,
+        stats: { frustumCulled, occlusionCulled },
+      };
     }
 
     const cameraPosition = this.camera.position;
@@ -502,9 +618,30 @@ export class TraversalSystem implements ISystem {
       const node = element.node;
       traversedCount++;
 
-      // 视锥剔除
-      if (!this.frustum.intersectsBox(node.boundingBox)) {
+      // 视锥剔除（使用 GPU 加速的 FrustumCuller 或降级到原生实现）
+      let passedFrustumTest = false;
+      if (this.frustumCuller && this.config.enableGPUCulling) {
+        passedFrustumTest = this.frustumCuller.testBox(node.boundingBox);
+      } else {
+        passedFrustumTest = this.frustum.intersectsBox(node.boundingBox);
+      }
+
+      if (!passedFrustumTest) {
+        frustumCulled++;
         continue;
+      }
+
+      // 遮挡查询（如果启用）
+      if (
+        this.occlusionQueryManager &&
+        this.config.enableOcclusionQuery &&
+        this.occlusionQueryManager.supported()
+      ) {
+        const nodeId = `${octree.url}/${node.name}`;
+        if (!this.occlusionQueryManager.isVisible(nodeId)) {
+          occlusionCulled++;
+          continue;
+        }
       }
 
       // 裁剪框检查
@@ -559,7 +696,11 @@ export class TraversalSystem implements ISystem {
       }
     }
 
-    return { nodes: visibleNodes, traversed: traversedCount };
+    return {
+      nodes: visibleNodes,
+      traversed: traversedCount,
+      stats: { frustumCulled, occlusionCulled },
+    };
   }
 
   /**
