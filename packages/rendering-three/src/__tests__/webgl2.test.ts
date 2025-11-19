@@ -2,13 +2,12 @@
  * Unit tests for WebGL2 utilities
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertWebGL2Available,
   checkWebGL2Support,
   getWebGL2Capabilities,
   isWebGL2Available,
-  type WebGL2Support,
 } from '../utils/webgl2';
 
 describe('webgl2 utilities', () => {

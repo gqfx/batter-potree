@@ -3,12 +3,11 @@
  * Note: Testing worker code requires special handling since it runs in a worker context
  */
 
-import type { IWorkerDecodeRequest, IWorkerDecodeResponse } from '@better-potree/core';
-import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
+import { PointAttributes } from '@better-potree/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the worker self context
-const mockSelf = {
+const _mockSelf = {
   onmessage: null as ((event: MessageEvent) => void) | null,
   postMessage: vi.fn(),
   performance: {
@@ -256,7 +255,7 @@ describe('BinaryDecoderWorker', () => {
   describe('Normal decoding', () => {
     it('should decode NORMAL_SPHEREMAPPED normals', () => {
       // Test sphere mapping decoding algorithm
-      const numPoints = 1;
+      const _numPoints = 1;
       const bx = 128; // Middle value
       const by = 128;
 
@@ -525,7 +524,7 @@ describe('BinaryDecoderWorker', () => {
     });
 
     it('should handle zero values', () => {
-      const numPoints = 1;
+      const _numPoints = 1;
       const buffer = new ArrayBuffer(4);
       const view = new DataView(buffer);
 

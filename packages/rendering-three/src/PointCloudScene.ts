@@ -225,18 +225,18 @@ export class PointCloudScene extends THREE.Group {
       // Update node-level uniforms if material has uniforms
       if (material instanceof THREE.ShaderMaterial && material.uniforms) {
         // Level uniform for LOD-based coloring
-        if (material.uniforms['level']) {
-          material.uniforms['level'].value = nodeMetadata.level;
+        if (material.uniforms.level) {
+          material.uniforms.level.value = nodeMetadata.level;
         }
 
         // Visibility node start for LOD
-        if (material.uniforms['vnStart']) {
-          material.uniforms['vnStart'].value = nodeMetadata.vnStart;
+        if (material.uniforms.vnStart) {
+          material.uniforms.vnStart.value = nodeMetadata.vnStart;
         }
 
         // Point cloud index for multi-cloud rendering
-        if (material.uniforms['pcIndex']) {
-          material.uniforms['pcIndex'].value = nodeMetadata.pcIndex;
+        if (material.uniforms.pcIndex) {
+          material.uniforms.pcIndex.value = nodeMetadata.pcIndex;
         }
       }
     };
@@ -280,7 +280,7 @@ export class PointCloudScene extends THREE.Group {
     const metadata = this.metadataMap.get(nodeId);
 
     // Update visible point count
-    if (metadata && metadata.isVisible) {
+    if (metadata?.isVisible) {
       this._visiblePointCount -= metadata.numPoints;
     }
 
@@ -530,8 +530,7 @@ export class PointCloudScene extends THREE.Group {
     for (const handler of this.disposeHandlers) {
       try {
         handler();
-      } catch (error) {
-        console.error('[PointCloudScene] Dispose handler error:', error);
+      } catch (_error) {
       }
     }
     this.disposeHandlers.length = 0;

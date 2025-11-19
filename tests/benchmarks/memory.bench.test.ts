@@ -46,10 +46,6 @@ describe('Memory Management Benchmarks', () => {
       },
     );
 
-    console.log(`\nLRU Cache Operations Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
-
     expect(result.avgTime).toBeLessThan(10);
   });
 
@@ -80,15 +76,10 @@ describe('Memory Management Benchmarks', () => {
     );
 
     profiler.snapshot('end');
-
-    console.log(`\nMemory Allocation Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
     if (result.memoryUsed) {
-      console.log(`  Memory delta: ${(result.memoryUsed / 1024).toFixed(2)}KB`);
     }
 
-    const memoryDiff = profiler.diff('start', 'end');
-    console.log(`  Total memory diff: ${(memoryDiff / 1024).toFixed(2)}KB`);
+    const _memoryDiff = profiler.diff('start', 'end');
 
     expect(result.avgTime).toBeLessThan(50);
   });
@@ -113,16 +104,12 @@ describe('Memory Management Benchmarks', () => {
         }
 
         // 读取数据
-        let sum = 0;
+        let _sum = 0;
         for (let i = 0; i < 100000; i++) {
-          sum += float32[i] + uint8[i];
+          _sum += float32[i] + uint8[i];
         }
       },
     );
-
-    console.log(`\nTypedArray Operations Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
 
     expect(result.avgTime).toBeLessThan(5);
   });

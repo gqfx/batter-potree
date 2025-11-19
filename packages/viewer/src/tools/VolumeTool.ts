@@ -63,8 +63,6 @@ export interface VolumeToolConfig {
  * 通过创建测量框并对点云进行网格采样来计算体积
  */
 export class VolumeTool {
-  // @ts-expect-error - viewer will be used in future implementations
-  private _viewer: Viewer;
   private config: Required<VolumeToolConfig>;
 
   // 测量框
@@ -100,7 +98,6 @@ export class VolumeTool {
    * 激活工具并准备接收用户输入
    */
   startMeasurement(): void {
-    console.log('Volume measurement started. Define measurement box.');
     this.clearVisualization();
   }
 
@@ -216,7 +213,7 @@ export class VolumeTool {
     );
     const direction = new THREE.Vector3(0, 0, -1);
     // @ts-expect-error - raycaster will be used when raycast is implemented
-    const raycaster = new THREE.Raycaster(origin, direction);
+    const _raycaster = new THREE.Raycaster(origin, direction);
 
     // TODO: 实现点云射线检测
     // 当前返回测量框底部高度作为占位符

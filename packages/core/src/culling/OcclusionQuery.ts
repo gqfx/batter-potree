@@ -19,7 +19,7 @@
  * ```
  */
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 
 /**
  * 遮挡查询状态
@@ -108,7 +108,6 @@ export class OcclusionQueryManager {
 
     // 检查是否为 WebGL2Context
     if (!('createQuery' in context)) {
-      console.warn('[OcclusionQuery] WebGL2 not supported, occlusion query disabled');
       this.isSupported = false;
       this.gl = context as WebGL2RenderingContext; // 为了类型兼容，但实际不会使用
       this.maxConcurrentQueries = 0;
@@ -169,14 +168,12 @@ export class OcclusionQueryManager {
 
     // 检查是否已有活跃查询
     if (this.activeQueries.has(nodeId)) {
-      console.warn(`[OcclusionQuery] Query already active for node: ${nodeId}`);
       return false;
     }
 
     // 从池中获取查询对象
     const query = this.queryPool.pop();
     if (!query) {
-      console.warn('[OcclusionQuery] No available query objects');
       return false;
     }
 
@@ -197,7 +194,6 @@ export class OcclusionQueryManager {
 
     const query = this.activeQueries.get(nodeId);
     if (!query) {
-      console.warn(`[OcclusionQuery] No active query for node: ${nodeId}`);
       return;
     }
 

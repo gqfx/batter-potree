@@ -27,12 +27,7 @@ describe('ECS Performance Benchmarks', () => {
         }
       },
     );
-
-    console.log(`\nECS Entity Creation Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
     if (result.memoryUsed) {
-      console.log(`  Memory used: ${(result.memoryUsed / 1024).toFixed(2)}KB`);
     }
 
     // 验证性能要求：10000 实体创建应该 < 100ms
@@ -61,10 +56,6 @@ describe('ECS Performance Benchmarks', () => {
         }
       },
     );
-
-    console.log(`\nECS Component Addition Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
 
     expect(result.avgTime).toBeLessThan(200);
   });
@@ -97,10 +88,6 @@ describe('ECS Performance Benchmarks', () => {
       },
     );
 
-    console.log(`\nECS Query Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
-
     // 验证性能要求：10000 实体查询应该 < 10ms
     expect(result.avgTime).toBeLessThan(10);
   });
@@ -131,15 +118,11 @@ describe('ECS Performance Benchmarks', () => {
           const component = world.getComponent(entity, TransformComponent);
           if (component) {
             // 模拟访问
-            const pos = component.position;
+            const _pos = component.position;
           }
         }
       },
     );
-
-    console.log(`\nECS Component Access Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
 
     expect(result.avgTime).toBeLessThan(5);
   });

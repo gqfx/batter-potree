@@ -4,7 +4,7 @@
 
 import { PointCloudColorMode, PointShape, PointSizeType } from '@better-potree/core';
 import * as THREE from 'three';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, } from 'vitest';
 import { PointCloudMaterial } from '../materials/PointCloudMaterial';
 
 describe('PointCloudMaterial', () => {
@@ -287,7 +287,7 @@ describe('PointCloudMaterial', () => {
         colorMode: PointCloudColorMode.RGB,
       });
 
-      const definesBefore = material.defines;
+      const _definesBefore = material.defines;
       material.colorMode = PointCloudColorMode.RGB;
 
       expect(material.colorMode).toBe(PointCloudColorMode.RGB);

@@ -191,7 +191,6 @@ export class WorkerPool<T = unknown, R = unknown> {
   private handleWorkerMessage(worker: WorkerInstance, response: WorkerResponse<R>): void {
     const task = this.activeTasks.get(response.taskId);
     if (!task) {
-      console.warn(`WorkerPool: Unknown task ID: ${response.taskId}`);
       return;
     }
 

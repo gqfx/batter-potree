@@ -64,8 +64,6 @@ describe('POC - 性能验证', () => {
 
       // 验证性能 (应该 < 10ms)
       expect(duration).toBeLessThan(10);
-
-      console.log(`[POC 性能] 10000 次可变 visibleNodes 更新耗时: ${duration.toFixed(2)}ms`);
     });
 
     it('10000 次可变 loadedNodes 更新 < 50ms', () => {
@@ -87,8 +85,6 @@ describe('POC - 性能验证', () => {
 
       // 验证性能 (应该 < 50ms，因为涉及 TypedArray 创建)
       expect(duration).toBeLessThan(50);
-
-      console.log(`[POC 性能] 10000 次可变 loadedNodes 更新耗时: ${duration.toFixed(2)}ms`);
     });
 
     it('混合更新: 10000 次 visibleNodes + 10000 次 loadedNodes < 100ms', () => {
@@ -112,8 +108,6 @@ describe('POC - 性能验证', () => {
 
       // 验证性能 (应该 < 100ms)
       expect(duration).toBeLessThan(100);
-
-      console.log(`[POC 性能] 混合更新耗时: ${duration.toFixed(2)}ms`);
     });
   });
 
@@ -137,8 +131,6 @@ describe('POC - 性能验证', () => {
 
       // 验证性能 (应该远慢于可变更新，预期 > 100ms)
       expect(duration).toBeGreaterThan(100);
-
-      console.log(`[POC 性能] 10000 次不可变 visibleNodes 更新耗时: ${duration.toFixed(2)}ms`);
     });
 
     it('10000 次不可变 loadedNodes 更新 (预期: 远慢于可变)', { timeout: 10000 }, () => {
@@ -164,8 +156,6 @@ describe('POC - 性能验证', () => {
 
       // 验证性能 (应该远慢于可变更新，预期 > 500ms)
       expect(duration).toBeGreaterThan(500);
-
-      console.log(`[POC 性能] 10000 次不可变 loadedNodes 更新耗时: ${duration.toFixed(2)}ms`);
     });
   });
 
@@ -197,10 +187,6 @@ describe('POC - 性能验证', () => {
 
       // 3. 计算性能倍数
       const speedup = immutableDuration / mutableDuration;
-
-      console.log(`[POC 性能] 可变更新耗时: ${mutableDuration.toFixed(2)}ms`);
-      console.log(`[POC 性能] 不可变更新耗时: ${immutableDuration.toFixed(2)}ms`);
-      console.log(`[POC 性能] 性能提升: ${speedup.toFixed(1)}x`);
 
       // 4. 验证性能提升至少 10 倍
       expect(speedup).toBeGreaterThan(10);
@@ -287,9 +273,6 @@ describe('POC - 性能验证', () => {
 
       // 验证性能 (应该保持线性增长，< 100ms)
       expect(duration).toBeLessThan(100);
-
-      console.log(`[POC 性能] ${iterations} 次可变更新耗时: ${duration.toFixed(2)}ms`);
-      console.log(`[POC 性能] 平均每次更新: ${((duration / iterations) * 1000).toFixed(3)}μs`);
     });
 
     it('频繁清空和重新填充 (模拟每帧更新)', () => {
@@ -312,9 +295,6 @@ describe('POC - 性能验证', () => {
       const duration = performance.now() - start;
       const avgFrameTime = duration / frames;
 
-      console.log(`[POC 性能] ${frames} 帧更新耗时: ${duration.toFixed(2)}ms`);
-      console.log(`[POC 性能] 平均每帧耗时: ${avgFrameTime.toFixed(3)}ms`);
-
       // 验证平均每帧耗时 < 1ms (远低于 16.7ms 的帧预算)
       expect(avgFrameTime).toBeLessThan(1);
 
@@ -326,7 +306,7 @@ describe('POC - 性能验证', () => {
   describe('测试 6: 真实场景模拟', () => {
     it('模拟 60fps 场景下的状态更新', () => {
       const runtime = new Runtime();
-      const fps = 60;
+      const _fps = 60;
       const frames = 600; // 10 秒
       const frameBudget = 16.7; // 每帧预算 16.7ms (60fps)
 
@@ -366,11 +346,6 @@ describe('POC - 性能验证', () => {
           slowFrames.push(frame);
         }
       }
-
-      console.log(`[POC 性能] 模拟 ${frames} 帧 @ ${fps}fps`);
-      console.log(
-        `[POC 性能] 超出帧预算的帧数: ${slowFrames.length} (${((slowFrames.length / frames) * 100).toFixed(1)}%)`,
-      );
 
       // 验证超出预算的帧数 < 5%
       expect(slowFrames.length / frames).toBeLessThan(0.05);

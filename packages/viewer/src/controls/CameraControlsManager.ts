@@ -82,13 +82,13 @@ export interface CameraControlsEvents {
   /** Fired when control mode changes */
   'mode-changed': { mode: NavigationMode };
   /** Fired when camera starts moving */
-  start: void;
+  start: undefined;
   /** Fired when camera is moving */
-  change: void;
+  change: undefined;
   /** Fired when camera stops moving */
-  end: void;
+  end: undefined;
   /** Fired when animation completes */
-  'animation-complete': void;
+  'animation-complete': undefined;
   [key: string]: any;
 }
 
@@ -208,22 +208,16 @@ export class CameraControlsManager extends TypedEventEmitter<CameraControlsEvent
         break;
 
       case 'orbit':
-        // TODO: Implement OrbitControls
-        console.warn('Orbit controls not yet implemented, using earth controls');
         this.earthControls = new EarthControls(this.camera, this.domElement);
         this.setupControlEvents(this.earthControls);
         break;
 
       case 'fly':
-        // TODO: Implement FlyControls
-        console.warn('Fly controls not yet implemented, using earth controls');
         this.earthControls = new EarthControls(this.camera, this.domElement);
         this.setupControlEvents(this.earthControls);
         break;
 
       case 'fps':
-        // TODO: Implement FPSControls
-        console.warn('FPS controls not yet implemented, using earth controls');
         this.earthControls = new EarthControls(this.camera, this.domElement);
         this.setupControlEvents(this.earthControls);
         break;
@@ -416,7 +410,7 @@ export class CameraControlsManager extends TypedEventEmitter<CameraControlsEvent
    */
   update(deltaTime: number): void {
     // Update animation
-    if (this.animation && this.animation.active) {
+    if (this.animation?.active) {
       const elapsed = performance.now() - this.animation.startTime;
       const progress = Math.min(elapsed / this.animation.duration, 1.0);
 

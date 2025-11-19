@@ -283,14 +283,6 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       octreeDir += '/';
     }
 
-    console.log('[parseMetadata] Octree directory configuration:', {
-      metadataOctreeDir: metadata.octreeDir,
-      resolvedOctreeDir: octreeDir,
-      hasCustomFileLoader: !!this.config.customFileLoader,
-      isPotree2,
-      version: metadata.version,
-    });
-
     // Construct full URL
     let fullUrl = baseUrl;
     if (fullUrl.endsWith('cloud.js') || fullUrl.endsWith('metadata.json')) {
@@ -300,12 +292,6 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       fullUrl += '/';
     }
     fullUrl += octreeDir;
-
-    console.log('[parseMetadata] Constructed fullUrl:', {
-      baseUrl,
-      octreeDir,
-      fullUrl,
-    });
 
     // Create root node
     const root = this.createRootNode(boundingBox, metadata);
@@ -385,27 +371,16 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     }
     hierarchyUrl += 'hierarchy.bin';
 
-    console.log('[loadHierarchy2] Attempting to load Potree 2.0 hierarchy:', {
-      baseUrl,
-      hierarchyUrl,
-      hasCustomFileLoader: !!this.config.customFileLoader,
-    });
-
     try {
       let buffer: ArrayBuffer;
 
       if (this.config.customFileLoader) {
         // Use custom file loader with normalized path
         const normalizedPath = this.normalizePath(hierarchyUrl);
-        console.log('[loadHierarchy2] Using custom file loader with normalized path:', normalizedPath);
         buffer = await this.config.customFileLoader(normalizedPath);
-        console.log('[loadHierarchy2] Successfully loaded hierarchy buffer, size:', buffer.byteLength);
       } else {
-        // Use standard fetch
-        console.log('[loadHierarchy2] Using standard fetch');
         const response = await fetch(hierarchyUrl, this.config.fetchOptions);
         if (!response.ok) {
-          console.warn(`Failed to load hierarchy from ${hierarchyUrl}`);
           return;
         }
         buffer = await response.arrayBuffer();
@@ -416,18 +391,10 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       const stepSize = hierarchyInfo?.stepSize ?? 4;
 
       const nodes = this.parseHierarchyBinary2(buffer, stepSize);
-      console.log('[loadHierarchy2] Parsed', nodes.length, 'nodes from hierarchy');
 
       // Build tree structure from flat hierarchy
       this.buildTreeFromHierarchy(root, nodes);
-      console.log('[loadHierarchy2] Successfully built tree from hierarchy');
-    } catch (error) {
-      console.warn('Failed to load hierarchy:', error);
-      console.error('[loadHierarchy2] Error details:', {
-        errorName: (error as Error).name,
-        errorMessage: (error as Error).message,
-        stack: (error as Error).stack,
-      });
+    } catch (_error) {
     }
   }
 
@@ -504,45 +471,26 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     // baseUrl already includes octreeDir (usually 'data/'), so just append the filename
     const hierarchyUrl = `${baseUrl}hierarchy.bin`;
 
-    console.log('[loadHierarchy] Attempting to load hierarchy:', {
-      baseUrl,
-      hierarchyUrl,
-      hasCustomFileLoader: !!this.config.customFileLoader,
-    });
-
     try {
       let buffer: ArrayBuffer;
 
       if (this.config.customFileLoader) {
         // Use custom file loader with normalized path
         const normalizedPath = this.normalizePath(hierarchyUrl);
-        console.log('[loadHierarchy] Using custom file loader with normalized path:', normalizedPath);
         buffer = await this.config.customFileLoader(normalizedPath);
-        console.log('[loadHierarchy] Successfully loaded hierarchy buffer, size:', buffer.byteLength);
       } else {
-        // Use standard fetch
-        console.log('[loadHierarchy] Using standard fetch');
         const response = await fetch(hierarchyUrl, this.config.fetchOptions);
         if (!response.ok) {
-          console.warn(`Failed to load hierarchy from ${hierarchyUrl}`);
           return;
         }
         buffer = await response.arrayBuffer();
       }
 
       const nodes = this.parseHierarchyBinary(buffer, metadata.hierarchyStepSize ?? 5);
-      console.log('[loadHierarchy] Parsed', nodes.length, 'nodes from hierarchy');
 
       // Build tree structure from flat hierarchy
       this.buildTreeFromHierarchy(root, nodes);
-      console.log('[loadHierarchy] Successfully built tree from hierarchy');
-    } catch (error) {
-      console.warn('Failed to load hierarchy:', error);
-      console.error('[loadHierarchy] Error details:', {
-        errorName: (error as Error).name,
-        errorMessage: (error as Error).message,
-        stack: (error as Error).stack,
-      });
+    } catch (_error) {
     }
   }
 

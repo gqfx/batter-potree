@@ -46,8 +46,8 @@ describe('VolumeTool', () => {
 
       const box = tool.getMeasurementBox();
       expect(box).toBeDefined();
-      expect(box!.min).toEqual(min);
-      expect(box!.max).toEqual(max);
+      expect(box?.min).toEqual(min);
+      expect(box?.max).toEqual(max);
     });
 
     it('应该克隆输入的向量', () => {
@@ -61,8 +61,8 @@ describe('VolumeTool', () => {
       max.x = 200;
 
       const box = tool.getMeasurementBox();
-      expect(box!.min.x).toBe(-10);
-      expect(box!.max.x).toBe(10);
+      expect(box?.min.x).toBe(-10);
+      expect(box?.max.x).toBe(10);
     });
   });
 
@@ -77,8 +77,8 @@ describe('VolumeTool', () => {
 
       const box = tool.getMeasurementBox();
       expect(box).toBeDefined();
-      expect(box!.min).toEqual(box3.min);
-      expect(box!.max).toEqual(box3.max);
+      expect(box?.min).toEqual(box3.min);
+      expect(box?.max).toEqual(box3.max);
     });
   });
 

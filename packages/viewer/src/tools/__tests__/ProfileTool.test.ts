@@ -2,7 +2,7 @@
  * ProfileTool 单元测试
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, } from 'vitest';
 import * as THREE from 'three';
 import { ProfileTool } from '../ProfileTool.js';
 import type { Viewer } from '../../Viewer.js';
@@ -70,7 +70,7 @@ describe('ProfileTool', () => {
       points[0]!.x = 100;
 
       const controlPoints = tool.getControlPoints();
-      expect(controlPoints[0]!.x).toBe(0);
+      expect(controlPoints[0]?.x).toBe(0);
     });
   });
 
@@ -89,7 +89,7 @@ describe('ProfileTool', () => {
       point.x = 100;
 
       const controlPoints = tool.getControlPoints();
-      expect(controlPoints[0]!.x).toBe(5);
+      expect(controlPoints[0]?.x).toBe(5);
     });
   });
 
@@ -144,7 +144,7 @@ describe('ProfileTool', () => {
       newPos.x = 100;
 
       const controlPoints = tool.getControlPoints();
-      expect(controlPoints[0]!.x).toBe(5);
+      expect(controlPoints[0]?.x).toBe(5);
     });
   });
 
@@ -254,7 +254,7 @@ describe('ProfileTool', () => {
 
       const data = tool.getProfileData();
       expect(data).not.toBeNull();
-      expect(data!.points.length).toBeGreaterThan(0);
+      expect(data?.points.length).toBeGreaterThan(0);
     });
   });
 

@@ -17,7 +17,6 @@
  */
 
 import type * as THREE from 'three';
-import type { PointCloudViewer } from '../PointCloudViewer.js';
 
 /**
  * 裁剪类型
@@ -58,22 +57,12 @@ export class ClipTool {
   private nextId = 0;
 
   /**
-   * 创建裁剪工具
-   *
-   * @param _viewer - 点云查看器（保留用于未来扩展）
-   * @param _config - 配置选项（保留用于未来扩展）
-   */
-  constructor(_viewer: PointCloudViewer, _config: ClipToolConfig = {}) {
-    // 占位符实现 - 将在Phase 3中完善
-  }
-
-  /**
    * 添加裁剪框
    *
    * @param box - 裁剪框
    * @returns 裁剪体 ID
    */
-  addClipBox(box: THREE.Box3): string {
+  addClipBox(_box: THREE.Box3): string {
     const id = `clip-box-${this.nextId++}`;
 
     const volume: ClipVolume = {
@@ -84,7 +73,6 @@ export class ClipTool {
     };
 
     this.clipVolumes.set(id, volume);
-    console.log(`Added clip box: ${id}`, box);
 
     return id;
   }
@@ -95,7 +83,7 @@ export class ClipTool {
    * @param plane - 裁剪平面
    * @returns 裁剪体 ID
    */
-  addClipPlane(plane: THREE.Plane): string {
+  addClipPlane(_plane: THREE.Plane): string {
     const id = `clip-plane-${this.nextId++}`;
 
     const volume: ClipVolume = {
@@ -106,7 +94,6 @@ export class ClipTool {
     };
 
     this.clipVolumes.set(id, volume);
-    console.log(`Added clip plane: ${id}`, plane);
 
     return id;
   }
@@ -117,7 +104,7 @@ export class ClipTool {
    * @param sphere - 裁剪球
    * @returns 裁剪体 ID
    */
-  addClipSphere(sphere: THREE.Sphere): string {
+  addClipSphere(_sphere: THREE.Sphere): string {
     const id = `clip-sphere-${this.nextId++}`;
 
     const volume: ClipVolume = {
@@ -128,7 +115,6 @@ export class ClipTool {
     };
 
     this.clipVolumes.set(id, volume);
-    console.log(`Added clip sphere: ${id}`, sphere);
 
     return id;
   }

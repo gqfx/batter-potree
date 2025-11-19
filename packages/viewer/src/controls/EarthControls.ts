@@ -25,9 +25,9 @@ export enum MouseButton {
  * Earth controls events
  */
 export interface EarthControlsEvents {
-  start: void;
-  change: void;
-  end: void;
+  start: undefined;
+  change: undefined;
+  end: undefined;
   [key: string]: any; // Index signature for EventMap compatibility
 }
 

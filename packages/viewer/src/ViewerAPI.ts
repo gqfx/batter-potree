@@ -84,7 +84,6 @@ export class ViewerAPI extends Viewer {
     const camera = this.getCamera();
 
     if (!renderer || !scene) {
-      console.warn('[ViewerAPI] Advanced features require Three.js renderer and scene');
       return;
     }
 
@@ -102,8 +101,6 @@ export class ViewerAPI extends Viewer {
 
     // Initialize clip tool
     this.clipTool = new AdvancedClipTool(scene);
-
-    console.log('[ViewerAPI] Advanced features initialized');
   }
   /**
    * Set navigation mode
@@ -132,7 +129,6 @@ export class ViewerAPI extends Viewer {
 
       this.emit('navigation-changed', { mode });
     } else {
-      console.warn('[ViewerAPI] Camera controls not initialized. Call initializeAdvancedFeatures() first.');
       this.emit('navigation-changed', { mode });
     }
   }
@@ -145,7 +141,6 @@ export class ViewerAPI extends Viewer {
   fitToScreen(_pointCloud?: any, options?: FitToScreenOptions): void {
     const clouds = _pointCloud ? [_pointCloud] : this.getPointClouds();
     if (clouds.length === 0) {
-      console.warn('No point clouds to fit to screen');
       return;
     }
 
@@ -190,25 +185,19 @@ export class ViewerAPI extends Viewer {
   /**
    * Set point size type
    */
-  setPointSizeType(type: PointSizeType): void {
-    // TODO: Implement when material system is ready
-    console.log('Setting point size type to:', type);
+  setPointSizeType(_type: PointSizeType): void {
   }
 
   /**
    * Set point shape
    */
-  setPointShape(shape: PointShape): void {
-    // TODO: Implement when material system is ready
-    console.log('Setting point shape to:', shape);
+  setPointShape(_shape: PointShape): void {
   }
 
   /**
    * Set point quality
    */
-  setPointQuality(quality: PointQuality): void {
-    // TODO: Implement when material system is ready
-    console.log('Setting point quality to:', quality);
+  setPointQuality(_quality: PointQuality): void {
   }
 
   /**
@@ -217,7 +206,6 @@ export class ViewerAPI extends Viewer {
    */
   addClipVolume(volume: any): void {
     if (!this.clipTool) {
-      console.warn('[ViewerAPI] Clip tool not initialized. Call initializeAdvancedFeatures() first.');
       this.emit('clip-volume-added', { volume });
       return;
     }
@@ -233,7 +221,6 @@ export class ViewerAPI extends Viewer {
       const id = this.clipTool.addSphereClip(volume);
       this.emit('clip-volume-added', { volume: { ...volume, id, type: 'sphere' } });
     } else {
-      console.warn('[ViewerAPI] Unknown clip volume type');
       this.emit('clip-volume-added', { volume });
     }
   }
@@ -244,7 +231,6 @@ export class ViewerAPI extends Viewer {
    */
   removeClipVolume(volume: string | any): void {
     if (!this.clipTool) {
-      console.warn('[ViewerAPI] Clip tool not initialized.');
       this.emit('clip-volume-removed', { volume });
       return;
     }
@@ -259,12 +245,10 @@ export class ViewerAPI extends Viewer {
    */
   removeAllClipVolumes(): void {
     if (!this.clipTool) {
-      console.warn('[ViewerAPI] Clip tool not initialized.');
       return;
     }
 
     this.clipTool.clearAllClips();
-    console.log('[ViewerAPI] All clip volumes removed');
   }
 
   /**
@@ -272,7 +256,6 @@ export class ViewerAPI extends Viewer {
    */
   getClipVolumes(): ClipVolume[] {
     if (!this.clipTool) {
-      console.warn('[ViewerAPI] Clip tool not initialized.');
       return [];
     }
 
@@ -287,7 +270,6 @@ export class ViewerAPI extends Viewer {
    */
   setClipVolumeEnabled(id: string, enabled: boolean): void {
     if (!this.clipTool) {
-      console.warn('[ViewerAPI] Clip tool not initialized.');
       return;
     }
 
@@ -302,7 +284,6 @@ export class ViewerAPI extends Viewer {
    */
   setClipVolumeInverted(id: string, inverted: boolean): void {
     if (!this.clipTool) {
-      console.warn('[ViewerAPI] Clip tool not initialized.');
       return;
     }
 
@@ -315,8 +296,6 @@ export class ViewerAPI extends Viewer {
    */
   startMeasuring(type: MeasurementType): void {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized. Call initializeAdvancedFeatures() first.');
-      console.log('Starting measurement:', type);
       return;
     }
 
@@ -332,7 +311,6 @@ export class ViewerAPI extends Viewer {
    */
   addMeasurementPoint(point: THREE.Vector3): void {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized.');
       return;
     }
 
@@ -344,7 +322,6 @@ export class ViewerAPI extends Viewer {
    */
   completeMeasurement(): void {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized.');
       return;
     }
 
@@ -356,7 +333,6 @@ export class ViewerAPI extends Viewer {
    */
   cancelMeasurement(): void {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized.');
       return;
     }
 
@@ -370,7 +346,6 @@ export class ViewerAPI extends Viewer {
    */
   getMeasurements(): MeasurementResult[] {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized.');
       return [];
     }
 
@@ -384,7 +359,6 @@ export class ViewerAPI extends Viewer {
    */
   removeMeasurement(id: string): void {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized.');
       return;
     }
 
@@ -396,7 +370,6 @@ export class ViewerAPI extends Viewer {
    */
   clearAllMeasurements(): void {
     if (!this.measurementTool) {
-      console.warn('[ViewerAPI] Measurement tool not initialized.');
       return;
     }
 
@@ -540,17 +513,13 @@ export class ViewerAPI extends Viewer {
   /**
    * Show or hide bounding boxes
    */
-  setShowBoundingBox(show: boolean): void {
-    // TODO: Implement when PointCloud has bounding box visualization
-    console.log('Show bounding box:', show);
+  setShowBoundingBox(_show: boolean): void {
   }
 
   /**
    * Set minimum node size (LOD parameter)
    */
-  setMinNodeSize(size: number): void {
-    // TODO: Implement when LOD system is ready
-    console.log('Setting min node size:', size);
+  setMinNodeSize(_size: number): void {
   }
 
   /**
@@ -604,7 +573,7 @@ export class ViewerAPI extends Viewer {
    * Override render to use EDL effect if enabled
    */
   override render(): void {
-    if (this.edlEffect && this.edlEffect.getEnabled()) {
+    if (this.edlEffect?.getEnabled()) {
       this.edlEffect.render();
     } else {
       super.render();
@@ -641,7 +610,5 @@ export class ViewerAPI extends Viewer {
 
     // Call parent destroy
     super.destroy();
-
-    console.log('[ViewerAPI] Advanced features disposed');
   }
 }

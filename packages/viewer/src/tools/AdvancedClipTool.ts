@@ -196,8 +196,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
 
     this.emit('clip-added', { volume });
 
-    console.log(`[ClipTool] Added box clip: ${id}`);
-
     return id;
   }
 
@@ -233,8 +231,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
 
     this.emit('clip-added', { volume });
 
-    console.log(`[ClipTool] Added plane clip: ${id}`);
-
     return id;
   }
 
@@ -269,8 +265,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
     }
 
     this.emit('clip-added', { volume });
-
-    console.log(`[ClipTool] Added sphere clip: ${id}`);
 
     return id;
   }
@@ -310,8 +304,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
 
     this.emit('clip-added', { volume });
 
-    console.log(`[ClipTool] Added polygon clip: ${id}`);
-
     return id;
   }
 
@@ -323,7 +315,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   removeClip(id: string): void {
     const volume = this.clipVolumes.get(id);
     if (!volume) {
-      console.warn(`[ClipTool] Clip volume not found: ${id}`);
       return;
     }
 
@@ -331,8 +322,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
     this.removeVisualization(id);
 
     this.emit('clip-removed', { id });
-
-    console.log(`[ClipTool] Removed clip: ${id}`);
   }
 
   /**
@@ -344,7 +333,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   setClipEnabled(id: string, enabled: boolean): void {
     const volume = this.clipVolumes.get(id);
     if (!volume) {
-      console.warn(`[ClipTool] Clip volume not found: ${id}`);
       return;
     }
 
@@ -361,8 +349,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
       inverted: volume.inverted,
     });
     this.emit('clip-updated', { volume });
-
-    console.log(`[ClipTool] Clip ${id} ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -374,7 +360,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   setClipInverted(id: string, inverted: boolean): void {
     const volume = this.clipVolumes.get(id);
     if (!volume) {
-      console.warn(`[ClipTool] Clip volume not found: ${id}`);
       return;
     }
 
@@ -386,8 +371,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
       inverted: volume.inverted,
     });
     this.emit('clip-updated', { volume });
-
-    console.log(`[ClipTool] Clip ${id} ${inverted ? 'inverted' : 'normal'}`);
   }
 
   /**
@@ -399,15 +382,12 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   setClipMode(id: string, mode: ClipMode): void {
     const volume = this.clipVolumes.get(id);
     if (!volume) {
-      console.warn(`[ClipTool] Clip volume not found: ${id}`);
       return;
     }
 
     volume.mode = mode;
 
     this.emit('clip-updated', { volume });
-
-    console.log(`[ClipTool] Clip ${id} mode set to ${mode}`);
   }
 
   /**
@@ -420,7 +400,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   updateBoxClip(id: string, box: THREE.Box3, matrix?: THREE.Matrix4): void {
     const volume = this.clipVolumes.get(id);
     if (!volume || volume.type !== 'box') {
-      console.warn(`[ClipTool] Box clip volume not found: ${id}`);
       return;
     }
 
@@ -444,7 +423,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   updatePlaneClip(id: string, plane: THREE.Plane): void {
     const volume = this.clipVolumes.get(id);
     if (!volume || volume.type !== 'plane') {
-      console.warn(`[ClipTool] Plane clip volume not found: ${id}`);
       return;
     }
 
@@ -656,7 +634,6 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
   clearAllClips(): void {
     const ids = Array.from(this.clipVolumes.keys());
     ids.forEach((id) => this.removeClip(id));
-    console.log('[ClipTool] All clips cleared');
   }
 
   /**
@@ -691,7 +668,7 @@ export class AdvancedClipTool extends TypedEventEmitter<ClipToolEvents> {
             max: (volume as BoxClipVolume).box.max.toArray(),
           };
           if ((volume as BoxClipVolume).matrix) {
-            clips[id].matrix = (volume as BoxClipVolume).matrix!.toArray();
+            clips[id].matrix = (volume as BoxClipVolume).matrix?.toArray();
           }
           break;
 

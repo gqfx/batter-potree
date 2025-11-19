@@ -48,7 +48,6 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
         (attr): attr is string => typeof attr === 'string',
       );
     } else {
-      console.warn('Invalid pointAttributes format:', cloudjs.pointAttributes);
       attributeNames = [];
     }
 
@@ -69,27 +68,16 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
       }
     }
   } else {
-    // Potree 2.0+ format
-    // Try both 'attributes' (new format) and 'pointAttributes' (old format)
-    console.log('[parseAttributes] Checking for attributes in cloudjs:', {
-      hasAttributes: 'attributes' in cloudjs,
-      hasPointAttributes: 'pointAttributes' in cloudjs,
-      attributesValue: (cloudjs as any).attributes,
-      pointAttributesValue: cloudjs.pointAttributes,
-    });
 
     const attributeSource = (cloudjs as any).attributes || cloudjs.pointAttributes;
 
     if (Array.isArray(attributeSource)) {
-      console.log('[parseAttributes] Found attribute source with', attributeSource.length, 'attributes');
       // For Potree 2.0+, should be IPotreeAttributeMetadata[]
       const attrs = attributeSource.filter(
         (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr,
       );
       pointAttributes.push(...attrs);
-      console.log('[parseAttributes] Parsed', attrs.length, 'valid attributes');
     } else {
-      console.warn('Invalid pointAttributes format for Potree 2.0+:', attributeSource);
     }
   }
 
@@ -115,12 +103,10 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
     const numElements = jsAttribute.numElements ?? jsAttribute.elements;
 
     if (!type) {
-      console.warn(`Unknown attribute type: ${jsAttribute.type}`);
       continue;
     }
 
     if (numElements === undefined) {
-      console.warn(`Attribute ${name} missing numElements/elements field`);
       continue;
     }
 

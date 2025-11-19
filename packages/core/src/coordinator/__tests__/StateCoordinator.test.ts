@@ -16,7 +16,7 @@ import { StateCoordinator } from '../StateCoordinator.js';
  */
 class MockOctreeManager {
   public loadedOctrees = new Set<string>();
-  public loadOctree = vi.fn((sourceId: string, url: string, type: string) => {
+  public loadOctree = vi.fn((sourceId: string, _url: string, _type: string) => {
     this.loadedOctrees.add(sourceId);
     return Promise.resolve();
   });

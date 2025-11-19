@@ -20,7 +20,6 @@
  */
 
 import * as THREE from 'three';
-import type { PointAttributes } from '../attributes/PointAttributes.js';
 import type { OctreeNode } from './OctreeNode.js';
 import { PointCloudOctree } from './PointCloudOctree.js';
 import type { OctreeMetadata, OctreeStats } from './types.js';

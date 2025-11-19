@@ -1,6 +1,6 @@
 import { defineConfig } from '@rsbuild/core';
 import { pluginTypeCheck } from '@rsbuild/plugin-type-check';
-import path from 'path';
+import path from 'node:path';
 
 export default defineConfig({
   plugins: [pluginTypeCheck()],
@@ -19,19 +19,19 @@ export default defineConfig({
   dev: {
     // 使用 setupMiddlewares 添加静态文件服务
     setupMiddlewares: [
-      (middlewares, server) => {
-        const fs = require('fs');
-        const pathModule = require('path');
+      (middlewares, _server) => {
+        const fs = require('node:fs');
+        const pathModule = require('node:path');
 
         // 在所有中间件之前添加
         middlewares.unshift((req: any, res: any, next: any) => {
-          if (req.url && req.url.startsWith('/pointcloud/')) {
+          if (req.url?.startsWith('/pointcloud/')) {
             const filePath = req.url.replace('/pointcloud', 'D:/3d_models/pointcloud');
 
             // 检查路径是否存在
             if (!fs.existsSync(filePath)) {
               res.statusCode = 404;
-              res.end('File not found: ' + filePath);
+              res.end(`File not found: ${filePath}`);
               return;
             }
 

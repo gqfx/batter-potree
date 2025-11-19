@@ -34,7 +34,8 @@
         "noUselessCatch": "error",
         "noUselessTypeConstraint": "error",
         "noAdjacentSpacesInRegex": "error",
-        "noArguments": "error"
+        "noArguments": "error",
+        "noStaticOnlyClass": "warn"
       },
       "correctness": {
         "noConstAssign": "error",
@@ -64,7 +65,8 @@
       },
       "style": {
         "useConst": "error",
-        "useTemplate": "warn"
+        "useTemplate": "warn",
+        "noNonNullAssertion": "warn"
       },
       "suspicious": {
         "noAsyncPromiseExecutor": "error",
@@ -100,12 +102,19 @@
   },
   "overrides": [
     {
-      "includes": ["**/__tests__/**", "**/playground/**"],
+      "includes": ["**/__tests__/**", "**/playground/**", "**/benchmarks/**", "**/poc/**", "**/examples/**"],
       "linter": {
         "rules": {
           "suspicious": {
             "noConsole": "off",
-            "noExplicitAny": "off"
+            "noExplicitAny": "off",
+            "noEmptyBlockStatements": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
+          },
+          "complexity": {
+            "noStaticOnlyClass": "off"
           }
         }
       }

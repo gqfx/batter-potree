@@ -3,8 +3,7 @@
  */
 
 import type { IPotreeAttributeMetadata, IPotreeMetadata } from '@better-potree/core';
-import { PointAttributeDataType } from '@better-potree/core';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseAttributes } from '../parseAttributes';
 
 describe('parseAttributes', () => {

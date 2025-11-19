@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { IBuffer } from '../src/interfaces/IBuffer';
 import type { IMaterial } from '../src/interfaces/IMaterial';
 import type { IRenderer } from '../src/interfaces/IRenderer';
-import type { RenderObject, RenderSystemConfig } from '../src/systems/RenderSystem';
+import type { RenderObject, } from '../src/systems/RenderSystem';
 import { RenderSystem, SystemStage } from '../src/systems/RenderSystem';
 import type { Matrix4 } from '../src/types/common';
 
@@ -181,9 +181,9 @@ describe('RenderSystem', () => {
   });
 
   it('应该能够初始化渲染系统', () => {
-    expect(renderSystem['isInitialized']).toBe(false);
+    expect(renderSystem.isInitialized).toBe(false);
     renderSystem.initialize();
-    expect(renderSystem['isInitialized']).toBe(true);
+    expect(renderSystem.isInitialized).toBe(true);
   });
 
   it('应该能够添加和移除渲染对象', () => {
@@ -199,10 +199,10 @@ describe('RenderSystem', () => {
     };
 
     renderSystem.addRenderObject(obj);
-    expect(renderSystem['renderQueue'].opaque.length).toBe(1);
+    expect(renderSystem.renderQueue.opaque.length).toBe(1);
 
     renderSystem.removeRenderObject(obj);
-    expect(renderSystem['renderQueue'].opaque.length).toBe(0);
+    expect(renderSystem.renderQueue.opaque.length).toBe(0);
   });
 
   it('应该能够区分不透明和透明对象', () => {
@@ -228,8 +228,8 @@ describe('RenderSystem', () => {
     renderSystem.addRenderObject(opaqueObj);
     renderSystem.addRenderObject(transparentObj);
 
-    expect(renderSystem['renderQueue'].opaque.length).toBe(1);
-    expect(renderSystem['renderQueue'].transparent.length).toBe(1);
+    expect(renderSystem.renderQueue.opaque.length).toBe(1);
+    expect(renderSystem.renderQueue.transparent.length).toBe(1);
   });
 
   it('应该能够执行渲染循环', () => {
@@ -264,11 +264,11 @@ describe('RenderSystem', () => {
     };
 
     renderSystem.addRenderObject(obj);
-    expect(renderSystem['renderQueue'].opaque.length).toBe(1);
+    expect(renderSystem.renderQueue.opaque.length).toBe(1);
 
     renderSystem.clearRenderQueue();
-    expect(renderSystem['renderQueue'].opaque.length).toBe(0);
-    expect(renderSystem['renderQueue'].transparent.length).toBe(0);
+    expect(renderSystem.renderQueue.opaque.length).toBe(0);
+    expect(renderSystem.renderQueue.transparent.length).toBe(0);
   });
 
   it('应该能够获取渲染器', () => {
@@ -291,7 +291,7 @@ describe('RenderSystem', () => {
     renderSystem.addRenderObject(obj);
     renderSystem.destroy();
 
-    expect(renderSystem['renderQueue'].opaque.length).toBe(0);
-    expect(renderSystem['isInitialized']).toBe(false);
+    expect(renderSystem.renderQueue.opaque.length).toBe(0);
+    expect(renderSystem.isInitialized).toBe(false);
   });
 });

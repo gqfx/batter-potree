@@ -244,7 +244,6 @@ export class EDLRenderer {
 
     // Check that depth texture exists
     if (!this.rtEDL.depthTexture) {
-      console.error('[EDLRenderer] Depth texture is null, cannot apply EDL');
       this.renderer.setRenderTarget(oldTarget);
       this.renderer.autoClear = oldAutoClear;
       return;

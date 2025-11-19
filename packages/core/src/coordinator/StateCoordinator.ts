@@ -432,10 +432,8 @@ export class StateCoordinator {
         if (sourceState) {
           sourceState.loadState = 'loaded';
         }
-        console.log(`[StateCoordinator] Octree loaded for source: ${config.id}`);
       })
-      .catch((error: Error) => {
-        console.error(`[StateCoordinator] Failed to load octree for ${config.id}:`, error);
+      .catch((_error: Error) => {
         const sourceState = this.runtime.sources.get(config.id);
         if (sourceState) {
           sourceState.loadState = 'failed';

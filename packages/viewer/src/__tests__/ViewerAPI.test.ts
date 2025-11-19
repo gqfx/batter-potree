@@ -10,7 +10,6 @@ import { ViewerAPI } from '../ViewerAPI';
 // Mock implementations
 class MockRenderer implements IRenderer {
   private domElement: HTMLCanvasElement;
-  private disposed = false;
 
   constructor() {
     this.domElement = document.createElement('canvas');
@@ -101,7 +100,7 @@ describe('ViewerAPI', () => {
 
   afterEach(() => {
     // Cleanup
-    if (container && container.parentElement) {
+    if (container?.parentElement) {
       document.body.removeChild(container);
     }
     vi.unstubAllGlobals();

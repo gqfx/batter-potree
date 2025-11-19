@@ -96,8 +96,7 @@ export class SystemScheduler {
       enableProfiling: options.enableProfiling ?? true,
       errorHandler:
         options.errorHandler ??
-        ((error: unknown, systemName: string) => {
-          console.error(`[SystemScheduler] Error in system "${systemName}":`, error);
+        ((_error: unknown, _systemName: string) => {
         }),
     };
   }

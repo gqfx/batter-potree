@@ -85,7 +85,6 @@ export class WorkerPool {
     event: MessageEvent<IWorkerDecodeResponse>,
   ): void {
     if (!instance.currentTask) {
-      console.warn('Received message from worker without current task');
       return;
     }
 
@@ -108,7 +107,6 @@ export class WorkerPool {
    * Handle worker error
    */
   private handleWorkerError(instance: WorkerInstance, error: ErrorEvent): void {
-    console.error('Worker error:', error);
 
     if (instance.currentTask) {
       instance.currentTask.reject(new Error(`Worker error: ${error.message || 'Unknown error'}`));

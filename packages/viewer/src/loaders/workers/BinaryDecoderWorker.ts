@@ -251,7 +251,6 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       const getter = getterMap[pointAttribute.type.name as keyof typeof getterMap];
 
       if (!getter) {
-        console.warn(`Unknown attribute type: ${pointAttribute.type.name}`);
         inOffset += pointAttribute.byteSize;
         continue;
       }
@@ -420,7 +419,6 @@ self.onmessage = (event: MessageEvent) => {
       (self as any).postMessage(result, { transfer: transferables });
     }
   } catch (error) {
-    console.error('Worker decode error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     if ('taskId' in event.data) {

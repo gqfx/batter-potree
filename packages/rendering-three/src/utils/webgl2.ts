@@ -24,7 +24,7 @@ export function isWebGL2Available(): boolean {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('webgl2');
     return context !== null;
-  } catch (e) {
+  } catch (_e) {
     return false;
   }
 }

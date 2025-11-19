@@ -15,7 +15,6 @@ class MockRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
   private context: WebGL2RenderingContext;
   private viewport: Viewport;
-  private clearColor: Color = { r: 0, g: 0, b: 0, a: 1 };
   private viewMatrix: Matrix4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
   private projectionMatrix: Matrix4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 

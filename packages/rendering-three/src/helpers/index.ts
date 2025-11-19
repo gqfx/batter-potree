@@ -136,10 +136,6 @@ export class MeasurementHelper extends THREE.Group {
   private lines: THREE.Line[] = [];
   private points: THREE.Points[] = [];
 
-  constructor() {
-    super();
-  }
-
   /**
    * Add a point marker
    */
@@ -206,10 +202,6 @@ export class MeasurementHelper extends THREE.Group {
  */
 export class AnnotationHelper extends THREE.Group {
   private labels: THREE.Sprite[] = [];
-
-  constructor() {
-    super();
-  }
 
   /**
    * Add an annotation label

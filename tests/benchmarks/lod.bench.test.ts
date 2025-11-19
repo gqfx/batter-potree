@@ -56,10 +56,6 @@ describe('LOD Performance Benchmarks', () => {
       },
     );
 
-    console.log(`\nLOD Selection Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
-
     // 验证性能要求：LOD 选择应该 < 5ms
     expect(result.avgTime).toBeLessThan(5);
   });
@@ -103,10 +99,6 @@ describe('LOD Performance Benchmarks', () => {
       },
     );
 
-    console.log(`\nFrustum Culling Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
-
     expect(result.avgTime).toBeLessThan(2);
   });
 
@@ -142,10 +134,6 @@ describe('LOD Performance Benchmarks', () => {
         pointBudget.allocate(nodes);
       },
     );
-
-    console.log(`\nPoint Budget Allocation Benchmark:`);
-    console.log(`  Average time: ${result.avgTime.toFixed(2)}ms`);
-    console.log(`  Ops/sec: ${result.opsPerSecond.toFixed(0)}`);
 
     expect(result.avgTime).toBeLessThan(3);
   });

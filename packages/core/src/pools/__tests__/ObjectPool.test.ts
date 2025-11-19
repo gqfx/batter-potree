@@ -2,7 +2,7 @@
  * ObjectPool 测试
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ObjectPool } from '../ObjectPool.js';
 import type { Poolable } from '../types.js';
 
@@ -201,7 +201,7 @@ describe('ObjectPool', () => {
       const pool = new ObjectPool(() => ({}));
 
       const obj1 = pool.acquire();
-      const obj2 = pool.acquire();
+      const _obj2 = pool.acquire();
       pool.release(obj1);
 
       const stats = pool.getStats();

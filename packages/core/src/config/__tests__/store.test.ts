@@ -153,8 +153,8 @@ describe('ConfigStore', () => {
       state.removeSource('toRemove');
 
       const newState = store.getState();
-      expect(newState.sources['toRemove']).toBeUndefined();
-      expect(newState.sources['toKeep']).toBeDefined();
+      expect(newState.sources.toRemove).toBeUndefined();
+      expect(newState.sources.toKeep).toBeDefined();
     });
 
     it('删除不存在的数据源不应报错', () => {
@@ -209,8 +209,8 @@ describe('ConfigStore', () => {
       state.updateSource('test', { visible: false });
 
       const newState = store.getState();
-      expect(newState.sources['test'].visible).toBe(false);
-      expect(newState.sources['test'].url).toBe('/test.json'); // 其他属性不变
+      expect(newState.sources.test.visible).toBe(false);
+      expect(newState.sources.test.url).toBe('/test.json'); // 其他属性不变
     });
 
     it('更新不存在的数据源应该打印警告', () => {
@@ -238,7 +238,7 @@ describe('ConfigStore', () => {
 
       const oldState = store.getState();
       const oldSources = oldState.sources;
-      const oldSource = oldSources['test'];
+      const oldSource = oldSources.test;
 
       oldState.updateSource('test', { visible: false });
 
@@ -247,7 +247,7 @@ describe('ConfigStore', () => {
       // sources 引用应该不同
       expect(newState.sources).not.toBe(oldSources);
       // source 引用应该不同
-      expect(newState.sources['test']).not.toBe(oldSource);
+      expect(newState.sources.test).not.toBe(oldSource);
       // 旧对象不应该被修改
       expect(oldSource.visible).toBe(true);
     });
@@ -271,8 +271,8 @@ describe('ConfigStore', () => {
       });
 
       const newState = store.getState();
-      expect(newState.sources['test'].visible).toBe(false);
-      expect(newState.sources['test'].materialId).toBe('custom-material');
+      expect(newState.sources.test.visible).toBe(false);
+      expect(newState.sources.test.materialId).toBe('custom-material');
     });
   });
 
@@ -389,8 +389,8 @@ describe('ConfigStore', () => {
       state.removeMaterial('toRemove');
 
       const newState = store.getState();
-      expect(newState.materials['toRemove']).toBeUndefined();
-      expect(newState.materials['toKeep']).toBeDefined();
+      expect(newState.materials.toRemove).toBeUndefined();
+      expect(newState.materials.toKeep).toBeDefined();
     });
 
     it('删除不存在的材质不应报错', () => {
@@ -444,8 +444,8 @@ describe('ConfigStore', () => {
       state.updateMaterial('test', { size: 2.0 });
 
       const newState = store.getState();
-      expect(newState.materials['test'].size).toBe(2.0);
-      expect(newState.materials['test'].colorEncoding).toBe('RGB'); // 其他属性不变
+      expect(newState.materials.test.size).toBe(2.0);
+      expect(newState.materials.test.colorEncoding).toBe('RGB'); // 其他属性不变
     });
 
     it('更新不存在的材质应该打印警告', () => {
@@ -472,7 +472,7 @@ describe('ConfigStore', () => {
 
       const oldState = store.getState();
       const oldMaterials = oldState.materials;
-      const oldMaterial = oldMaterials['test'];
+      const oldMaterial = oldMaterials.test;
 
       oldState.updateMaterial('test', { size: 2.0 });
 
@@ -481,7 +481,7 @@ describe('ConfigStore', () => {
       // materials 引用应该不同
       expect(newState.materials).not.toBe(oldMaterials);
       // material 引用应该不同
-      expect(newState.materials['test']).not.toBe(oldMaterial);
+      expect(newState.materials.test).not.toBe(oldMaterial);
       // 旧对象不应该被修改
       expect(oldMaterial.size).toBe(1.0);
     });
@@ -505,8 +505,8 @@ describe('ConfigStore', () => {
       });
 
       const newState = store.getState();
-      expect(newState.materials['test'].size).toBe(2.0);
-      expect(newState.materials['test'].colorEncoding).toBe('INTENSITY');
+      expect(newState.materials.test.size).toBe(2.0);
+      expect(newState.materials.test.colorEncoding).toBe('INTENSITY');
     });
   });
 

@@ -253,8 +253,6 @@ describe('POC - 分层状态管理', () => {
 
       // 验证性能 (应该非常快，远小于 100ms)
       expect(duration).toBeLessThan(100);
-
-      console.log(`[POC] 1000 次高频更新耗时: ${duration.toFixed(2)}ms`);
     });
 
     it('模拟 10000 次 Runtime.loadedNodes 更新', () => {
@@ -285,8 +283,6 @@ describe('POC - 分层状态管理', () => {
 
       // 验证性能
       expect(duration).toBeLessThan(500);
-
-      console.log(`[POC] 10000 次 loadedNodes 更新耗时: ${duration.toFixed(2)}ms`);
     });
   });
 

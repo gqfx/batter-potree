@@ -141,7 +141,6 @@ export class ObjectPool<T> {
    */
   release(obj: T): void {
     if (this.inUseCount <= 0) {
-      console.warn('ObjectPool: Attempted to release more objects than acquired');
       return;
     }
 

@@ -425,11 +425,6 @@ export class StreamingSystem implements ISystem {
 
       // For Potree 2.0, we need to read a byte range from octree.bin
       if (node.byteOffset !== undefined && node.byteSize !== undefined) {
-        console.log('[StreamingSystem] Loading Potree 2.0 node with byte range:', {
-          path: relativePath,
-          byteOffset: node.byteOffset,
-          byteSize: node.byteSize,
-        });
 
         // Load the entire octree.bin and slice the needed portion
         // TODO: Implement more efficient range reading for File System API
@@ -445,11 +440,6 @@ export class StreamingSystem implements ISystem {
     if (node.byteOffset !== undefined && node.byteSize !== undefined) {
       const headers = new Headers();
       headers.set('Range', `bytes=${node.byteOffset}-${node.byteOffset + node.byteSize - 1}`);
-
-      console.log('[StreamingSystem] Fetching Potree 2.0 node with Range header:', {
-        url,
-        range: `bytes=${node.byteOffset}-${node.byteOffset + node.byteSize - 1}`,
-      });
 
       const response = await fetch(url, { signal, headers });
       if (!response.ok && response.status !== 206) {
@@ -510,8 +500,7 @@ export class StreamingSystem implements ISystem {
 
       // 处理解码后的数据
       await this.processDecodedData(request, decodedData, startTime);
-    } catch (error) {
-      console.error('[StreamingSystem] Worker decode error:', error);
+    } catch (_error) {
       // Worker 解码失败，回退到同步解码
       return this.processLoadComplete(request, buffer, startTime);
     }
@@ -529,12 +518,6 @@ export class StreamingSystem implements ISystem {
     decodedData: IWorkerDecodeResponse,
     startTime: number,
   ): Promise<void> {
-    console.log('[StreamingSystem] Worker 解码完成:', {
-      节点: request.node.name,
-      点数: decodedData.numPoints,
-      属性数: Object.keys(decodedData.attributeBuffers).length,
-      耗时: `${(performance.now() - startTime).toFixed(2)}ms`,
-    });
 
     // 从活动加载中移除
     const key = this.getNodeKey(request.octree, request.node);
@@ -585,12 +568,6 @@ export class StreamingSystem implements ISystem {
   ): Promise<void> {
     const key = this.getNodeKey(request.octree, request.node);
 
-    console.log('[StreamingSystem] 节点数据加载完成:', {
-      节点: request.node.name,
-      数据大小: buffer.byteLength,
-      耗时: `${(performance.now() - startTime).toFixed(2)}ms`,
-    });
-
     // 从活动加载中移除
     this.activeLoads.delete(key);
 
@@ -616,12 +593,6 @@ export class StreamingSystem implements ISystem {
     // 标记节点为已加载
     (request.node as { loaded: boolean; loading: boolean }).loaded = true;
     (request.node as { loading: boolean }).loading = false;
-
-    console.log('[StreamingSystem] 节点数据解码完成:', {
-      节点: request.node.name,
-      点数: decodedData.numPoints,
-      属性数: Object.keys(decodedData.attributeBuffers).length,
-    });
 
     // 触发完成事件
     if (this.onLoadComplete) {
@@ -735,7 +706,7 @@ export class StreamingSystem implements ISystem {
         }
 
         // Store as 'rgba' for compatibility with rendering system
-        attributeBuffers['rgba'] = {
+        attributeBuffers.rgba = {
           buffer: colors.buffer,
           attribute: pointAttribute,
         };
@@ -806,19 +777,11 @@ export class StreamingSystem implements ISystem {
       // octree.url 对于 Potree 2.0 是空字符串或 '/'
       // 需要从基础 URL 构建 octree.bin 路径
       const url = `${octree.url}octree.bin`;
-      console.log('[StreamingSystem] buildNodeUrl (Potree 2.0):', {
-        octreeUrl: octree.url,
-        nodeName: node.name,
-        byteOffset: node.byteOffset,
-        byteSize: node.byteSize,
-        resultUrl: url
-      });
       return url;
     }
 
     // Potree 1.x format
     const url = `${octree.url}${node.name}.bin`;
-    console.log('[StreamingSystem] buildNodeUrl (Potree 1.x):', { octreeUrl: octree.url, nodeName: node.name, resultUrl: url });
     return url;
   }
 

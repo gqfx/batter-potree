@@ -136,7 +136,6 @@ export class ClassificationScheme {
    */
   setClassColor(classId: number, color: THREE.Color, name?: string): void {
     if (classId < 0 || classId > 255) {
-      console.warn(`Classification ID ${classId} out of range [0, 255]`);
       return;
     }
 
@@ -169,7 +168,6 @@ export class ClassificationScheme {
    */
   setClassVisible(classId: number, visible: boolean): void {
     if (classId < 0 || classId > 255) {
-      console.warn(`Classification ID ${classId} out of range [0, 255]`);
       return;
     }
 

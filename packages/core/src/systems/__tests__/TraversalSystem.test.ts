@@ -3,7 +3,7 @@
  */
 
 import * as THREE from 'three';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, } from 'vitest';
 import type { IPointCloudOctree, IPointCloudOctreeNode } from '../../types/potree.js';
 import { TraversalSystem } from '../TraversalSystem.js';
 
@@ -195,7 +195,7 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(5, 5, 5),
         1000,
       );
-      mockOctree.root!.children[0] = child;
+      mockOctree.root?.children[0] = child;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -222,8 +222,8 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(5, 5, -8),
         1000,
       );
-      mockOctree.root!.children[0] = nearChild;
-      mockOctree.root!.children[1] = farChild;
+      mockOctree.root?.children[0] = nearChild;
+      mockOctree.root?.children[1] = farChild;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -292,9 +292,9 @@ describe('TraversalSystem', () => {
         1500,
       );
 
-      mockOctree.root!.children[0] = child1;
-      mockOctree.root!.children[1] = child2;
-      mockOctree.root!.children[2] = child3;
+      mockOctree.root?.children[0] = child1;
+      mockOctree.root?.children[1] = child2;
+      mockOctree.root?.children[2] = child3;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -324,8 +324,8 @@ describe('TraversalSystem', () => {
         3000,
       );
 
-      mockOctree.root!.children[0] = child1;
-      mockOctree.root!.children[1] = child2;
+      mockOctree.root?.children[0] = child1;
+      mockOctree.root?.children[1] = child2;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -356,8 +356,8 @@ describe('TraversalSystem', () => {
         1000,
       );
 
-      mockOctree.root!.children[0] = nearChild;
-      mockOctree.root!.children[1] = farChild;
+      mockOctree.root?.children[0] = nearChild;
+      mockOctree.root?.children[1] = farChild;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -383,7 +383,7 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(5, 5, 5),
         1000,
       );
-      mockOctree.root!.children[0] = child;
+      mockOctree.root?.children[0] = child;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -412,7 +412,7 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(1, 1, 1),
         500,
       );
-      mockOctree.root!.children[0] = smallChild;
+      mockOctree.root?.children[0] = smallChild;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -438,8 +438,8 @@ describe('TraversalSystem', () => {
         1000,
       );
 
-      mockOctree.root!.children[0] = child1;
-      mockOctree.root!.children[1] = child2;
+      mockOctree.root?.children[0] = child1;
+      mockOctree.root?.children[1] = child2;
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);

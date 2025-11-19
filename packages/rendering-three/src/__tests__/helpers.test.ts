@@ -3,7 +3,7 @@
  */
 
 import * as THREE from 'three';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   AnnotationHelper,
   BoundingBoxHelper,

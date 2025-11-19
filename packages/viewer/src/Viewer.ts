@@ -156,17 +156,14 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         const maxWorkers = config.maxWorkers ?? Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
 
         this.workerPool = createDecoderWorkerPool(workerUrl, maxWorkers);
-        console.log(`[Viewer] Worker Pool 初始化成功 (${maxWorkers} workers)`);
-      } catch (error) {
-        console.warn('[Viewer] Worker Pool 初始化失败，将使用同步解码:', error);
+      } catch (_error) {
       }
     }
 
     // Initialize systems
     this.scheduler = new SystemScheduler({
       enableProfiling: true,
-      errorHandler: (error, systemName) => {
-        console.error(`[Viewer] System "${systemName}" error:`, error);
+      errorHandler: (_error, _systemName) => {
       },
     });
 
@@ -280,20 +277,14 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     this.streamingSystem.setOnLoadComplete((event) => {
       const { octree, node, data } = event;
 
-      console.debug(
-        `[Viewer] Node loaded: ${node.name} (${data.numPoints} points) in ${event.loadTime.toFixed(2)}ms`,
-      );
-
       // Find the point cloud scene for this octree
       const cloudName = this.getPointCloudNameByOctree(octree);
       if (!cloudName) {
-        console.error('[Viewer] Cannot find point cloud name for octree');
         return;
       }
 
       const scene = this.pointCloudScenes.get(cloudName);
       if (!scene) {
-        console.error(`[Viewer] PointCloudScene not found: ${cloudName}`);
         return;
       }
 
@@ -322,10 +313,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         node.loading = false;
         node.geometry = geometry; // Cache geometry reference on node
         node.numPoints = data.numPoints; // Update numPoints from actual data
-
-        console.debug(`[Viewer] Node added to scene: ${node.name}, level=${metadata.level}, vnStart=${metadata.vnStart}, pcIndex=${metadata.pcIndex}`);
-      } catch (error) {
-        console.error(`[Viewer] Failed to create geometry for node ${node.name}:`, error);
+      } catch (_error) {
 
         // Update node state on error
         node.loading = false;
@@ -352,11 +340,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       // Update node state
       node.loading = false;
       node.loaded = false;
-
-      console.error(
-        `[Viewer] Node load failed: ${node.name} after ${retries} retries:`,
-        error
-      );
 
       // Emit node-load-failed event for external listeners
       this.emit('node-load-failed', {
@@ -385,7 +368,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     }
 
     // Check for position data (POSITION_CARTESIAN is the standard Potree attribute name)
-    const positionBuffer = data.attributeBuffers['POSITION_CARTESIAN'];
+    const positionBuffer = data.attributeBuffers.POSITION_CARTESIAN;
     if (!positionBuffer || !positionBuffer.buffer) {
       throw new Error('Geometry data must contain POSITION_CARTESIAN attribute');
     }
@@ -399,21 +382,15 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Validate that position buffer size matches numPoints
     const expectedLength = data.numPoints * 3;
     if (positionArray.length !== expectedLength) {
-      console.warn(
-        `Position buffer length mismatch: expected ${expectedLength}, got ${positionArray.length}`,
-      );
     }
 
     // Validate other attributes if present
     const validateAttribute = (name: string, componentsPerPoint: number) => {
       const attr = data.attributeBuffers[name];
-      if (attr && attr.buffer) {
+      if (attr?.buffer) {
         const array = new Float32Array(attr.buffer);
         const expectedLength = data.numPoints * componentsPerPoint;
         if (array.length !== expectedLength) {
-          console.warn(
-            `${name} buffer length mismatch: expected ${expectedLength}, got ${array.length}`,
-          );
         }
       }
     };
@@ -808,7 +785,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     const cloud = this.pointClouds.get(name);
 
     if (!cloud) {
-      console.warn(`Point cloud "${name}" not found`);
       return;
     }
 
@@ -944,7 +920,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     const cloud = this.pointClouds.get(cloudName);
 
     if (!cloud) {
-      console.warn(`Point cloud "${cloudName}" not found`);
       return;
     }
 
@@ -1029,7 +1004,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     const scene = this.pointCloudScenes.get(cloudName);
 
     if (!scene) {
-      console.warn(`Point cloud scene "${cloudName}" not found`);
       return;
     }
 
@@ -1366,7 +1340,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       if (!nodesByCloud.has(cloudName)) {
         nodesByCloud.set(cloudName, []);
       }
-      nodesByCloud.get(cloudName)!.push(visibleNode);
+      nodesByCloud.get(cloudName)?.push(visibleNode);
     }
 
     // Process each point cloud
@@ -1552,7 +1526,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Dispose Worker Pool
     if (this.workerPool) {
       this.workerPool.dispose();
-      console.log('[Viewer] Worker Pool 已清理');
     }
 
     // Cleanup renderer

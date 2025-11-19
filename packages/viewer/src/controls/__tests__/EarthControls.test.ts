@@ -20,7 +20,7 @@ class MockHTMLElement {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
-    this.listeners.get(type)!.add(listener);
+    this.listeners.get(type)?.add(listener);
   }
 
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
@@ -57,7 +57,7 @@ const mockDocument = {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
-    this.listeners.get(type)!.add(listener);
+    this.listeners.get(type)?.add(listener);
   },
 
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
@@ -173,9 +173,9 @@ describe('EarthControls', () => {
       controls.setPivot(pivot);
 
       expect(controls.pivot).toBeInstanceOf(THREE.Vector3);
-      expect(controls.pivot!.x).toBe(5);
-      expect(controls.pivot!.y).toBe(5);
-      expect(controls.pivot!.z).toBe(5);
+      expect(controls.pivot?.x).toBe(5);
+      expect(controls.pivot?.y).toBe(5);
+      expect(controls.pivot?.z).toBe(5);
     });
 
     it('should clone the pivot point', () => {
@@ -184,9 +184,9 @@ describe('EarthControls', () => {
 
       pivot.set(9, 9, 9);
 
-      expect(controls.pivot!.x).toBe(1);
-      expect(controls.pivot!.y).toBe(2);
-      expect(controls.pivot!.z).toBe(3);
+      expect(controls.pivot?.x).toBe(1);
+      expect(controls.pivot?.y).toBe(2);
+      expect(controls.pivot?.z).toBe(3);
     });
   });
 

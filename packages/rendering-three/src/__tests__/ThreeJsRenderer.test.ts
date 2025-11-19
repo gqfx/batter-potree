@@ -4,7 +4,7 @@
 
 import type { IScene } from '@better-potree/core';
 import * as THREE from 'three';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ThreeJsRenderer, ThreeScene } from '../ThreeJsRenderer';
 
 describe('ThreeJsRenderer', () => {

@@ -17,7 +17,6 @@
  */
 
 import type * as THREE from 'three';
-import type { PointCloudViewer } from '../PointCloudViewer.js';
 
 /**
  * 测量类型
@@ -66,23 +65,12 @@ export class MeasurementTool {
   private onCompleteCallback?: (result: MeasurementResult) => void;
 
   /**
-   * 创建测量工具
-   *
-   * @param _viewer - 点云查看器（保留用于未来扩展）
-   * @param _config - 配置选项（保留用于未来扩展）
-   */
-  constructor(_viewer: PointCloudViewer, _config: MeasurementToolConfig = {}) {
-    // 占位符实现 - 将在Phase 3中完善
-  }
-
-  /**
    * 开始距离测量
    */
   startDistanceMeasurement(): void {
     this.currentType = 'distance';
     this.isActive = true;
     this.points = [];
-    console.log('Distance measurement started. Click two points to measure.');
   }
 
   /**
@@ -92,7 +80,6 @@ export class MeasurementTool {
     this.currentType = 'area';
     this.isActive = true;
     this.points = [];
-    console.log('Area measurement started. Click points to define polygon.');
   }
 
   /**

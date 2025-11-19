@@ -4,7 +4,6 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OctreeManager } from '../OctreeManager.js';
-import { OctreeNode } from '../OctreeNode.js';
 import * as utils from '../utils.js';
 
 // Mock metadata response

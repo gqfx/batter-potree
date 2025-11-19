@@ -82,7 +82,7 @@ export interface MeasurementToolEvents {
   /** Fired when measurement completes */
   'measurement-complete': MeasurementResult;
   /** Fired when measurement is cancelled */
-  'measurement-cancelled': void;
+  'measurement-cancelled': undefined;
   [key: string]: any;
 }
 
@@ -184,8 +184,6 @@ export class AdvancedMeasurementTool extends TypedEventEmitter<MeasurementToolEv
     this.currentPoints = [];
 
     this.emit('measurement-started', { type });
-
-    console.log(`[MeasurementTool] Started ${type} measurement`);
   }
 
   /**
@@ -195,7 +193,6 @@ export class AdvancedMeasurementTool extends TypedEventEmitter<MeasurementToolEv
    */
   addPoint(point: THREE.Vector3): void {
     if (!this.isActive || !this.currentType) {
-      console.warn('[MeasurementTool] No active measurement');
       return;
     }
 
@@ -258,7 +255,6 @@ export class AdvancedMeasurementTool extends TypedEventEmitter<MeasurementToolEv
     }
 
     if (this.currentPoints.length === 0) {
-      console.warn('[MeasurementTool] No points to measure');
       return;
     }
 
@@ -272,8 +268,6 @@ export class AdvancedMeasurementTool extends TypedEventEmitter<MeasurementToolEv
 
     this.measurements.set(id, finalResult);
     this.emit('measurement-complete', finalResult);
-
-    console.log('[MeasurementTool] Measurement complete:', finalResult);
 
     // Reset state
     this.isActive = false;
@@ -296,8 +290,6 @@ export class AdvancedMeasurementTool extends TypedEventEmitter<MeasurementToolEv
     this.clearVisualization();
 
     this.emit('measurement-cancelled', undefined);
-
-    console.log('[MeasurementTool] Measurement cancelled');
   }
 
   /**

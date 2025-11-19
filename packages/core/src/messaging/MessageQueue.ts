@@ -208,16 +208,13 @@ export class MessageQueue<T extends BaseMessage = BaseMessage> {
           for (const handler of handlers) {
             try {
               handler(message);
-            } catch (error) {
-              // 错误隔离：单个处理器失败不影响其他处理器
-              console.error(`MessageQueue: Handler error for type "${message.type}":`, error);
+            } catch (_error) {
             }
           }
         }
 
         processed++;
-      } catch (error) {
-        console.error('MessageQueue: Process error:', error);
+      } catch (_error) {
       }
     }
 

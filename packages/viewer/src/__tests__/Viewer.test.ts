@@ -254,7 +254,7 @@ describe('Viewer', () => {
     });
 
     it('should append canvas to container', () => {
-      const viewer = new Viewer({
+      const _viewer = new Viewer({
         container,
         renderer,
         scene,
@@ -264,7 +264,7 @@ describe('Viewer', () => {
     });
 
     it('should set renderer size to container size', () => {
-      const viewer = new Viewer({
+      const _viewer = new Viewer({
         container,
         renderer,
         scene,
@@ -523,7 +523,7 @@ describe('Viewer', () => {
 
       // Also add to traversal system to match real behavior
       const traversalSystem = viewer.getTraversalSystem();
-      const addSpy = vi.spyOn(traversalSystem, 'addPointCloud');
+      const _addSpy = vi.spyOn(traversalSystem, 'addPointCloud');
       const removeSpy = vi.spyOn(traversalSystem, 'removePointCloud');
 
       viewer.remove('test');
@@ -1124,7 +1124,7 @@ describe('Viewer', () => {
     });
 
     it('should update renderer size on resize', () => {
-      const viewer = new Viewer({
+      const _viewer = new Viewer({
         container,
         renderer,
         scene,
@@ -2557,8 +2557,8 @@ describe('Viewer', () => {
 
       expect(geometry.boundingBox).toBeDefined();
       expect(geometry.boundingSphere).toBeDefined();
-      expect(geometry.boundingBox!.min.x).toBe(-1);
-      expect(geometry.boundingBox!.max.x).toBe(1);
+      expect(geometry.boundingBox?.min.x).toBe(-1);
+      expect(geometry.boundingBox?.max.x).toBe(1);
     });
 
     it('should throw error if attributeBuffers is missing', () => {

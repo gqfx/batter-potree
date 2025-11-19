@@ -226,7 +226,6 @@ export function example7_animateShapes() {
     const nextShapeValue = shapes[currentShapeIndex];
     if (nextShapeValue) {
       material.shape = nextShapeValue;
-      console.log(`Switched to ${nextShapeValue}`);
     }
   };
 

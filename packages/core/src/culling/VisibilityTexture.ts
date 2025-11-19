@@ -113,7 +113,6 @@ export class VisibilityTextureManager {
     // 检查是否还有空间
     const maxNodes = this.size * this.size;
     if (this.nextIndex >= maxNodes) {
-      console.warn('[VisibilityTexture] Texture full, cannot register more nodes');
       return -1;
     }
 
@@ -145,7 +144,6 @@ export class VisibilityTextureManager {
   ): void {
     const index = this.nodeIdToIndex.get(nodeId);
     if (index === undefined) {
-      console.warn(`[VisibilityTexture] Node not registered: ${nodeId}`);
       return;
     }
 

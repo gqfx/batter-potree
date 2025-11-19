@@ -4,7 +4,7 @@
 
 import { PointCloudColorMode, PointSizeType } from '@better-potree/core';
 import * as THREE from 'three';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { PointCloudMaterial } from '../materials/PointCloudMaterial';
 import { PointCloudObject3D } from '../objects/PointCloudObject3D';
 

@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EnhancedFrustumCuller } from './FrustumCuller.js';
-import type { FrustumCullingStats } from './FrustumCuller.js';
 import * as THREE from 'three';
 
 describe('EnhancedFrustumCuller', () => {

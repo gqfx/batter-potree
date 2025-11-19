@@ -57,8 +57,6 @@ function basicUsage() {
     numPoints: 3,
   });
 
-  console.log(`Nodes: ${scene.nodeCount}, Points: ${scene.visiblePointCount}`);
-
   return scene;
 }
 
@@ -88,15 +86,9 @@ function lodHierarchy() {
   scene.addNode('r00', createGeometry(400), { level: 2 });
   scene.addNode('r01', createGeometry(400), { level: 2 });
 
-  console.log(`Total nodes: ${scene.nodeCount}`);
-  console.log(`Initial visible points: ${scene.visiblePointCount}`);
-
   // Simulate LOD update - only show root and first level
   const visibleNodes = new Set(['r', 'r0', 'r1']);
   scene.updateVisibility(visibleNodes);
-
-  console.log(`After LOD: ${scene.visiblePointCount} visible points`);
-  console.log(`Visible nodes: ${scene.getVisibleNodeIds().join(', ')}`);
 
   return scene;
 }
@@ -171,16 +163,13 @@ function dynamicNodeManagement() {
   // Add initial nodes
   scene.addNode('r', createGeometry());
   scene.addNode('r0', createGeometry());
-  console.log(`Initial: ${scene.nodeCount} nodes`);
 
   // Add more nodes dynamically
   scene.addNode('r1', createGeometry());
   scene.addNode('r00', createGeometry());
-  console.log(`After additions: ${scene.nodeCount} nodes`);
 
   // Remove a node
   scene.removeNode('r0');
-  console.log(`After removal: ${scene.nodeCount} nodes`);
 
   // Update node metadata
   scene.updateNodeMetadata('r', {
@@ -188,8 +177,7 @@ function dynamicNodeManagement() {
     pcIndex: 2,
   });
 
-  const metadata = scene.getNodeMetadata('r');
-  console.log(`Node 'r' metadata:`, metadata);
+  const _metadata = scene.getNodeMetadata('r');
 
   return scene;
 }
@@ -209,9 +197,6 @@ function materialUpdates() {
   scene.material.size = 3.0;
   scene.material.colorMode = PointCloudColorMode.INTENSITY;
 
-  console.log(`Material size: ${scene.material.size}`);
-  console.log(`Material color mode: ${scene.material.colorMode}`);
-
   // Or replace entire material
   const { PointCloudMaterial } = require('./materials/PointCloudMaterial');
   const newMaterial = new PointCloudMaterial({
@@ -220,7 +205,6 @@ function materialUpdates() {
   });
 
   scene.updateMaterial(newMaterial);
-  console.log(`New material applied`);
 
   return scene;
 }
@@ -233,7 +217,6 @@ function cleanup() {
 
   // Add dispose handler
   scene.addDisposeHandler(() => {
-    console.log('Custom cleanup logic');
   });
 
   // Add some nodes
@@ -243,7 +226,6 @@ function cleanup() {
 
   // Later: dispose all resources
   scene.dispose();
-  console.log(`Cleaned up: ${scene.nodeCount} nodes remain`);
 }
 
 // Export examples
@@ -258,18 +240,9 @@ export {
 
 // Run examples if this file is executed directly
 if (require.main === module) {
-  console.log('\n=== Example 1: Basic Usage ===');
   basicUsage();
-
-  console.log('\n=== Example 2: LOD Hierarchy ===');
   lodHierarchy();
-
-  console.log('\n=== Example 4: Dynamic Node Management ===');
   dynamicNodeManagement();
-
-  console.log('\n=== Example 5: Material Updates ===');
   materialUpdates();
-
-  console.log('\n=== Example 6: Cleanup ===');
   cleanup();
 }

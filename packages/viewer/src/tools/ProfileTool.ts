@@ -92,8 +92,6 @@ interface ProfileSegment {
  * 沿指定路径采样点云高程并生成剖面数据
  */
 export class ProfileTool {
-  // @ts-expect-error - viewer will be used in future implementations
-  private _viewer: Viewer;
   private config: Required<ProfileToolConfig>;
 
   // 剖面线控制点

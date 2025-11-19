@@ -434,7 +434,7 @@ export class TraversalSystem implements ISystem {
     const updates = visibleNodes.map((vn) => {
       // 注册节点（如果尚未注册）
       const nodeId = `${vn.octree.url}/${vn.node.name}`;
-      this.visibilityTextureManager!.registerNode(nodeId);
+      this.visibilityTextureManager?.registerNode(nodeId);
 
       return {
         nodeId,
