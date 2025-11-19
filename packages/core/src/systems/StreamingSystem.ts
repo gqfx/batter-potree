@@ -22,6 +22,7 @@
 import type {
   IPointCloudOctree,
   IPointCloudOctreeNode,
+  IWorkerDecodeRequest,
   IWorkerDecodeResponse,
 } from '../types/potree.js';
 import type { ISystem, SystemStage } from '../types/system.js';
@@ -375,7 +376,7 @@ export class StreamingSystem implements ISystem {
     const startTime = performance.now();
 
     // 异步加载数据
-    this.fetchNodeData(request.octree, nodeUrl, request.abortController.signal)
+    this.fetchNodeData(request.octree, request.node, nodeUrl, request.abortController.signal)
       .then((arrayBuffer) => {
         if (request.abortController.signal.aborted) {
           return;
@@ -401,12 +402,14 @@ export class StreamingSystem implements ISystem {
    * 获取节点数据
    *
    * @param octree - 点云八叉树（可能包含自定义加载器）
+   * @param node - 节点（包含 byte offset 信息）
    * @param url - 节点数据 URL
    * @param signal - 取消信号
    * @returns ArrayBuffer
    */
   private async fetchNodeData(
     octree: IPointCloudOctree,
+    node: IPointCloudOctreeNode,
     url: string,
     signal: AbortSignal,
   ): Promise<ArrayBuffer> {
@@ -419,10 +422,43 @@ export class StreamingSystem implements ISystem {
 
       // 移除 URL 的开头部分，只保留相对路径
       const relativePath = url.replace(/^\/?/, '');
+
+      // For Potree 2.0, we need to read a byte range from octree.bin
+      if (node.byteOffset !== undefined && node.byteSize !== undefined) {
+        console.log('[StreamingSystem] Loading Potree 2.0 node with byte range:', {
+          path: relativePath,
+          byteOffset: node.byteOffset,
+          byteSize: node.byteSize,
+        });
+
+        // Load the entire octree.bin and slice the needed portion
+        // TODO: Implement more efficient range reading for File System API
+        const fullBuffer = await octree.customFileLoader(relativePath);
+        return fullBuffer.slice(node.byteOffset, node.byteOffset + node.byteSize);
+      }
+
       return octree.customFileLoader(relativePath);
     }
 
     // 否则使用标准 fetch
+    // For Potree 2.0, use HTTP Range request
+    if (node.byteOffset !== undefined && node.byteSize !== undefined) {
+      const headers = new Headers();
+      headers.set('Range', `bytes=${node.byteOffset}-${node.byteOffset + node.byteSize - 1}`);
+
+      console.log('[StreamingSystem] Fetching Potree 2.0 node with Range header:', {
+        url,
+        range: `bytes=${node.byteOffset}-${node.byteOffset + node.byteSize - 1}`,
+      });
+
+      const response = await fetch(url, { signal, headers });
+      if (!response.ok && response.status !== 206) {
+        throw new Error(`Failed to fetch node data: ${response.statusText}`);
+      }
+      return response.arrayBuffer();
+    }
+
+    // Potree 1.x: fetch entire file
     const response = await fetch(url, { signal });
     if (!response.ok) {
       throw new Error(`Failed to fetch node data: ${response.statusText}`);
@@ -442,9 +478,97 @@ export class StreamingSystem implements ISystem {
     buffer: ArrayBuffer,
     startTime: number,
   ): Promise<void> {
-    // 这里需要与 Worker 池集成
-    // 目前简化处理
-    return this.processLoadComplete(request, buffer, startTime);
+    if (!this.config.workerPool) {
+      // Fallback to synchronous decode if no worker pool
+      return this.processLoadComplete(request, buffer, startTime);
+    }
+
+    try {
+      // 准备 Worker 解码请求
+      const decodeRequest: IWorkerDecodeRequest = {
+        buffer,
+        pointAttributes: request.octree.pointAttributes,
+        version: request.octree.version,
+        offset: [0, 0, 0], // Potree 2.0 不需要 offset
+        scale: request.octree.scale,
+        spacing: request.octree.spacing,
+        hasChildren: request.node.children.some((c) => c !== null) ? 1 : 0,
+        name: request.node.name,
+      };
+
+      // 使用 WorkerPool 执行解码
+      const transferables: Transferable[] = [buffer];
+      const decodedData = (await this.config.workerPool.execute(
+        decodeRequest,
+        transferables,
+      )) as IWorkerDecodeResponse;
+
+      // 检查是否被取消
+      if (request.abortController.signal.aborted) {
+        return;
+      }
+
+      // 处理解码后的数据
+      await this.processDecodedData(request, decodedData, startTime);
+    } catch (error) {
+      console.error('[StreamingSystem] Worker decode error:', error);
+      // Worker 解码失败，回退到同步解码
+      return this.processLoadComplete(request, buffer, startTime);
+    }
+  }
+
+  /**
+   * 处理 Worker 解码后的数据
+   *
+   * @param request - 加载请求
+   * @param decodedData - 解码后的数据
+   * @param startTime - 开始时间
+   */
+  private async processDecodedData(
+    request: LoadRequest,
+    decodedData: IWorkerDecodeResponse,
+    startTime: number,
+  ): Promise<void> {
+    console.log('[StreamingSystem] Worker 解码完成:', {
+      节点: request.node.name,
+      点数: decodedData.numPoints,
+      属性数: Object.keys(decodedData.attributeBuffers).length,
+      耗时: `${(performance.now() - startTime).toFixed(2)}ms`,
+    });
+
+    // 从活动加载中移除
+    const key = this.getNodeKey(request.octree, request.node);
+    this.activeLoads.delete(key);
+
+    // 更新统计和速率限制计数器
+    const loadTime = performance.now() - startTime;
+    const bytesLoaded = decodedData.buffer.byteLength;
+
+    this.stats.completedLoads++;
+    this.stats.totalBytesLoaded += bytesLoaded;
+    this.stats.loadTimes.push(loadTime);
+
+    // 更新速率限制计数器
+    this.downloadedBytesThisSecond += bytesLoaded;
+
+    // 保持统计数组大小合理
+    if (this.stats.loadTimes.length > 100) {
+      this.stats.loadTimes.shift();
+    }
+
+    // 标记节点为已加载
+    (request.node as { loaded: boolean; loading: boolean }).loaded = true;
+    (request.node as { loading: boolean }).loading = false;
+
+    // 触发完成事件
+    if (this.onLoadComplete) {
+      this.onLoadComplete({
+        octree: request.octree,
+        node: request.node,
+        data: decodedData,
+        loadTime,
+      });
+    }
   }
 
   /**
@@ -546,12 +670,14 @@ export class StreamingSystem implements ISystem {
     for (const pointAttribute of pointAttributes.attributes) {
       if (pointAttribute.name === 'POSITION_CARTESIAN') {
         // Decode position data
+        // Potree 2.0 uses int32, Potree 1.x uses uint32
         const positions = new Float32Array(numPoints * 3);
 
         for (let j = 0; j < numPoints; j++) {
-          const x = view.getUint32(inOffset + j * pointAttributes.byteSize + 0, true) * octree.scale;
-          const y = view.getUint32(inOffset + j * pointAttributes.byteSize + 4, true) * octree.scale;
-          const z = view.getUint32(inOffset + j * pointAttributes.byteSize + 8, true) * octree.scale;
+          // Read as int32 for Potree 2.0 compatibility
+          const x = view.getInt32(inOffset + j * pointAttributes.byteSize + 0, true) * octree.scale;
+          const y = view.getInt32(inOffset + j * pointAttributes.byteSize + 4, true) * octree.scale;
+          const z = view.getInt32(inOffset + j * pointAttributes.byteSize + 8, true) * octree.scale;
 
           positions[3 * j + 0] = x;
           positions[3 * j + 1] = y;
@@ -575,7 +701,7 @@ export class StreamingSystem implements ISystem {
           attribute: pointAttribute,
         };
       } else if (pointAttribute.name === 'rgba') {
-        // Decode RGBA color data
+        // Decode RGBA color data (uint8)
         const colors = new Uint8Array(numPoints * 4);
 
         for (let j = 0; j < numPoints; j++) {
@@ -586,6 +712,30 @@ export class StreamingSystem implements ISystem {
         }
 
         attributeBuffers[pointAttribute.name] = {
+          buffer: colors.buffer,
+          attribute: pointAttribute,
+        };
+      } else if (pointAttribute.name === 'rgb') {
+        // Decode RGB color data (uint16 - Potree 2.0 format)
+        // Convert uint16 to uint8 for rendering
+        const colors = new Uint8Array(numPoints * 4);
+
+        for (let j = 0; j < numPoints; j++) {
+          // Potree 2.0 stores RGB as 3 x uint16
+          const r = view.getUint16(inOffset + j * pointAttributes.byteSize + 0, true);
+          const g = view.getUint16(inOffset + j * pointAttributes.byteSize + 2, true);
+          const b = view.getUint16(inOffset + j * pointAttributes.byteSize + 4, true);
+
+          // Convert from uint16 (0-65535) to uint8 (0-255)
+          // Note: Some Potree exports use 0-255 range even in uint16
+          colors[4 * j + 0] = r > 255 ? Math.floor(r / 256) : r;
+          colors[4 * j + 1] = g > 255 ? Math.floor(g / 256) : g;
+          colors[4 * j + 2] = b > 255 ? Math.floor(b / 256) : b;
+          colors[4 * j + 3] = 255; // Alpha
+        }
+
+        // Store as 'rgba' for compatibility with rendering system
+        attributeBuffers['rgba'] = {
           buffer: colors.buffer,
           attribute: pointAttribute,
         };
@@ -647,9 +797,29 @@ export class StreamingSystem implements ISystem {
    * @returns URL 字符串
    */
   private buildNodeUrl(octree: IPointCloudOctree, node: IPointCloudOctreeNode): string {
-    // Potree 2.0 格式：octree.url + node.name + .bin
-    // Potree 1.x 格式：octree.url + "r/" + node.name + ".bin"
-    return `${octree.url}${node.name}.bin`;
+    // Potree 2.0 格式：所有数据在 octree.bin 文件中，使用 byte offset
+    // Potree 1.x 格式：octree.url + node.name + .bin
+
+    // Check if this is Potree 2.0 (node has byteOffset)
+    if (node.byteOffset !== undefined) {
+      // Potree 2.0: return path to octree.bin
+      // octree.url 对于 Potree 2.0 是空字符串或 '/'
+      // 需要从基础 URL 构建 octree.bin 路径
+      const url = `${octree.url}octree.bin`;
+      console.log('[StreamingSystem] buildNodeUrl (Potree 2.0):', {
+        octreeUrl: octree.url,
+        nodeName: node.name,
+        byteOffset: node.byteOffset,
+        byteSize: node.byteSize,
+        resultUrl: url
+      });
+      return url;
+    }
+
+    // Potree 1.x format
+    const url = `${octree.url}${node.name}.bin`;
+    console.log('[StreamingSystem] buildNodeUrl (Potree 1.x):', { octreeUrl: octree.url, nodeName: node.name, resultUrl: url });
+    return url;
   }
 
   /**

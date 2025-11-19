@@ -186,7 +186,7 @@ export class WorkerPoolManager {
       const task: PooledWorkerTask<T, R> = {
         id: `task-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         data,
-        transferables,
+        transferables: transferables ?? [],
         resolve: resolve as (result: unknown) => void,
         reject,
       };

@@ -381,9 +381,24 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 }
 
 // Worker message handler
-self.onmessage = (event: MessageEvent<IWorkerDecodeRequest>) => {
+self.onmessage = (event: MessageEvent) => {
   try {
-    const result = decodePointCloudData(event);
+    // 支持两种消息格式：
+    // 1. 直接的 IWorkerDecodeRequest
+    // 2. WorkerPool 的包装格式 { taskId, data }
+    let decodeRequest: IWorkerDecodeRequest;
+    let taskId: string | undefined;
+
+    if ('taskId' in event.data && 'data' in event.data) {
+      // WorkerPool 格式
+      taskId = event.data.taskId;
+      decodeRequest = event.data.data;
+    } else {
+      // 直接格式
+      decodeRequest = event.data;
+    }
+
+    const result = decodePointCloudData({ data: decodeRequest } as MessageEvent<IWorkerDecodeRequest>);
 
     // Collect transferable objects
     const transferables: Transferable[] = [result.buffer];
@@ -397,11 +412,28 @@ self.onmessage = (event: MessageEvent<IWorkerDecodeRequest>) => {
     }
 
     // Send response with transferable objects
-    (self as any).postMessage(result, { transfer: transferables });
+    if (taskId) {
+      // WorkerPool 格式响应
+      (self as any).postMessage({ taskId, result }, { transfer: transferables });
+    } else {
+      // 直接格式响应
+      (self as any).postMessage(result, { transfer: transferables });
+    }
   } catch (error) {
     console.error('Worker decode error:', error);
-    (self as any).postMessage({
-      error: error instanceof Error ? error.message : String(error),
-    });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if ('taskId' in event.data) {
+      // WorkerPool 格式错误响应
+      (self as any).postMessage({
+        taskId: event.data.taskId,
+        error: errorMessage,
+      });
+    } else {
+      // 直接格式错误响应
+      (self as any).postMessage({
+        error: errorMessage,
+      });
+    }
   }
 };

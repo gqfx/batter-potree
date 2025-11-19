@@ -9,3 +9,4 @@ export type { WorkerPoolOptions } from './WorkerPool.js';
 export { WorkerPool } from './WorkerPool.js';
 export type { WorkerPoolManagerOptions } from './WorkerPoolManager.js';
 export { WorkerPoolManager } from './WorkerPoolManager.js';
+export { createDecoderWorkerPool } from './createDecoderWorkerPool.js';

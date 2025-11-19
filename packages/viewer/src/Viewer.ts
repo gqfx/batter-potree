@@ -17,6 +17,8 @@ import {
   SystemScheduler,
   TraversalSystem,
   TypedEventEmitter,
+  createDecoderWorkerPool,
+  type WorkerPool,
 } from '@better-potree/core';
 import { PointCloudMaterial, PointCloudScene } from '@better-potree/rendering-three';
 import * as THREE from 'three';
@@ -50,6 +52,16 @@ export interface ViewerConfig {
   backgroundColor?: THREE.ColorRepresentation;
   /** Show debug info */
   showStats?: boolean;
+  /**
+   * Enable Worker-based decoding
+   * @default true
+   */
+  enableWorkerDecoding?: boolean;
+  /**
+   * Maximum number of worker threads for decoding
+   * @default navigator.hardwareConcurrency - 1
+   */
+  maxWorkers?: number;
 }
 
 /**
@@ -99,6 +111,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
   private streamingSystem: StreamingSystem;
   private traversalSystem: TraversalSystem;
 
+  // Worker Pool
+  private workerPool?: WorkerPool;
+
   // Animation
   private animationId: number | null;
   private lastTimestamp: number;
@@ -132,6 +147,21 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     };
     this.backgroundColor = new THREE.Color(config.backgroundColor ?? 0x000000);
 
+    // Initialize Worker Pool for decoding
+    const enableWorkerDecoding = config.enableWorkerDecoding ?? true;
+    if (enableWorkerDecoding) {
+      try {
+        // Get Worker URL
+        const workerUrl = new URL('./loaders/workers/BinaryDecoderWorker.js', import.meta.url).href;
+        const maxWorkers = config.maxWorkers ?? Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
+
+        this.workerPool = createDecoderWorkerPool(workerUrl, maxWorkers);
+        console.log(`[Viewer] Worker Pool 初始化成功 (${maxWorkers} workers)`);
+      } catch (error) {
+        console.warn('[Viewer] Worker Pool 初始化失败，将使用同步解码:', error);
+      }
+    }
+
     // Initialize systems
     this.scheduler = new SystemScheduler({
       enableProfiling: true,
@@ -140,11 +170,23 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       },
     });
 
-    this.streamingSystem = new StreamingSystem({
+    // Create StreamingSystem config
+    const streamingConfig: {
+      maxConcurrentLoads: number;
+      maxRetries: number;
+      maxRequestsPerFrame: number;
+      workerPool?: WorkerPool;
+    } = {
       maxConcurrentLoads: 8,
       maxRetries: 3,
       maxRequestsPerFrame: 10,
-    });
+    };
+
+    if (this.workerPool) {
+      streamingConfig.workerPool = this.workerPool;
+    }
+
+    this.streamingSystem = new StreamingSystem(streamingConfig);
 
     // Create TraversalSystem
     this.traversalSystem = new TraversalSystem({
@@ -1506,6 +1548,12 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
     // Dispose scheduler and all systems
     this.scheduler.dispose();
+
+    // Dispose Worker Pool
+    if (this.workerPool) {
+      this.workerPool.dispose();
+      console.log('[Viewer] Worker Pool 已清理');
+    }
 
     // Cleanup renderer
     this.renderer.dispose();
