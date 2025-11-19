@@ -112,8 +112,8 @@ export class ProfileTool {
    * @param viewer - Viewer 实例
    * @param config - 配置选项
    */
-  constructor(viewer: Viewer, config: ProfileToolConfig = {}) {
-    this._viewer = viewer;
+  constructor(_viewer: Viewer, config: ProfileToolConfig = {}) {
+    
     this.config = {
       lineColor: config.lineColor ?? 0xff0000,
       lineWidth: config.lineWidth ?? 2,

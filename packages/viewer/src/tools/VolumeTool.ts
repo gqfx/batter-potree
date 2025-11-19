@@ -78,8 +78,8 @@ export class VolumeTool {
    * @param viewer - Viewer 实例
    * @param config - 配置选项
    */
-  constructor(viewer: Viewer, config: VolumeToolConfig = {}) {
-    this._viewer = viewer;
+  constructor(_viewer: Viewer, config: VolumeToolConfig = {}) {
+    
     this.config = {
       boxColor: config.boxColor ?? 0x00ff00,
       boxOpacity: config.boxOpacity ?? 0.3,
