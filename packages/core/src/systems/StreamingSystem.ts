@@ -461,9 +461,11 @@ export class StreamingSystem implements ISystem {
   ): Promise<void> {
     const key = this.getNodeKey(request.octree, request.node);
 
-    // 标记节点为已加载
-    (request.node as { loaded: boolean; loading: boolean }).loaded = true;
-    (request.node as { loading: boolean }).loading = false;
+    console.log('[StreamingSystem] 节点数据加载完成:', {
+      节点: request.node.name,
+      数据大小: buffer.byteLength,
+      耗时: `${(performance.now() - startTime).toFixed(2)}ms`,
+    });
 
     // 从活动加载中移除
     this.activeLoads.delete(key);
@@ -484,32 +486,122 @@ export class StreamingSystem implements ISystem {
       this.stats.loadTimes.shift();
     }
 
+    // 解码二进制数据
+    const decodedData = this.decodeNodeData(buffer, request.octree, request.node);
+
+    // 标记节点为已加载
+    (request.node as { loaded: boolean; loading: boolean }).loaded = true;
+    (request.node as { loading: boolean }).loading = false;
+
+    console.log('[StreamingSystem] 节点数据解码完成:', {
+      节点: request.node.name,
+      点数: decodedData.numPoints,
+      属性数: Object.keys(decodedData.attributeBuffers).length,
+    });
+
     // 触发完成事件
     if (this.onLoadComplete) {
       this.onLoadComplete({
         octree: request.octree,
         node: request.node,
-        data: {
-          buffer,
-          numPoints: request.node.numPoints,
-          mean: [0, 0, 0],
-          tightBoundingBox: {
-            min: [
-              request.node.boundingBox.min.x,
-              request.node.boundingBox.min.y,
-              request.node.boundingBox.min.z,
-            ],
-            max: [
-              request.node.boundingBox.max.x,
-              request.node.boundingBox.max.y,
-              request.node.boundingBox.max.z,
-            ],
-          },
-          attributeBuffers: {},
-        },
+        data: decodedData,
         loadTime,
       });
     }
+  }
+
+  /**
+   * 解码节点二进制数据
+   *
+   * @param buffer - 原始二进制数据
+   * @param octree - 点云八叉树
+   * @param _node - 节点（暂未使用）
+   * @returns 解码后的数据
+   */
+  private decodeNodeData(
+    buffer: ArrayBuffer,
+    octree: IPointCloudOctree,
+    _node: IPointCloudOctreeNode,
+  ): IWorkerDecodeResponse {
+    const pointAttributes = octree.pointAttributes;
+    const numPoints = Math.floor(buffer.byteLength / pointAttributes.byteSize);
+    const view = new DataView(buffer);
+
+    const tightBoxMin: [number, number, number] = [
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+      Number.POSITIVE_INFINITY,
+    ];
+    const tightBoxMax: [number, number, number] = [
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+    ];
+    const mean: [number, number, number] = [0, 0, 0];
+
+    const attributeBuffers: IWorkerDecodeResponse['attributeBuffers'] = {};
+    let inOffset = 0;
+
+    // Process each attribute
+    for (const pointAttribute of pointAttributes.attributes) {
+      if (pointAttribute.name === 'POSITION_CARTESIAN') {
+        // Decode position data
+        const positions = new Float32Array(numPoints * 3);
+
+        for (let j = 0; j < numPoints; j++) {
+          const x = view.getUint32(inOffset + j * pointAttributes.byteSize + 0, true) * octree.scale;
+          const y = view.getUint32(inOffset + j * pointAttributes.byteSize + 4, true) * octree.scale;
+          const z = view.getUint32(inOffset + j * pointAttributes.byteSize + 8, true) * octree.scale;
+
+          positions[3 * j + 0] = x;
+          positions[3 * j + 1] = y;
+          positions[3 * j + 2] = z;
+
+          mean[0] += x / numPoints;
+          mean[1] += y / numPoints;
+          mean[2] += z / numPoints;
+
+          tightBoxMin[0] = Math.min(tightBoxMin[0], x);
+          tightBoxMin[1] = Math.min(tightBoxMin[1], y);
+          tightBoxMin[2] = Math.min(tightBoxMin[2], z);
+
+          tightBoxMax[0] = Math.max(tightBoxMax[0], x);
+          tightBoxMax[1] = Math.max(tightBoxMax[1], y);
+          tightBoxMax[2] = Math.max(tightBoxMax[2], z);
+        }
+
+        attributeBuffers[pointAttribute.name] = {
+          buffer: positions.buffer,
+          attribute: pointAttribute,
+        };
+      } else if (pointAttribute.name === 'rgba') {
+        // Decode RGBA color data
+        const colors = new Uint8Array(numPoints * 4);
+
+        for (let j = 0; j < numPoints; j++) {
+          colors[4 * j + 0] = view.getUint8(inOffset + j * pointAttributes.byteSize + 0);
+          colors[4 * j + 1] = view.getUint8(inOffset + j * pointAttributes.byteSize + 1);
+          colors[4 * j + 2] = view.getUint8(inOffset + j * pointAttributes.byteSize + 2);
+          colors[4 * j + 3] = 255; // Alpha
+        }
+
+        attributeBuffers[pointAttribute.name] = {
+          buffer: colors.buffer,
+          attribute: pointAttribute,
+        };
+      }
+      // TODO: Add support for other attributes (normals, intensity, etc.)
+
+      inOffset += pointAttribute.byteSize;
+    }
+
+    return {
+      buffer,
+      mean,
+      attributeBuffers,
+      tightBoundingBox: { min: tightBoxMin, max: tightBoxMax },
+      numPoints,
+    };
   }
 
   /**
