@@ -7,10 +7,16 @@
  * - Visualization settings
  * - Measurement and annotation tools
  * - Screenshot and export
+ * - EDL (Eye-Dome Lighting) effects
+ * - Clipping tools
  */
 
-import type { NavigationMode, PointQuality, PointShape, PointSizeType } from '@better-potree/core';
+import type { MeasurementType, NavigationMode, PointQuality, PointShape, PointSizeType } from '@better-potree/core';
 import * as THREE from 'three';
+import { CameraControlsManager, type CameraAnimationOptions } from './controls/index.js';
+import { EDLEffect } from './effects/index.js';
+import { AdvancedClipTool, type ClipVolume } from './tools/AdvancedClipTool.js';
+import { AdvancedMeasurementTool, type MeasurementResult } from './tools/AdvancedMeasurementTool.js';
 import { Viewer } from './Viewer.js';
 
 /**
@@ -55,21 +61,80 @@ export interface ScreenshotOptions {
  * Extended Viewer class with high-level API methods
  */
 export class ViewerAPI extends Viewer {
+  // Advanced tools and effects
+  private cameraControls: CameraControlsManager | undefined;
+  private edlEffect: EDLEffect | undefined;
+  private measurementTool: AdvancedMeasurementTool | undefined;
+  private clipTool: AdvancedClipTool | undefined;
+
+  /**
+   * Initialize advanced features
+   *
+   * Call this after the viewer is constructed to enable advanced features.
+   *
+   * @example
+   * ```typescript
+   * const viewer = new ViewerAPI(config);
+   * viewer.initializeAdvancedFeatures();
+   * ```
+   */
+  initializeAdvancedFeatures(): void {
+    const renderer = this.getRenderer().getThreeRenderer?.();
+    const scene = this.getScene().getThreeScene?.();
+    const camera = this.getCamera();
+
+    if (!renderer || !scene) {
+      console.warn('[ViewerAPI] Advanced features require Three.js renderer and scene');
+      return;
+    }
+
+    // Initialize camera controls
+    const container = this.getRenderer().getDomElement().parentElement;
+    if (container) {
+      this.cameraControls = new CameraControlsManager(camera, container);
+    }
+
+    // Initialize EDL effect
+    this.edlEffect = new EDLEffect(renderer, scene, camera, this.getEDLConfig());
+
+    // Initialize measurement tool
+    this.measurementTool = new AdvancedMeasurementTool(scene, camera, container || document.body);
+
+    // Initialize clip tool
+    this.clipTool = new AdvancedClipTool(scene);
+
+    console.log('[ViewerAPI] Advanced features initialized');
+  }
   /**
    * Set navigation mode
    * @param mode - Navigation mode (orbit, fly, earth, fps)
-   * @param _options - Navigation options
+   * @param options - Navigation options
    */
-  setNavigation(mode: NavigationMode, _options?: NavigationOptions): void {
-    // This will interact with the controls package from Phase 3
-    // For now, emit an event to notify listeners
-    this.emit('navigation-changed', { mode });
+  setNavigation(mode: NavigationMode, options?: NavigationOptions): void {
+    if (this.cameraControls) {
+      this.cameraControls.setMode(mode);
 
-    // TODO: When controls are implemented:
-    // this.controls.setMode(mode);
-    // if (options) {
-    //   this.controls.setOptions(options);
-    // }
+      if (options) {
+        const controlOptions: {
+          rotateSpeed?: number;
+          enableRotation?: boolean;
+          enablePanning?: boolean;
+          enableZooming?: boolean;
+        } = {};
+
+        if (options.speed !== undefined) controlOptions.rotateSpeed = options.speed;
+        if (options.enableRotation !== undefined) controlOptions.enableRotation = options.enableRotation;
+        if (options.enablePanning !== undefined) controlOptions.enablePanning = options.enablePanning;
+        if (options.enableZooming !== undefined) controlOptions.enableZooming = options.enableZooming;
+
+        this.cameraControls.setOptions(controlOptions);
+      }
+
+      this.emit('navigation-changed', { mode });
+    } else {
+      console.warn('[ViewerAPI] Camera controls not initialized. Call initializeAdvancedFeatures() first.');
+      this.emit('navigation-changed', { mode });
+    }
   }
 
   /**
@@ -151,42 +216,204 @@ export class ViewerAPI extends Viewer {
    * @param volume - Clip volume to add
    */
   addClipVolume(volume: any): void {
-    // TODO: Implement when ClipVolume is available
-    this.emit('clip-volume-added', { volume });
+    if (!this.clipTool) {
+      console.warn('[ViewerAPI] Clip tool not initialized. Call initializeAdvancedFeatures() first.');
+      this.emit('clip-volume-added', { volume });
+      return;
+    }
+
+    // Determine volume type and add appropriately
+    if (volume instanceof THREE.Box3) {
+      const id = this.clipTool.addBoxClip(volume);
+      this.emit('clip-volume-added', { volume: { ...volume, id, type: 'box' } });
+    } else if (volume instanceof THREE.Plane) {
+      const id = this.clipTool.addPlaneClip(volume);
+      this.emit('clip-volume-added', { volume: { ...volume, id, type: 'plane' } });
+    } else if (volume instanceof THREE.Sphere) {
+      const id = this.clipTool.addSphereClip(volume);
+      this.emit('clip-volume-added', { volume: { ...volume, id, type: 'sphere' } });
+    } else {
+      console.warn('[ViewerAPI] Unknown clip volume type');
+      this.emit('clip-volume-added', { volume });
+    }
   }
 
   /**
    * Remove a clip volume
-   * @param volume - Clip volume to remove
+   * @param volume - Clip volume ID or reference
    */
-  removeClipVolume(volume: any): void {
-    // TODO: Implement when ClipVolume is available
-    this.emit('clip-volume-removed', { volume });
+  removeClipVolume(volume: string | any): void {
+    if (!this.clipTool) {
+      console.warn('[ViewerAPI] Clip tool not initialized.');
+      this.emit('clip-volume-removed', { volume });
+      return;
+    }
+
+    const id = typeof volume === 'string' ? volume : volume.id;
+    this.clipTool.removeClip(id);
+    this.emit('clip-volume-removed', { volume: id });
   }
 
   /**
    * Remove all clip volumes
    */
   removeAllClipVolumes(): void {
-    // TODO: Implement when ClipVolume is available
-    console.log('Removing all clip volumes');
+    if (!this.clipTool) {
+      console.warn('[ViewerAPI] Clip tool not initialized.');
+      return;
+    }
+
+    this.clipTool.clearAllClips();
+    console.log('[ViewerAPI] All clip volumes removed');
   }
 
   /**
    * Get all clip volumes
    */
-  getClipVolumes(): any[] {
-    // TODO: Implement when ClipVolume is available
-    return [];
+  getClipVolumes(): ClipVolume[] {
+    if (!this.clipTool) {
+      console.warn('[ViewerAPI] Clip tool not initialized.');
+      return [];
+    }
+
+    return this.clipTool.getAllClips();
+  }
+
+  /**
+   * Enable/disable clip volume
+   *
+   * @param id - Clip volume ID
+   * @param enabled - Enable state
+   */
+  setClipVolumeEnabled(id: string, enabled: boolean): void {
+    if (!this.clipTool) {
+      console.warn('[ViewerAPI] Clip tool not initialized.');
+      return;
+    }
+
+    this.clipTool.setClipEnabled(id, enabled);
+  }
+
+  /**
+   * Invert clip volume
+   *
+   * @param id - Clip volume ID
+   * @param inverted - Invert state
+   */
+  setClipVolumeInverted(id: string, inverted: boolean): void {
+    if (!this.clipTool) {
+      console.warn('[ViewerAPI] Clip tool not initialized.');
+      return;
+    }
+
+    this.clipTool.setClipInverted(id, inverted);
   }
 
   /**
    * Start measuring
    * @param type - Measurement type
    */
-  startMeasuring(type: string): void {
-    // This will be implemented by the MeasuringTool in T4.4
-    console.log('Starting measurement:', type);
+  startMeasuring(type: MeasurementType): void {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized. Call initializeAdvancedFeatures() first.');
+      console.log('Starting measurement:', type);
+      return;
+    }
+
+    this.measurementTool.startMeasurement(type);
+  }
+
+  /**
+   * Add measurement point
+   *
+   * Call this from raycasting or user interaction to add points to the current measurement.
+   *
+   * @param point - 3D point
+   */
+  addMeasurementPoint(point: THREE.Vector3): void {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized.');
+      return;
+    }
+
+    this.measurementTool.addPoint(point);
+  }
+
+  /**
+   * Complete current measurement
+   */
+  completeMeasurement(): void {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized.');
+      return;
+    }
+
+    this.measurementTool.completeMeasurement();
+  }
+
+  /**
+   * Cancel current measurement
+   */
+  cancelMeasurement(): void {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized.');
+      return;
+    }
+
+    this.measurementTool.cancel();
+  }
+
+  /**
+   * Get all measurements
+   *
+   * @returns Array of measurement results
+   */
+  getMeasurements(): MeasurementResult[] {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized.');
+      return [];
+    }
+
+    return this.measurementTool.getAllMeasurements();
+  }
+
+  /**
+   * Remove a measurement
+   *
+   * @param id - Measurement ID
+   */
+  removeMeasurement(id: string): void {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized.');
+      return;
+    }
+
+    this.measurementTool.removeMeasurement(id);
+  }
+
+  /**
+   * Clear all measurements
+   */
+  clearAllMeasurements(): void {
+    if (!this.measurementTool) {
+      console.warn('[ViewerAPI] Measurement tool not initialized.');
+      return;
+    }
+
+    this.measurementTool.clearAllMeasurements();
+  }
+
+  /**
+   * Check if measurement is active
+   *
+   * @returns True if a measurement is in progress
+   */
+  isMeasuring(): boolean {
+    if (!this.measurementTool) {
+      return false;
+    }
+
+    return this.measurementTool.getIsActive();
   }
 
   /**
@@ -249,13 +476,29 @@ export class ViewerAPI extends Viewer {
    * Move camera to position
    * @param position - Target position
    * @param target - Look at target
-   * @param duration - Animation duration in ms
+   * @param options - Animation options (duration, easing, etc.)
    */
-  moveCameraTo(position: THREE.Vector3, target?: THREE.Vector3, duration: number = 0): void {
-    const camera = this.getCamera();
+  moveCameraTo(position: THREE.Vector3, target?: THREE.Vector3, options?: CameraAnimationOptions): void {
+    if (this.cameraControls) {
+      const duration = options?.duration ?? 0;
 
-    if (duration === 0) {
-      // Instant move
+      if (duration === 0) {
+        // Instant move
+        this.cameraControls.moveTo(position, target);
+      } else {
+        // Animated move
+        this.cameraControls.flyTo(position, target || new THREE.Vector3(), options);
+      }
+
+      this.emit('camera-changed', {
+        camera: this.getCamera(),
+        position: this.getCamera().position,
+        target: target ?? new THREE.Vector3(),
+      });
+    } else {
+      // Fallback to direct camera manipulation
+      const camera = this.getCamera();
+
       camera.position.copy(position);
       if (target) {
         camera.lookAt(target);
@@ -269,9 +512,6 @@ export class ViewerAPI extends Viewer {
         position: camera.position,
         target: target ?? new THREE.Vector3(),
       });
-    } else {
-      // TODO: Implement animated camera movement
-      console.log('Animated camera movement not yet implemented');
     }
   }
 
@@ -314,10 +554,94 @@ export class ViewerAPI extends Viewer {
   }
 
   /**
-   * Enable or disable frustum culling
+   * Enable or disable EDL (Eye-Dome Lighting)
+   *
+   * @param enabled - Enable state
    */
-  setFrustumCulling(enabled: boolean): void {
-    // TODO: Implement when visibility culling is ready
-    console.log('Frustum culling:', enabled);
+  setEDLEnabled(enabled: boolean): void {
+    if (this.edlEffect) {
+      this.edlEffect.setEnabled(enabled);
+    }
+
+    // Call parent method to update config
+    super.setEDLEnabled(enabled);
+  }
+
+  /**
+   * Set EDL radius
+   *
+   * @param radius - EDL radius (typically 1.0 - 3.0)
+   */
+  setEDLRadius(radius: number): void {
+    if (this.edlEffect) {
+      this.edlEffect.setRadius(radius);
+    }
+  }
+
+  /**
+   * Set EDL strength
+   *
+   * @param strength - EDL strength (typically 0.1 - 1.0)
+   */
+  setEDLStrength(strength: number): void {
+    if (this.edlEffect) {
+      this.edlEffect.setStrength(strength);
+    }
+  }
+
+  /**
+   * Set EDL opacity
+   *
+   * @param opacity - EDL opacity (0.0 - 1.0)
+   */
+  setEDLOpacity(opacity: number): void {
+    if (this.edlEffect) {
+      this.edlEffect.setOpacity(opacity);
+    }
+  }
+
+  /**
+   * Override render to use EDL effect if enabled
+   */
+  override render(): void {
+    if (this.edlEffect && this.edlEffect.getEnabled()) {
+      this.edlEffect.render();
+    } else {
+      super.render();
+    }
+  }
+
+  /**
+   * Override destroy to cleanup advanced features
+   */
+  override destroy(): void {
+    // Dispose camera controls
+    if (this.cameraControls) {
+      this.cameraControls.dispose();
+      this.cameraControls = undefined;
+    }
+
+    // Dispose EDL effect
+    if (this.edlEffect) {
+      this.edlEffect.dispose();
+      this.edlEffect = undefined;
+    }
+
+    // Dispose measurement tool
+    if (this.measurementTool) {
+      this.measurementTool.dispose();
+      this.measurementTool = undefined;
+    }
+
+    // Dispose clip tool
+    if (this.clipTool) {
+      this.clipTool.dispose();
+      this.clipTool = undefined;
+    }
+
+    // Call parent destroy
+    super.destroy();
+
+    console.log('[ViewerAPI] Advanced features disposed');
   }
 }
