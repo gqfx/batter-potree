@@ -59,9 +59,6 @@ export default defineConfig({
               return;
             }
 
-            // 读取文件并发送
-            const content = fs.readFileSync(filePath);
-
             // 设置正确的 Content-Type
             const ext = pathModule.extname(filePath).toLowerCase();
             if (ext === '.json' || ext === '.js') {
@@ -71,7 +68,41 @@ export default defineConfig({
             }
 
             res.setHeader('Access-Control-Allow-Origin', '*');
-            res.end(content);
+
+            // 支持 HTTP Range 请求（用于 Potree 2.0 octree.bin）
+            const rangeHeader = req.headers.range;
+            if (rangeHeader && ext === '.bin') {
+              const fileSize = stats.size;
+              const parts = rangeHeader.replace(/bytes=/, '').split('-');
+              const start = parseInt(parts[0], 10);
+              const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+              const chunkSize = end - start + 1;
+
+              // 验证范围
+              if (start >= fileSize || end >= fileSize) {
+                res.statusCode = 416; // Range Not Satisfiable
+                res.setHeader('Content-Range', `bytes */${fileSize}`);
+                res.end();
+                return;
+              }
+
+              // 读取指定范围的数据
+              const buffer = Buffer.alloc(chunkSize);
+              const fd = fs.openSync(filePath, 'r');
+              fs.readSync(fd, buffer, 0, chunkSize, start);
+              fs.closeSync(fd);
+
+              res.statusCode = 206; // Partial Content
+              res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`);
+              res.setHeader('Accept-Ranges', 'bytes');
+              res.setHeader('Content-Length', chunkSize);
+              res.end(buffer);
+            } else {
+              // 读取整个文件
+              const content = fs.readFileSync(filePath);
+              res.setHeader('Content-Length', content.length);
+              res.end(content);
+            }
             return;
           }
           next();

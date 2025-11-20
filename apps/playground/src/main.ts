@@ -64,6 +64,12 @@ debug.info(LogCategory.VIEWER, 'Viewer API created', {
   edlEnabled: viewer.getEDLConfig().enabled,
 });
 
+// 将对象暴露到全局,方便调试
+(window as any).viewerAPI = viewer;
+(window as any).threeScene = scene;
+(window as any).threeCamera = camera;
+(window as any).threeRenderer = renderer;
+
 // 检查 Worker Pool 状态
 const streamingSystem = viewer.getStreamingSystem();
 const hasWorkerPool = !!(streamingSystem as any).config?.workerPool;
