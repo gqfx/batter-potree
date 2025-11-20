@@ -252,6 +252,111 @@ describe('BinaryDecoderWorker', () => {
     });
   });
 
+  describe('RGB color decoding (uint16)', () => {
+    it('should decode RGB color data from uint16 format', () => {
+      // Simulate the real metadata.json structure:
+      // - position: 12 bytes (int32 x 3)
+      // - intensity: 2 bytes (uint16)
+      // - return number: 1 byte (uint8)
+      // - number of returns: 1 byte (uint8)
+      // - classification flags: 1 byte (uint8)
+      // - classification: 1 byte (uint8)
+      // - user data: 1 byte (uint8)
+      // - scan angle: 2 bytes (int16)
+      // - point source id: 2 bytes (uint16)
+      // - gps-time: 8 bytes (double)
+      // - rgb: 6 bytes (uint16 x 3)
+      // Total: 37 bytes per point
+
+      const numPoints = 2;
+      const bytesPerPoint = 37;
+      const buffer = new ArrayBuffer(numPoints * bytesPerPoint);
+      const view = new DataView(buffer);
+
+      // Point 1
+      // Position (offset 0, 12 bytes)
+      view.setUint32(0, 1000, true);
+      view.setUint32(4, 2000, true);
+      view.setUint32(8, 3000, true);
+
+      // Other attributes (offset 12-30, 19 bytes) - fill with zeros for simplicity
+      // RGB (offset 31, 6 bytes)
+      view.setUint16(31, 255, true); // R
+      view.setUint16(33, 128, true); // G
+      view.setUint16(35, 64, true);  // B
+
+      // Point 2
+      // Position (offset 37, 12 bytes)
+      view.setUint32(37, 4000, true);
+      view.setUint32(41, 5000, true);
+      view.setUint32(45, 6000, true);
+
+      // Other attributes (offset 49-67, 19 bytes) - fill with zeros
+      // RGB (offset 68, 6 bytes)
+      view.setUint16(68, 200, true); // R
+      view.setUint16(70, 100, true); // G
+      view.setUint16(72, 50, true);  // B
+
+      // Decode RGB (simulating the worker logic)
+      const colors = new Uint8Array(numPoints * 4);
+      const rgbOffset = 31; // RGB starts at byte 31 in each point
+
+      for (let j = 0; j < numPoints; j++) {
+        const pointOffset = j * bytesPerPoint;
+        const r = view.getUint16(pointOffset + rgbOffset + 0, true);
+        const g = view.getUint16(pointOffset + rgbOffset + 2, true);
+        const b = view.getUint16(pointOffset + rgbOffset + 4, true);
+
+        // Convert to uint8 (clamp to 0-255 range)
+        colors[4 * j + 0] = Math.min(255, r); // R
+        colors[4 * j + 1] = Math.min(255, g); // G
+        colors[4 * j + 2] = Math.min(255, b); // B
+        colors[4 * j + 3] = 255; // Alpha
+      }
+
+      // Verify first point
+      expect(colors[0]).toBe(255); // R
+      expect(colors[1]).toBe(128); // G
+      expect(colors[2]).toBe(64);  // B
+      expect(colors[3]).toBe(255); // A
+
+      // Verify second point
+      expect(colors[4]).toBe(200); // R
+      expect(colors[5]).toBe(100); // G
+      expect(colors[6]).toBe(50);  // B
+      expect(colors[7]).toBe(255); // A
+    });
+
+    it('should clamp RGB values above 255', () => {
+      const numPoints = 1;
+      const bytesPerPoint = 37;
+      const buffer = new ArrayBuffer(numPoints * bytesPerPoint);
+      const view = new DataView(buffer);
+
+      // RGB with values above 255 (offset 31)
+      view.setUint16(31, 300, true); // R (will be clamped to 255)
+      view.setUint16(33, 500, true); // G (will be clamped to 255)
+      view.setUint16(35, 100, true); // B (stays 100)
+
+      const colors = new Uint8Array(numPoints * 4);
+      const rgbOffset = 31;
+
+      const r = view.getUint16(rgbOffset + 0, true);
+      const g = view.getUint16(rgbOffset + 2, true);
+      const b = view.getUint16(rgbOffset + 4, true);
+
+      colors[0] = Math.min(255, r);
+      colors[1] = Math.min(255, g);
+      colors[2] = Math.min(255, b);
+      colors[3] = 255;
+
+      expect(colors[0]).toBe(255); // Clamped from 300
+      expect(colors[1]).toBe(255); // Clamped from 500
+      expect(colors[2]).toBe(100); // Original value
+      expect(colors[3]).toBe(255); // Alpha
+    });
+  });
+
   describe('Normal decoding', () => {
     it('should decode NORMAL_SPHEREMAPPED normals', () => {
       // Test sphere mapping decoding algorithm

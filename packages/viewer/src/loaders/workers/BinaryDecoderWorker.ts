@@ -197,7 +197,7 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
         attribute: pointAttribute,
       };
     } else if (pointAttribute.name === 'rgba') {
-      // Decode RGBA color data
+      // Decode RGBA color data (uint8 x 4)
       const colors = new Uint8Array(numPoints * 4);
 
       for (let j = 0; j < numPoints; j++) {
@@ -208,6 +208,27 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       }
 
       attributeBuffers[pointAttribute.name] = {
+        buffer: colors.buffer,
+        attribute: pointAttribute,
+      };
+    } else if (pointAttribute.name === 'rgb') {
+      // Decode RGB color data (uint16 x 3 → uint8 x 4)
+      // Convert from uint16 [0-255] range to uint8 [0-255]
+      const colors = new Uint8Array(numPoints * 4);
+
+      for (let j = 0; j < numPoints; j++) {
+        const r = view.getUint16(inOffset + j * pointAttributes.byteSize + 0, true);
+        const g = view.getUint16(inOffset + j * pointAttributes.byteSize + 2, true);
+        const b = view.getUint16(inOffset + j * pointAttributes.byteSize + 4, true);
+
+        colors[4 * j + 0] = Math.min(255, r); // R
+        colors[4 * j + 1] = Math.min(255, g); // G
+        colors[4 * j + 2] = Math.min(255, b); // B
+        colors[4 * j + 3] = 255; // Alpha
+      }
+
+      // Store as 'rgba' for compatibility with rendering
+      attributeBuffers['rgba'] = {
         buffer: colors.buffer,
         attribute: pointAttribute,
       };
