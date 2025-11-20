@@ -39,18 +39,24 @@ const createGetterMap = (view: DataView) => ({
 
 /**
  * Decode NORMAL_SPHEREMAPPED attribute
+ *
+ * @param view - DataView of the buffer
+ * @param attrOffset - Offset of this attribute within a single point
+ * @param pointByteSize - Total byte size of a single point (pointAttributes.byteSize)
+ * @param numPoints - Number of points
  */
 function decodeSphereMapping(
   view: DataView,
-  inOffset: number,
-  byteSize: number,
+  attrOffset: number,
+  pointByteSize: number,
   numPoints: number,
 ): Float32Array {
   const normals = new Float32Array(numPoints * 3);
 
   for (let j = 0; j < numPoints; j++) {
-    const bx = view.getUint8(inOffset + j * byteSize);
-    const by = view.getUint8(inOffset + j * byteSize + 1);
+    // ✅ 修复: attrOffset 是属性在点中的偏移, j * pointByteSize 是点之间的间隔
+    const bx = view.getUint8(attrOffset + j * pointByteSize);
+    const by = view.getUint8(attrOffset + j * pointByteSize + 1);
 
     const ex = bx / 255;
     const ey = by / 255;
@@ -79,18 +85,24 @@ function decodeSphereMapping(
 
 /**
  * Decode NORMAL_OCT16 attribute
+ *
+ * @param view - DataView of the buffer
+ * @param attrOffset - Offset of this attribute within a single point
+ * @param pointByteSize - Total byte size of a single point (pointAttributes.byteSize)
+ * @param numPoints - Number of points
  */
 function decodeOct16Normals(
   view: DataView,
-  inOffset: number,
-  byteSize: number,
+  attrOffset: number,
+  pointByteSize: number,
   numPoints: number,
 ): Float32Array {
   const normals = new Float32Array(numPoints * 3);
 
   for (let j = 0; j < numPoints; j++) {
-    const bx = view.getUint8(inOffset + j * byteSize);
-    const by = view.getUint8(inOffset + j * byteSize + 1);
+    // ✅ 修复: attrOffset 是属性在点中的偏移, j * pointByteSize 是点之间的间隔
+    const bx = view.getUint8(attrOffset + j * pointByteSize);
+    const by = view.getUint8(attrOffset + j * pointByteSize + 1);
 
     const u = (bx / 255) * 2 - 1;
     const v = (by / 255) * 2 - 1;
@@ -154,10 +166,25 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
   const mean: [number, number, number] = [0, 0, 0];
 
   const attributeBuffers: Record<string, any> = {};
-  let inOffset = 0;
+
+  // ✅ 修复: 使用 getAttributeOffset 获取每个属性的正确偏移量
+  // 而不是累加 inOffset
+  const getAttributeOffset = (attrName: string): number => {
+    let offset = 0;
+    for (const attr of pointAttributes.attributes) {
+      if (attr.name === attrName) {
+        return offset;
+      }
+      offset += attr.byteSize;
+    }
+    return 0;
+  };
 
   // Process each attribute
   for (const pointAttribute of pointAttributes.attributes) {
+    // ✅ 获取该属性在点数据中的正确偏移量
+    const attrOffset = getAttributeOffset(pointAttribute.name);
+
     if (pointAttribute.name === 'POSITION_CARTESIAN') {
       // Decode position data
       const positions = new Float32Array(numPoints * 3);
@@ -166,13 +193,13 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
         let x: number, y: number, z: number;
 
         if (version.newerThan('1.3')) {
-          x = view.getUint32(inOffset + j * pointAttributes.byteSize + 0, true) * scale;
-          y = view.getUint32(inOffset + j * pointAttributes.byteSize + 4, true) * scale;
-          z = view.getUint32(inOffset + j * pointAttributes.byteSize + 8, true) * scale;
+          x = view.getUint32(attrOffset + j * pointAttributes.byteSize + 0, true) * scale;
+          y = view.getUint32(attrOffset + j * pointAttributes.byteSize + 4, true) * scale;
+          z = view.getUint32(attrOffset + j * pointAttributes.byteSize + 8, true) * scale;
         } else {
-          x = view.getFloat32(inOffset + j * pointAttributes.byteSize + 0, true) + nodeOffset[0];
-          y = view.getFloat32(inOffset + j * pointAttributes.byteSize + 4, true) + nodeOffset[1];
-          z = view.getFloat32(inOffset + j * pointAttributes.byteSize + 8, true) + nodeOffset[2];
+          x = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 0, true) + nodeOffset[0];
+          y = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 4, true) + nodeOffset[1];
+          z = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 8, true) + nodeOffset[2];
         }
 
         positions[3 * j + 0] = x;
@@ -201,9 +228,9 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       const colors = new Uint8Array(numPoints * 4);
 
       for (let j = 0; j < numPoints; j++) {
-        colors[4 * j + 0] = view.getUint8(inOffset + j * pointAttributes.byteSize + 0);
-        colors[4 * j + 1] = view.getUint8(inOffset + j * pointAttributes.byteSize + 1);
-        colors[4 * j + 2] = view.getUint8(inOffset + j * pointAttributes.byteSize + 2);
+        colors[4 * j + 0] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 0);
+        colors[4 * j + 1] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 1);
+        colors[4 * j + 2] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 2);
         colors[4 * j + 3] = 255; // Alpha
       }
 
@@ -224,7 +251,7 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       }
 
       for (let j = 0; j < numPoints; j++) {
-        const offset = inOffset + j * pointAttributes.byteSize;
+        const offset = attrOffset + j * pointAttributes.byteSize;
 
         // Check if we can read 6 bytes (3 x uint16) from this offset
         if (offset + 6 > buffer.byteLength) {
@@ -254,14 +281,14 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       };
     } else if (pointAttribute.name === 'NORMAL_SPHEREMAPPED') {
       // Decode sphere-mapped normals
-      const normals = decodeSphereMapping(view, inOffset, pointAttributes.byteSize, numPoints);
+      const normals = decodeSphereMapping(view, attrOffset, pointAttributes.byteSize, numPoints);
       attributeBuffers[pointAttribute.name] = {
         buffer: normals.buffer,
         attribute: pointAttribute,
       };
     } else if (pointAttribute.name === 'NORMAL_OCT16') {
       // Decode octahedron-encoded normals
-      const normals = decodeOct16Normals(view, inOffset, pointAttributes.byteSize, numPoints);
+      const normals = decodeOct16Normals(view, attrOffset, pointAttributes.byteSize, numPoints);
       attributeBuffers[pointAttribute.name] = {
         buffer: normals.buffer,
         attribute: pointAttribute,
@@ -271,9 +298,9 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       const normals = new Float32Array(numPoints * 3);
 
       for (let j = 0; j < numPoints; j++) {
-        const x = view.getFloat32(inOffset + j * pointAttributes.byteSize + 0, true);
-        const y = view.getFloat32(inOffset + j * pointAttributes.byteSize + 4, true);
-        const z = view.getFloat32(inOffset + j * pointAttributes.byteSize + 8, true);
+        const x = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 0, true);
+        const y = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 4, true);
+        const z = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 8, true);
 
         normals[3 * j + 0] = x;
         normals[3 * j + 1] = y;
@@ -299,14 +326,13 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       const getter = getterMap[pointAttribute.type.name as keyof typeof getterMap];
 
       if (!getter) {
-        inOffset += pointAttribute.byteSize;
         continue;
       }
 
       // Compute offset and scale for packing larger types into 32-bit floats
       if (pointAttribute.type.size > 4) {
         for (let j = 0; j < numPoints; j++) {
-          let value: any = getter(inOffset + j * pointAttributes.byteSize, true);
+          let value: any = getter(attrOffset + j * pointAttributes.byteSize, true);
 
           // Convert BigInt to Number for int64/uint64
           if (typeof value === 'bigint') {
@@ -331,7 +357,7 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 
       // Read and normalize values
       for (let j = 0; j < numPoints; j++) {
-        let value: any = getter(inOffset + j * pointAttributes.byteSize, true);
+        let value: any = getter(attrOffset + j * pointAttributes.byteSize, true);
 
         // Convert BigInt to Number for int64/uint64
         if (typeof value === 'bigint') {
@@ -359,8 +385,6 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
         scale: attrScale,
       };
     }
-
-    inOffset += pointAttribute.byteSize;
   }
 
   // Add indices

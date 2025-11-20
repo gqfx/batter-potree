@@ -600,11 +600,11 @@ var createGetterMap = (view) => ({
   float: view.getFloat32.bind(view),
   double: view.getFloat64.bind(view)
 });
-function decodeSphereMapping(view, inOffset, byteSize, numPoints) {
+function decodeSphereMapping(view, attrOffset, pointByteSize, numPoints) {
   const normals = new Float32Array(numPoints * 3);
   for (let j = 0; j < numPoints; j++) {
-    const bx = view.getUint8(inOffset + j * byteSize);
-    const by = view.getUint8(inOffset + j * byteSize + 1);
+    const bx = view.getUint8(attrOffset + j * pointByteSize);
+    const by = view.getUint8(attrOffset + j * pointByteSize + 1);
     const ex = bx / 255;
     const ey = by / 255;
     let nx = ex * 2 - 1;
@@ -624,11 +624,11 @@ function decodeSphereMapping(view, inOffset, byteSize, numPoints) {
   }
   return normals;
 }
-function decodeOct16Normals(view, inOffset, byteSize, numPoints) {
+function decodeOct16Normals(view, attrOffset, pointByteSize, numPoints) {
   const normals = new Float32Array(numPoints * 3);
   for (let j = 0; j < numPoints; j++) {
-    const bx = view.getUint8(inOffset + j * byteSize);
-    const by = view.getUint8(inOffset + j * byteSize + 1);
+    const bx = view.getUint8(attrOffset + j * pointByteSize);
+    const by = view.getUint8(attrOffset + j * pointByteSize + 1);
     const u = bx / 255 * 2 - 1;
     const v = by / 255 * 2 - 1;
     const z = 1 - Math.abs(u) - Math.abs(v);
@@ -676,20 +676,30 @@ function decodePointCloudData(event) {
   ];
   const mean = [0, 0, 0];
   const attributeBuffers = {};
-  let inOffset = 0;
+  const getAttributeOffset = (attrName) => {
+    let offset = 0;
+    for (const attr of pointAttributes.attributes) {
+      if (attr.name === attrName) {
+        return offset;
+      }
+      offset += attr.byteSize;
+    }
+    return 0;
+  };
   for (const pointAttribute of pointAttributes.attributes) {
+    const attrOffset = getAttributeOffset(pointAttribute.name);
     if (pointAttribute.name === "POSITION_CARTESIAN") {
       const positions = new Float32Array(numPoints * 3);
       for (let j = 0; j < numPoints; j++) {
         let x, y, z;
         if (version.newerThan("1.3")) {
-          x = view.getUint32(inOffset + j * pointAttributes.byteSize + 0, true) * scale;
-          y = view.getUint32(inOffset + j * pointAttributes.byteSize + 4, true) * scale;
-          z = view.getUint32(inOffset + j * pointAttributes.byteSize + 8, true) * scale;
+          x = view.getUint32(attrOffset + j * pointAttributes.byteSize + 0, true) * scale;
+          y = view.getUint32(attrOffset + j * pointAttributes.byteSize + 4, true) * scale;
+          z = view.getUint32(attrOffset + j * pointAttributes.byteSize + 8, true) * scale;
         } else {
-          x = view.getFloat32(inOffset + j * pointAttributes.byteSize + 0, true) + nodeOffset[0];
-          y = view.getFloat32(inOffset + j * pointAttributes.byteSize + 4, true) + nodeOffset[1];
-          z = view.getFloat32(inOffset + j * pointAttributes.byteSize + 8, true) + nodeOffset[2];
+          x = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 0, true) + nodeOffset[0];
+          y = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 4, true) + nodeOffset[1];
+          z = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 8, true) + nodeOffset[2];
         }
         positions[3 * j + 0] = x;
         positions[3 * j + 1] = y;
@@ -711,9 +721,9 @@ function decodePointCloudData(event) {
     } else if (pointAttribute.name === "rgba") {
       const colors = new Uint8Array(numPoints * 4);
       for (let j = 0; j < numPoints; j++) {
-        colors[4 * j + 0] = view.getUint8(inOffset + j * pointAttributes.byteSize + 0);
-        colors[4 * j + 1] = view.getUint8(inOffset + j * pointAttributes.byteSize + 1);
-        colors[4 * j + 2] = view.getUint8(inOffset + j * pointAttributes.byteSize + 2);
+        colors[4 * j + 0] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 0);
+        colors[4 * j + 1] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 1);
+        colors[4 * j + 2] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 2);
         colors[4 * j + 3] = 255;
       }
       attributeBuffers[pointAttribute.name] = {
@@ -728,7 +738,7 @@ function decodePointCloudData(event) {
         throw new Error(`Buffer size mismatch: expected ${requiredSize} bytes, got ${buffer.byteLength} bytes`);
       }
       for (let j = 0; j < numPoints; j++) {
-        const offset = inOffset + j * pointAttributes.byteSize;
+        const offset = attrOffset + j * pointAttributes.byteSize;
         if (offset + 6 > buffer.byteLength) {
           console.error(`[BinaryDecoder] RGB read would exceed buffer: offset=${offset}, bufferSize=${buffer.byteLength}`);
           colors[4 * j + 0] = 128;
@@ -750,13 +760,13 @@ function decodePointCloudData(event) {
         attribute: pointAttribute
       };
     } else if (pointAttribute.name === "NORMAL_SPHEREMAPPED") {
-      const normals = decodeSphereMapping(view, inOffset, pointAttributes.byteSize, numPoints);
+      const normals = decodeSphereMapping(view, attrOffset, pointAttributes.byteSize, numPoints);
       attributeBuffers[pointAttribute.name] = {
         buffer: normals.buffer,
         attribute: pointAttribute
       };
     } else if (pointAttribute.name === "NORMAL_OCT16") {
-      const normals = decodeOct16Normals(view, inOffset, pointAttributes.byteSize, numPoints);
+      const normals = decodeOct16Normals(view, attrOffset, pointAttributes.byteSize, numPoints);
       attributeBuffers[pointAttribute.name] = {
         buffer: normals.buffer,
         attribute: pointAttribute
@@ -764,9 +774,9 @@ function decodePointCloudData(event) {
     } else if (pointAttribute.name === "NORMAL") {
       const normals = new Float32Array(numPoints * 3);
       for (let j = 0; j < numPoints; j++) {
-        const x = view.getFloat32(inOffset + j * pointAttributes.byteSize + 0, true);
-        const y = view.getFloat32(inOffset + j * pointAttributes.byteSize + 4, true);
-        const z = view.getFloat32(inOffset + j * pointAttributes.byteSize + 8, true);
+        const x = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 0, true);
+        const y = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 4, true);
+        const z = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 8, true);
         normals[3 * j + 0] = x;
         normals[3 * j + 1] = y;
         normals[3 * j + 2] = z;
@@ -786,12 +796,11 @@ function decodePointCloudData(event) {
       const getterMap = createGetterMap(view);
       const getter = getterMap[pointAttribute.type.name];
       if (!getter) {
-        inOffset += pointAttribute.byteSize;
         continue;
       }
       if (pointAttribute.type.size > 4) {
         for (let j = 0; j < numPoints; j++) {
-          let value = getter(inOffset + j * pointAttributes.byteSize, true);
+          let value = getter(attrOffset + j * pointAttributes.byteSize, true);
           if (typeof value === "bigint") {
             value = Number(value);
           }
@@ -810,7 +819,7 @@ function decodePointCloudData(event) {
         }
       }
       for (let j = 0; j < numPoints; j++) {
-        let value = getter(inOffset + j * pointAttributes.byteSize, true);
+        let value = getter(attrOffset + j * pointAttributes.byteSize, true);
         if (typeof value === "bigint") {
           value = Number(value);
         }
@@ -831,7 +840,6 @@ function decodePointCloudData(event) {
         scale: attrScale
       };
     }
-    inOffset += pointAttribute.byteSize;
   }
   {
     const indices = new Uint32Array(numPoints);

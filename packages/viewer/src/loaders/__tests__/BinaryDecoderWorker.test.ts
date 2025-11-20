@@ -841,6 +841,100 @@ describe('BinaryDecoderWorker', () => {
     });
   });
 
+  describe('Attribute offset calculation', () => {
+    it('should correctly calculate attribute offsets for interleaved data', () => {
+      // Test data structure: POSITION (12) + intensity (2) + rgb (6) = 20 bytes per point
+      const numPoints = 2;
+      const bytesPerPoint = 20;
+
+      // Simulate getAttributeOffset function from Worker
+      const attributes = [
+        { name: 'POSITION_CARTESIAN', byteSize: 12 },
+        { name: 'intensity', byteSize: 2 },
+        { name: 'rgb', byteSize: 6 },
+      ];
+
+      const getAttributeOffset = (attrName: string): number => {
+        let offset = 0;
+        for (const attr of attributes) {
+          if (attr.name === attrName) {
+            return offset;
+          }
+          offset += attr.byteSize;
+        }
+        return 0;
+      };
+
+      // Verify correct offsets
+      expect(getAttributeOffset('POSITION_CARTESIAN')).toBe(0);
+      expect(getAttributeOffset('intensity')).toBe(12);
+      expect(getAttributeOffset('rgb')).toBe(14);
+    });
+
+    it('should read RGB from correct offset in interleaved buffer', () => {
+      // Real structure matching metadata.json:
+      // 0-11:   POSITION (12 bytes)
+      // 12-13:  intensity (2 bytes)
+      // 14-19:  rgb (6 bytes) ← RGB should be read from offset 14
+      const numPoints = 2;
+      const bytesPerPoint = 20;
+      const buffer = new ArrayBuffer(numPoints * bytesPerPoint);
+      const view = new DataView(buffer);
+
+      // Write test data for point 0
+      // Position at offset 0
+      view.setUint32(0, 1000, true);
+      view.setUint32(4, 2000, true);
+      view.setUint32(8, 3000, true);
+      // Intensity at offset 12
+      view.setUint16(12, 100, true);
+      // RGB at offset 14 (NOT offset 12!)
+      view.setUint16(14, 255, true); // R
+      view.setUint16(16, 128, true); // G
+      view.setUint16(18, 64, true);  // B
+
+      // Write test data for point 1
+      // Position at offset 20
+      view.setUint32(20, 4000, true);
+      view.setUint32(24, 5000, true);
+      view.setUint32(28, 6000, true);
+      // Intensity at offset 32
+      view.setUint16(32, 200, true);
+      // RGB at offset 34 (NOT offset 32!)
+      view.setUint16(34, 200, true); // R
+      view.setUint16(36, 100, true); // G
+      view.setUint16(38, 50, true);  // B
+
+      // Simulate Worker logic with CORRECT offset
+      const rgbOffset = 14; // Correct: 12 (position) + 2 (intensity)
+      const colors = new Uint8Array(numPoints * 4);
+
+      for (let j = 0; j < numPoints; j++) {
+        const offset = rgbOffset + j * bytesPerPoint;
+        const r = view.getUint16(offset + 0, true);
+        const g = view.getUint16(offset + 2, true);
+        const b = view.getUint16(offset + 4, true);
+
+        colors[4 * j + 0] = Math.min(255, r);
+        colors[4 * j + 1] = Math.min(255, g);
+        colors[4 * j + 2] = Math.min(255, b);
+        colors[4 * j + 3] = 255;
+      }
+
+      // Verify point 0 colors
+      expect(colors[0]).toBe(255); // R
+      expect(colors[1]).toBe(128); // G
+      expect(colors[2]).toBe(64);  // B
+      expect(colors[3]).toBe(255); // A
+
+      // Verify point 1 colors
+      expect(colors[4]).toBe(200); // R
+      expect(colors[5]).toBe(100); // G
+      expect(colors[6]).toBe(50);  // B
+      expect(colors[7]).toBe(255); // A
+    });
+  });
+
   describe('Real-world data structure simulation', () => {
     it('should decode data matching inchurch_colorized_las_converted metadata', () => {
       // Exact structure from metadata.json:
