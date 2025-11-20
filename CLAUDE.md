@@ -1,0 +1,431 @@
+# Better Potree 开发指南
+
+> 本文档为 AI 辅助开发提供项目上下文和关键技术要点
+
+## 项目概述
+
+Better Potree 是基于 [Potree](https://github.com/potree/potree) 的现代化 WebGL 点云查看器重写版本。
+
+### 核心特性
+- **现代架构**: 模块化设计，清晰的关注点分离
+- **TypeScript 优先**: 启用严格模式的完整类型安全
+- **Monorepo 结构**: 独立、可测试的包
+- **高性能**: 优化的渲染和加载策略
+- **可扩展性**: 基于插件的架构
+
+---
+
+## 项目结构
+
+```
+better-potree/
+├── packages/
+│   ├── core/                # 核心点云逻辑 + 类型定义 + 事件系统
+│   ├── rendering-three/     # Three.js 渲染实现
+│   └── viewer/              # 高级查看器 API + Potree 格式加载器
+└── apps/
+    └── playground/          # 开发调试环境
+```
+
+### 包依赖关系
+- `@better-potree/core`: 基础包，无外部依赖
+- `@better-potree/rendering-three`: 依赖 core + Three.js
+- `@better-potree/viewer`: 依赖 core + rendering-three
+
+---
+
+## 开发命令
+
+```bash
+# 安装依赖
+pnpm install
+
+# 构建所有包
+pnpm build
+
+# 开发模式（启动 playground）
+pnpm dev
+
+# 运行测试
+pnpm test
+
+# 测试 UI 界面
+pnpm test:ui
+
+# 代码检查和格式化
+pnpm lint
+pnpm format
+```
+
+---
+
+## 关键技术要点
+
+### 1. Potree 点云数据格式
+
+#### 1.1 交错布局 (Interleaved Layout)
+
+Potree 使用**交错布局**存储点云数据，每个点包含所有属性：
+
+```
+示例 (37 bytes/point):
+Point 0: [position(12) + intensity(2) + classification(1) + ... + RGB(6)]
+Point 1: [position(12) + intensity(2) + classification(1) + ... + RGB(6)]
+Point 2: [position(12) + intensity(2) + classification(1) + ... + RGB(6)]
+```
+
+#### 1.2 属性偏移计算
+
+**核心公式**：读取点 `j` 的属性 `A` 的位置：
+```typescript
+const offset = attrOffset + j * pointAttributes.byteSize
+```
+
+其中：
+- `attrOffset`: 属性在**单个点内**的固定偏移量
+- `pointAttributes.byteSize`: 单个点的总字节大小
+- `j`: 点的索引
+
+**示例**（37 字节/点）：
+```typescript
+// 假设 RGB 属性在点内的偏移量为 31
+const rgbOffset = 31;  // 所有前置属性的总字节数
+
+// 读取第 0 个点的 RGB：offset = 31 + 0 * 37 = 31
+// 读取第 1 个点的 RGB：offset = 31 + 1 * 37 = 68
+// 读取第 2 个点的 RGB：offset = 31 + 2 * 37 = 105
+```
+
+#### 1.3 常见错误模式 ❌
+
+```typescript
+// ❌ 错误：使用累加的 inOffset
+let inOffset = 0;
+for (const attr of attributes) {
+  for (let j = 0; j < numPoints; j++) {
+    // 错误！inOffset 在外层循环累加，导致偏移错误
+    view.getUint16(inOffset + j * attr.byteSize);
+  }
+  inOffset += attr.byteSize * numPoints;
+}
+
+// ✅ 正确：使用固定的 attrOffset
+for (const attr of attributes) {
+  const attrOffset = getAttributeOffset(attr.name, pointAttributes);
+  for (let j = 0; j < numPoints; j++) {
+    // 正确！attrOffset 是属性在单个点内的固定偏移
+    view.getUint16(attrOffset + j * pointAttributes.byteSize);
+  }
+}
+```
+
+#### 1.4 参考实现
+
+参考 Potree 原始实现：
+- 文件：`src/loader/POCLoader.js`
+- 关键代码：`createChildAABB()` 中的属性读取逻辑
+
+---
+
+### 2. Shader 编译要求
+
+#### 2.1 版本指令位置
+
+GLSL 着色器的 `#version` 指令**必须在第一行**：
+
+```glsl
+#version 300 es
+// ✅ 正确：版本指令在第一行
+
+// 其他代码...
+precision highp float;
+```
+
+```glsl
+// 注释或空行
+#version 300 es
+// ❌ 错误：版本指令不在第一行，会导致编译失败
+```
+
+#### 2.2 相关文件
+- `packages/rendering-three/src/shaders/pointcloud.vert.glsl`
+- `packages/rendering-three/src/shaders/pointcloud.frag.glsl`
+- `packages/rendering-three/src/shaders/edl.*.glsl`
+
+---
+
+### 3. Web Worker 数据传输
+
+#### 3.1 Transferable Objects
+
+使用 `postMessage` 传输大型 `ArrayBuffer` 时需要注意：
+
+```typescript
+// ✅ 推荐：不使用 transferables（避免 buffer detached）
+self.postMessage({ buffer: arrayBuffer });
+
+// ⚠️ 使用 transferables 会导致 buffer 所有权转移
+self.postMessage({ buffer: arrayBuffer }, [arrayBuffer]);
+// 之后 arrayBuffer 将不可用（detached）
+```
+
+**相关提交**: `dc1fd01 - fix: 移除 Worker transferables 避免 buffer detached`
+
+#### 3.2 相关文件
+- `packages/viewer/src/loaders/workers/BinaryDecoderWorker.ts`
+
+---
+
+### 4. HTTP Range 请求
+
+Potree 2.0 使用 HTTP Range 请求加载节点数据：
+
+```typescript
+// 支持 Range 请求
+fetch(url, {
+  headers: {
+    'Range': `bytes=${start}-${end}`
+  }
+})
+```
+
+**相关提交**: `9c1190f - fix: 添加 HTTP Range 请求支持`
+
+---
+
+## 最近的关键修复
+
+### 修复 1: BinaryDecoderWorker 属性偏移计算错误 (2025-11-20)
+
+**问题**：
+- DataView bounds 错误持续出现
+- 根本原因：使用累加的 `inOffset` 导致属性偏移计算错误
+
+**修复**：
+1. 引入 `getAttributeOffset()` 函数正确计算属性偏移
+2. 修复所有属性读取：使用 `attrOffset + j * pointByteSize`
+3. 修复 Normal 解码函数：
+   - `decodeSphereMapping()`
+   - `decodeOct16Normals()`
+
+**测试覆盖**：
+- 添加属性偏移计算测试
+- 添加交错缓冲区 RGB 读取测试
+- 总计 31 个单元测试全部通过
+
+**相关提交**: `60098d1`
+
+**相关文件**：
+- `packages/viewer/src/loaders/workers/BinaryDecoderWorker.ts`
+- `packages/viewer/src/loaders/__tests__/BinaryDecoderWorker.test.ts`
+
+---
+
+### 修复 2: ThreeJsRenderer 接口对齐 (2025-11-19)
+
+**问题**：
+- `Viewer.ts` 调用 `renderer.render(scene, camera)` 时类型不匹配
+
+**修复**：
+- 实现标准的 `render(scene, camera)` 方法
+- 移除低级别的 `render(buffer, material, matrix)` 方法
+- 删除不需要的 `viewMatrix` 和 `projectionMatrix` 字段
+
+**相关提交**: `1ec6c12`
+
+---
+
+### 修复 3: Shader 编译错误 (早期)
+
+**问题**：
+- GLSL 着色器编译失败
+
+**修复**：
+- 将 `#version 300 es` 移到文件第一行
+
+**相关文件**：
+- `packages/rendering-three/src/shaders/*.glsl`
+
+---
+
+## 测试策略
+
+### 单元测试
+```bash
+# 运行所有测试
+pnpm test
+
+# 运行特定包的测试
+pnpm --filter @better-potree/viewer test
+
+# 观察模式
+pnpm test -- --watch
+
+# 覆盖率报告
+pnpm test -- --coverage
+```
+
+### 测试框架
+- **Vitest**: 快速的单元测试框架
+- **Testing Library**: 组件测试（如需要）
+
+---
+
+## 代码规范
+
+### Linter & Formatter
+- **Biome**: 统一的代码检查和格式化工具
+
+### TypeScript 配置
+- 启用 `strict` 模式
+- 路径别名配置在各包的 `tsconfig.json`
+
+### 命名约定
+- 接口：`I` 前缀（如 `IRenderer`）
+- 类型：PascalCase（如 `PointAttribute`）
+- 枚举：PascalCase（如 `PointAttributeType`）
+
+---
+
+## 调试技巧
+
+### Playground 调试
+```bash
+# 启动开发服务器
+pnpm dev
+
+# 访问 http://localhost:3000
+# 使用浏览器开发者工具调试
+```
+
+### Worker 调试
+- 在 Chrome DevTools 中查看 Worker 线程
+- 使用 `console.log` 输出调试信息（会显示在主线程控制台）
+
+### Shader 调试
+- 使用 [Spector.js](https://spector.babylonjs.com/) 捕获 WebGL 调用
+- 检查 Three.js 的 `renderer.info` 对象
+
+---
+
+## 性能优化要点
+
+### 1. LOD (Level of Detail)
+- 基于八叉树的 LOD 管理
+- 优先级队列遍历替代深度优先遍历
+
+### 2. GPU 加速
+- GPU 可见性剔除
+- 可见性纹理用于 LOD 遍历
+
+### 3. 内存管理
+- 基于内存大小的 LRU 缓存自动卸载
+- Worker Pool 管理器
+
+---
+
+## 常见问题排查
+
+### 问题 1: DataView bounds 错误
+**原因**: 属性偏移计算错误
+**解决**: 参考"属性偏移计算"章节
+
+### 问题 2: Shader 编译失败
+**原因**: `#version` 指令位置错误
+**解决**: 确保 `#version 300 es` 在文件第一行
+
+### 问题 3: Worker buffer detached
+**原因**: 使用了 transferables
+**解决**: 移除 `postMessage` 的第二个参数
+
+### 问题 4: 点云加载失败
+**可能原因**:
+- HTTP Range 请求未支持
+- 元数据解析错误
+- 属性格式不匹配
+
+**排查步骤**:
+1. 检查网络请求（DevTools Network 标签）
+2. 检查控制台错误
+3. 验证点云文件格式（Potree 1.x vs 2.0）
+
+---
+
+## 参考资源
+
+### 官方文档
+- [Potree](https://github.com/potree/potree)
+- [Three.js](https://threejs.org/docs/)
+
+### 项目文档
+- `docs/` - 详细的架构和 API 文档
+- `plan.md` - 开发路线图
+- `PROJECT_STATUS.md` - 项目状态报告
+
+### 相关技术
+- [WebGL 2.0 规范](https://www.khronos.org/registry/webgl/specs/latest/2.0/)
+- [GLSL ES 3.00 规范](https://www.khronos.org/registry/OpenGL/specs/es/3.0/GLSL_ES_Specification_3.00.pdf)
+
+---
+
+## 提交规范
+
+使用简洁的中文 commit message：
+
+```bash
+# 功能
+feat: 添加 XXX 功能
+
+# 修复
+fix: 修复 XXX 问题
+
+# 文档
+docs: 更新 XXX 文档
+
+# 测试
+test: 添加 XXX 测试
+
+# 重构
+refactor: 重构 XXX 模块
+
+# 性能
+perf: 优化 XXX 性能
+
+# 工具
+chore: 更新构建配置
+```
+
+---
+
+## 开发工作流
+
+1. **拉取最新代码**
+   ```bash
+   git pull origin main
+   ```
+
+2. **安装依赖**
+   ```bash
+   pnpm install
+   ```
+
+3. **开发和测试**
+   ```bash
+   pnpm dev      # 启动开发服务器
+   pnpm test     # 运行测试
+   ```
+
+4. **提交代码**
+   ```bash
+   git add .
+   git commit -m "feat: 添加新功能"
+   ```
+
+5. **推送代码**
+   ```bash
+   git push origin main
+   ```
+
+---
+
+*最后更新: 2025-11-20*
