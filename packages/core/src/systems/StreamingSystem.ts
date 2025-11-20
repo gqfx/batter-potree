@@ -487,6 +487,7 @@ export class StreamingSystem implements ISystem {
       };
 
       // 使用 WorkerPool 执行解码
+      // 注意：buffer 会被转移到 Worker，之后不能再使用
       const transferables: Transferable[] = [buffer];
       const decodedData = (await this.config.workerPool.execute(
         decodeRequest,
@@ -500,9 +501,11 @@ export class StreamingSystem implements ISystem {
 
       // 处理解码后的数据
       await this.processDecodedData(request, decodedData, startTime);
-    } catch (_error) {
-      // Worker 解码失败，回退到同步解码
-      return this.processLoadComplete(request, buffer, startTime);
+    } catch (error) {
+      // Worker 解码失败，直接抛出错误
+      // 不能回退到同步解码，因为 buffer 已经被转移到 Worker
+      const key = this.getNodeKey(request.octree, request.node);
+      this.handleLoadError(key, request, error as Error);
     }
   }
 

@@ -34,6 +34,10 @@ export interface WorkerPoolOptions {
    * Worker 脚本路径
    */
   readonly workerUrl: string;
+  /**
+   * Worker 构造函数选项
+   */
+  readonly workerOptions?: WorkerOptions;
 }
 
 /**
@@ -60,6 +64,7 @@ interface WorkerInstance {
 export class WorkerPool<T = unknown, R = unknown> {
   private readonly workerUrl: string;
   private readonly maxWorkers: number;
+  private readonly workerOptions: WorkerOptions;
   private readonly workers: WorkerInstance[] = [];
   private readonly taskQueue: Array<WorkerTask<T, R>> = [];
   private readonly activeTasks = new Map<string, WorkerTask<T, R>>();
@@ -73,6 +78,8 @@ export class WorkerPool<T = unknown, R = unknown> {
   constructor(options: WorkerPoolOptions) {
     this.workerUrl = options.workerUrl;
     this.maxWorkers = options.maxWorkers ?? navigator.hardwareConcurrency ?? 4;
+    // 不指定 type，让浏览器自动判断（对于打包后的 Worker，通常不需要 module 类型）
+    this.workerOptions = options.workerOptions ?? {};
   }
 
   /**
@@ -106,6 +113,8 @@ export class WorkerPool<T = unknown, R = unknown> {
    * @param transferables - 可转移对象
    */
   private submitTask(task: WorkerTask<T, R>, transferables?: Transferable[]): void {
+    console.log('[WorkerPool] Submitting task:', task.id);
+
     if (this.disposed) {
       task.onError(new Error('WorkerPool has been disposed'));
       return;
@@ -114,9 +123,12 @@ export class WorkerPool<T = unknown, R = unknown> {
     this.activeTasks.set(task.id, task);
 
     const worker = this.getAvailableWorker();
+    console.log('[WorkerPool] Available worker:', worker ? 'found' : 'not found', 'Total workers:', this.workers.length, 'Queue size:', this.taskQueue.length);
+
     if (worker) {
       this.assignTask(worker, task, transferables);
     } else {
+      console.log('[WorkerPool] No available worker, queueing task');
       this.taskQueue.push(task);
     }
   }
@@ -144,22 +156,34 @@ export class WorkerPool<T = unknown, R = unknown> {
    * 创建 Worker
    */
   private createWorker(): WorkerInstance {
-    const worker = new Worker(this.workerUrl);
-    const instance: WorkerInstance = {
-      worker,
-      busy: false,
-    };
+    console.log('[WorkerPool] Creating worker with URL:', this.workerUrl, 'options:', this.workerOptions);
 
-    worker.addEventListener('message', (event: MessageEvent<WorkerResponse<R>>) => {
-      this.handleWorkerMessage(instance, event.data);
-    });
+    try {
+      const worker = new Worker(this.workerUrl, this.workerOptions);
+      console.log('[WorkerPool] Worker created successfully:', worker);
 
-    worker.addEventListener('error', (event: ErrorEvent) => {
-      this.handleWorkerError(instance, event);
-    });
+      const instance: WorkerInstance = {
+        worker,
+        busy: false,
+      };
 
-    this.workers.push(instance);
-    return instance;
+      worker.addEventListener('message', (event: MessageEvent<WorkerResponse<R>>) => {
+        console.log('[WorkerPool] Worker message received:', event.data);
+        this.handleWorkerMessage(instance, event.data);
+      });
+
+      worker.addEventListener('error', (event: ErrorEvent) => {
+        console.error('[WorkerPool] Worker error:', event.message, event.filename, event.lineno);
+        this.handleWorkerError(instance, event);
+      });
+
+      this.workers.push(instance);
+      console.log('[WorkerPool] Total workers:', this.workers.length);
+      return instance;
+    } catch (error) {
+      console.error('[WorkerPool] Failed to create worker:', error);
+      throw error;
+    }
   }
 
   /**
@@ -170,6 +194,8 @@ export class WorkerPool<T = unknown, R = unknown> {
     task: WorkerTask<T, R>,
     transferables?: Transferable[],
   ): void {
+    console.log('[WorkerPool] Assigning task', task.id, 'to worker');
+
     worker.busy = true;
     worker.currentTaskId = task.id;
 
@@ -179,8 +205,10 @@ export class WorkerPool<T = unknown, R = unknown> {
     };
 
     if (transferables && transferables.length > 0) {
+      console.log('[WorkerPool] Posting message with', transferables.length, 'transferables');
       worker.worker.postMessage(message, transferables);
     } else {
+      console.log('[WorkerPool] Posting message without transferables');
       worker.worker.postMessage(message);
     }
   }
@@ -217,11 +245,20 @@ export class WorkerPool<T = unknown, R = unknown> {
    */
   private handleWorkerError(worker: WorkerInstance, event: ErrorEvent): void {
     const taskId = worker.currentTaskId;
+
+    // 构建详细的错误信息
+    const errorDetails = [
+      event.message || 'Unknown worker error',
+      event.filename ? `File: ${event.filename}` : '',
+      event.lineno ? `Line: ${event.lineno}` : '',
+      event.colno ? `Column: ${event.colno}` : '',
+    ].filter(Boolean).join(' | ');
+
     if (taskId) {
       const task = this.activeTasks.get(taskId);
       if (task) {
         this.activeTasks.delete(taskId);
-        task.onError(new Error(event.message || 'Worker error'));
+        task.onError(new Error(errorDetails || 'Worker error'));
       }
     }
 

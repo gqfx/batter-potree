@@ -128,7 +128,14 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 
   const buffer = event.data.buffer;
   const pointAttributes = event.data.pointAttributes;
+
+  console.log('[BinaryDecoder] Input buffer.byteLength:', buffer.byteLength);
+  console.log('[BinaryDecoder] pointAttributes.byteSize:', pointAttributes.byteSize);
+  console.log('[BinaryDecoder] pointAttributes.attributes:', pointAttributes.attributes.map((a: any) => ({ name: a.name, byteSize: a.byteSize })));
+
   const numPoints = buffer.byteLength / pointAttributes.byteSize;
+  console.log('[BinaryDecoder] Calculated numPoints:', numPoints);
+
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
   const nodeOffset = event.data.offset;
@@ -397,29 +404,38 @@ self.onmessage = (event: MessageEvent) => {
       decodeRequest = event.data;
     }
 
+    // 验证必要的数据
+    if (!decodeRequest.buffer) {
+      throw new Error('Missing buffer in decode request');
+    }
+    if (!decodeRequest.pointAttributes) {
+      throw new Error('Missing pointAttributes in decode request');
+    }
+    if (typeof decodeRequest.pointAttributes.byteSize !== 'number') {
+      throw new Error(`Invalid pointAttributes.byteSize: ${decodeRequest.pointAttributes.byteSize}`);
+    }
+    if (!Array.isArray(decodeRequest.pointAttributes.attributes)) {
+      throw new Error('Invalid pointAttributes.attributes: not an array');
+    }
+
     const result = decodePointCloudData({ data: decodeRequest } as MessageEvent<IWorkerDecodeRequest>);
 
-    // Collect transferable objects
-    const transferables: Transferable[] = [result.buffer];
-    for (const property in result.attributeBuffers) {
-      if (result.attributeBuffers[property]?.buffer) {
-        transferables.push(result.attributeBuffers[property].buffer);
-      }
-      if (result.attributeBuffers[property]?.preciseBuffer) {
-        transferables.push(result.attributeBuffers[property].preciseBuffer!);
-      }
-    }
+    // 不使用 transferables，因为会导致 buffer detached
+    // 这样接收端可以安全地访问 buffer
+    // 注意：这会增加内存开销，但避免了 detached buffer 问题
 
-    // Send response with transferable objects
+    // Send response WITHOUT transferable objects
     if (taskId) {
       // WorkerPool 格式响应
-      (self as any).postMessage({ taskId, result }, { transfer: transferables });
+      (self as any).postMessage({ taskId, result });
     } else {
       // 直接格式响应
-      (self as any).postMessage(result, { transfer: transferables });
+      (self as any).postMessage(result);
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error
+      ? `${error.message}\nStack: ${error.stack}`
+      : String(error);
 
     if ('taskId' in event.data) {
       // WorkerPool 格式错误响应

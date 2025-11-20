@@ -4,8 +4,8 @@
  * @module workers
  */
 
-import { WorkerPool } from './WorkerPool.js';
 import type { WorkerPoolOptions } from './WorkerPool.js';
+import { WorkerPool } from './WorkerPool.js';
 
 /**
  * 创建点云解码 Worker Pool
@@ -26,6 +26,7 @@ export function createDecoderWorkerPool(
   const options: WorkerPoolOptions = {
     workerUrl,
     maxWorkers: maxWorkers ?? Math.max(1, (navigator.hardwareConcurrency || 4) - 1),
+    workerOptions: { type: 'module' },
   };
 
   return new WorkerPool(options);

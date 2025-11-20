@@ -9,7 +9,9 @@ import type { IPointCloudOctree } from '@better-potree/core';
 import { ThreeJsRenderer, ThreeScene } from '@better-potree/rendering-three';
 import { EarthControls, PotreeLoader, ViewerAPI } from '@better-potree/viewer';
 import * as THREE from 'three';
+import { debugSystem as debug, LogCategory } from './debugger';
 
+debug.info(LogCategory.INIT, 'Better Potree Playground - 初始化中...');
 console.log('Better Potree Playground - 初始化中...');
 
 // 获取 DOM 元素
@@ -19,39 +21,211 @@ const infoPanel = document.getElementById('info');
 const controlsPanel = document.getElementById('controls');
 
 if (!container || !canvas) {
+  debug.error(LogCategory.INIT, 'Required DOM elements not found');
   throw new Error('Required DOM elements not found');
 }
 
+debug.info(LogCategory.INIT, 'DOM elements found', { container, canvas });
+
 // 创建渲染器和场景
+debug.info(LogCategory.INIT, 'Creating renderer and scene...');
 const renderer = new ThreeJsRenderer({ canvas });
 const scene = new ThreeScene();
+debug.info(LogCategory.INIT, 'Renderer and scene created');
 
 // 创建相机
+debug.info(LogCategory.CAMERA, 'Creating camera...');
 const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
 camera.position.set(10, 10, 10);
 camera.lookAt(0, 0, 0);
+debug.info(LogCategory.CAMERA, 'Camera created', {
+  position: camera.position,
+  aspect: camera.aspect,
+});
 
 // 创建 Viewer
-// ThreeJsRenderer 现在已经实现了正确的 IRenderer 接口（来自 @better-potree/core）
+// ThreeJsRenderer 现在已经实现了正确的 IRenderer 接口(来自 @better-potree/core)
+debug.info(LogCategory.VIEWER, 'Creating Viewer API...');
 const viewer = new ViewerAPI({
   container,
   renderer: renderer as any, // ThreeJsRenderer 实现了 IRenderer 接口
   scene,
   camera,
   pointBudget: 1_000_000,
-  pointSize: 1.0,
-  edlEnabled: true,
+  pointSize: 5.0, // 增大点大小，方便查看
+  edlEnabled: false, // 暂时禁用 EDL，简化调试
   backgroundColor: 0x000000,
+  // 使用从 public 目录提供的 Worker 文件
+  workerUrl: '/BinaryDecoderWorker.js',
+});
+debug.info(LogCategory.VIEWER, 'Viewer API created', {
+  pointBudget: viewer.getPointBudget(),
+  pointSize: viewer.getPointSize(),
+  edlEnabled: viewer.getEDLConfig().enabled,
 });
 
+// 检查 Worker Pool 状态
+const streamingSystem = viewer.getStreamingSystem();
+const hasWorkerPool = !!(streamingSystem as any).config?.workerPool;
+debug.info(LogCategory.VIEWER, 'Worker Pool status', {
+  hasWorkerPool,
+  streamingSystemExists: !!streamingSystem,
+});
+console.log('[DEBUG] StreamingSystem config:', (streamingSystem as any).config);
+
+// 测试 Worker 是否能被创建
+try {
+  console.log('[DEBUG] Testing simple worker...');
+  const simpleWorker = new Worker('/test-worker.js');
+  simpleWorker.addEventListener('message', (event) => {
+    console.log('[DEBUG] Simple worker message:', event.data);
+  });
+  simpleWorker.addEventListener('error', (event) => {
+    console.error('[DEBUG] Simple worker error:', event);
+  });
+  simpleWorker.postMessage({ test: 'simple' });
+
+  console.log('[DEBUG] Testing BinaryDecoderWorker...');
+  const testWorker = new Worker('/BinaryDecoderWorker.js');
+  testWorker.addEventListener('message', (event) => {
+    console.log('[DEBUG] Test worker message:', event.data);
+  });
+  testWorker.addEventListener('error', (event) => {
+    console.error('[DEBUG] Test worker error:', event);
+  });
+  console.log('[DEBUG] Test worker created successfully:', testWorker);
+  // 发送测试消息
+  testWorker.postMessage({ test: true });
+} catch (error) {
+  console.error('[DEBUG] Failed to create test worker:', error);
+}
+
 // 创建控制器
+debug.info(LogCategory.CAMERA, 'Creating EarthControls...');
 const controls = new EarthControls(camera, canvas);
 controls.rotationSpeed = 0.5;
 controls.zoomSpeed = 1.0;
 controls.fadeFactor = 10;
+debug.info(LogCategory.CAMERA, 'EarthControls created');
 
 // 创建加载器
 const loader = new PotreeLoader();
+
+// 添加 Viewer 事件监听用于调试
+debug.info(LogCategory.VIEWER, 'Setting up Viewer event listeners...');
+
+viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {
+  debug.info(LogCategory.LOADER, '点云加载完成', {
+    name,
+    version: pointCloud.version,
+    numPoints: pointCloud.root?.numPoints,
+    boundingBox: pointCloud.boundingBox,
+    spacing: pointCloud.spacing,
+  });
+});
+
+viewer.on('node-loaded', ({ pointCloud, node, data }) => {
+  console.log('[DEBUG] Node loaded:', node.name, 'numPoints:', data.numPoints);
+  debug.debug(LogCategory.STREAMING, '节点加载完成', {
+    nodeName: node.name,
+    numPoints: data.numPoints,
+    level: node.level,
+    attributeKeys: Object.keys(data.attributeBuffers || {}),
+  });
+
+  // 更新调试统计
+  const loadedNodes = viewer.getLoadedNodesCount();
+  const totalPoints = viewer.getTotalPointsLoaded();
+  debug.updateStats({
+    loadedNodes,
+    visiblePoints: totalPoints,
+  });
+
+  // 检查场景中的节点数量
+  const pcScenes = viewer.getPointCloudScenes();
+  if (pcScenes.length > 0) {
+    console.log('[DEBUG] After node load - PointCloudScene children:', pcScenes[0].children.length);
+    console.log('[DEBUG] After node load - PointCloudScene nodeCount:', pcScenes[0].nodeCount);
+  }
+});
+
+viewer.on('node-load-failed', ({ node, error, retries }) => {
+  console.error('[DEBUG] Node load failed:', node.name, 'error:', error, 'retries:', retries);
+  debug.error(LogCategory.STREAMING, '节点加载失败', {
+    nodeName: node.name,
+    level: node.level,
+    error: error.message,
+    retries,
+  });
+
+  // 更新失败请求统计
+  const stats = viewer.getStreamingSystem().getStats();
+  debug.updateStats({
+    failedRequests: stats.failedRequests,
+  });
+});
+
+viewer.on('render', () => {
+  // 每帧更新可见节点统计
+  try {
+    const traversal = viewer.getTraversalSystem();
+    const result = traversal?.getLastResult();
+    const streaming = viewer.getStreamingSystem();
+    const streamingStats = streaming?.getStats();
+
+    debug.updateStats({
+      visibleNodes: result?.visibleNodes?.length ?? 0,
+      visiblePoints: result?.totalPoints ?? 0,
+      pendingRequests: streamingStats?.pendingRequests ?? 0,
+      completedRequests: streamingStats?.completedLoads ?? 0,
+    });
+  } catch (error) {
+    console.error('[DEBUG] render 事件处理出错:', error);
+  }
+});
+
+// 每秒输出一次渲染状态（用于调试）
+let lastDebugTime = 0;
+viewer.on('update', () => {
+  const now = performance.now();
+  if (now - lastDebugTime > 2000) { // 每2秒
+    lastDebugTime = now;
+
+    try {
+      const pointClouds = viewer.getPointClouds();
+      const traversal = viewer.getTraversalSystem();
+      const streaming = viewer.getStreamingSystem();
+      const result = traversal?.getLastResult();
+      const streamingStats = streaming?.getStats();
+
+      debug.info(LogCategory.RENDER, '渲染状态检查', {
+        pointCloudCount: pointClouds?.length ?? 0,
+        visibleNodes: result?.visibleNodes?.length ?? 0,
+        totalPoints: result?.totalPoints ?? 0,
+        pendingRequests: streamingStats?.pendingRequests ?? 0,
+        activeLoads: streamingStats?.activeLoads ?? 0,
+        completedLoads: streamingStats?.completedLoads ?? 0,
+        failedLoads: streamingStats?.failedLoads ?? 0,
+      });
+
+      // 检查点云是否在场景中
+      if (pointClouds && pointClouds.length > 0) {
+        const pc = pointClouds[0];
+        debug.debug(LogCategory.RENDER, '点云详情', {
+          url: pc.url,
+          rootLoaded: pc.root?.loaded,
+          rootLoading: pc.root?.loading,
+          rootNumPoints: pc.root?.numPoints,
+          rootChildren: pc.root?.children?.filter(c => c !== null).length ?? 0,
+        });
+      }
+    } catch (error) {
+      console.error('[DEBUG] 渲染状态检查出错:', error);
+    }
+  }
+});
+
+debug.info(LogCategory.VIEWER, 'Viewer event listeners configured');
 
 // 添加环境光和方向光
 const ambientLight = new THREE.AmbientLight(0x404040, 2);
@@ -307,6 +481,8 @@ function createControlsPanel() {
     // 使用代理服务器路径加载测试数据
     const testDataUrl = '/pointcloud/inchurch_colorized_las_converted/';
 
+    debug.info(LogCategory.LOADER, '开始加载测试数据', { url: testDataUrl });
+
     try {
       if (loadStatus) {
         loadStatus.style.display = 'block';
@@ -314,11 +490,20 @@ function createControlsPanel() {
         loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
 
+      debug.debug(LogCategory.NETWORK, '发起加载请求', { url: testDataUrl });
       console.log('正在加载测试数据:', testDataUrl);
 
       // 使用 viewer.load() API 加载点云
+      debug.info(LogCategory.LOADER, '调用 viewer.load()');
       const octree = await viewer.load(testDataUrl);
 
+      debug.info(LogCategory.LOADER, '测试数据加载成功', {
+        version: octree.version,
+        root: octree.root ? '存在' : '不存在',
+        numPoints: octree.root?.numPoints,
+        boundingBox: octree.boundingBox,
+        pointAttributes: octree.pointAttributes,
+      });
       console.log('测试数据加载成功:', octree);
 
       // 调整相机以适应点云边界
@@ -328,6 +513,12 @@ function createControlsPanel() {
         const size = boundingBox.getSize(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
 
+        debug.info(LogCategory.CAMERA, '调整相机位置以适应点云', {
+          center,
+          size,
+          maxDim,
+        });
+
         camera.position.copy(center);
         camera.position.z += maxDim * 2;
         camera.lookAt(center);
@@ -336,6 +527,37 @@ function createControlsPanel() {
         // 隐藏网格和坐标轴（可选）
         gridHelper.visible = false;
         axesHelper.visible = false;
+      } else {
+        debug.warn(LogCategory.LOADER, '点云没有边界框信息');
+      }
+
+      // 检查点云是否已添加到 viewer
+      const pointClouds = viewer.getPointClouds();
+      debug.info(LogCategory.VIEWER, '当前 viewer 中的点云数量', {
+        count: pointClouds.length,
+        pointClouds: pointClouds.map(pc => ({
+          name: pc.name,
+          version: pc.version,
+          hasRoot: !!pc.root,
+        })),
+      });
+
+      // 调试：检查场景中的对象
+      const threeScene = scene.getThreeScene();
+      console.log('[DEBUG] Scene children count:', threeScene.children.length);
+      console.log('[DEBUG] Scene children:', threeScene.children);
+
+      // 检查 PointCloudScene
+      const pcScenes = viewer.getPointCloudScenes();
+      console.log('[DEBUG] PointCloudScenes:', pcScenes.length);
+      if (pcScenes.length > 0) {
+        const pcScene = pcScenes[0];
+        console.log('[DEBUG] PointCloudScene children:', pcScene.children.length);
+        console.log('[DEBUG] PointCloudScene material:', pcScene.material);
+        console.log('[DEBUG] PointCloudScene material uniforms:', pcScene.material.uniforms);
+        console.log('[DEBUG] PointCloudScene visible:', pcScene.visible);
+        console.log('[DEBUG] PointCloudScene nodeCount:', pcScene.nodeCount);
+        console.log('[DEBUG] PointCloudScene visiblePointCount:', pcScene.visiblePointCount);
       }
 
       if (loadStatus) {
@@ -350,7 +572,33 @@ function createControlsPanel() {
         `;
         loadStatus.style.background = 'rgba(0,255,0,0.1)';
       }
+
+      // 5秒后检查加载状态
+      setTimeout(() => {
+        console.log('\n===== 5秒后状态检查 =====');
+        const pcScenes2 = viewer.getPointCloudScenes();
+        if (pcScenes2.length > 0) {
+          const pcScene2 = pcScenes2[0];
+          console.log('[DEBUG] PointCloudScene children:', pcScene2.children.length);
+          console.log('[DEBUG] PointCloudScene nodeCount:', pcScene2.nodeCount);
+          console.log('[DEBUG] PointCloudScene visiblePointCount:', pcScene2.visiblePointCount);
+
+          if (pcScene2.children.length > 0) {
+            console.log('[DEBUG] First child:', pcScene2.children[0]);
+          }
+        }
+
+        const streamingStats2 = viewer.getStreamingSystem().getStats();
+        console.log('[DEBUG] StreamingSystem stats:', streamingStats2);
+        console.log('[DEBUG] Loaded nodes count:', viewer.getLoadedNodesCount());
+        console.log('[DEBUG] Total points loaded:', viewer.getTotalPointsLoaded());
+        console.log('========================\n');
+      }, 5000);
     } catch (error) {
+      debug.error(LogCategory.LOADER, '加载测试数据失败', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       console.error('加载测试数据失败:', error);
 
       if (loadStatus) {
@@ -628,26 +876,88 @@ let frameCount = 0;
 
 // 监听 Viewer 的 update 事件来更新控制器和 UI
 viewer.on('update', ({ deltaTime }) => {
+  debug.startFrame();
+
   // 更新控制器
   controls.update(deltaTime);
 
-  // 每 30 帧更新一次信息面板
+  // 每 30 帧更新一次信息面板和调试统计
   frameCount++;
   if (frameCount % 30 === 0) {
     updateInfo();
+
+    // 更新调试统计
+    const pointClouds = viewer.getPointClouds();
+    debug.updateStats({
+      totalPointClouds: pointClouds.length,
+      cameraPosition: {
+        x: camera.position.x,
+        y: camera.position.y,
+        z: camera.position.z,
+      },
+      cameraDistance: camera.position.length(),
+    });
   }
+
+  debug.endFrame();
 });
 
 // 初始化
+debug.info(LogCategory.INIT, 'Creating controls panel...');
 createControlsPanel();
 updateInfo();
 
 // 启动 Viewer 内置的动画循环
 // 这会启动系统调度器，包括 TraversalSystem 和 StreamingSystem
+debug.info(LogCategory.VIEWER, 'Starting animation loop...');
 viewer.startAnimation();
 
+debug.info(LogCategory.INIT, '初始化完成 - 按 Ctrl+D 打开调试面板');
 console.log('✅ Better Potree Playground 初始化完成');
 console.log('📦 Viewer:', viewer);
 console.log('🎮 Controls:', controls);
 console.log('📥 Loader:', loader);
 console.log('🎬 动画循环已启动，系统调度器运行中...');
+console.log('🐛 按 Ctrl+D 打开调试面板');
+
+// 自动加载测试数据
+(async () => {
+  const testDataUrl = '/pointcloud/inchurch_colorized_las_converted/';
+  debug.info(LogCategory.LOADER, '自动加载测试数据', { url: testDataUrl });
+  console.log('🚀 自动加载测试数据:', testDataUrl);
+
+  try {
+    const octree = await viewer.load(testDataUrl);
+
+    debug.info(LogCategory.LOADER, '测试数据加载成功', {
+      version: octree.version,
+      root: octree.root ? '存在' : '不存在',
+      numPoints: octree.root?.numPoints,
+      boundingBox: octree.boundingBox,
+    });
+    console.log('✅ 测试数据自动加载成功:', octree);
+
+    // 调整相机以适应点云边界
+    if (octree.boundingBox) {
+      const boundingBox = octree.boundingBox;
+      const center = boundingBox.getCenter(new THREE.Vector3());
+      const size = boundingBox.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      camera.position.copy(center);
+      camera.position.z += maxDim * 2;
+      camera.lookAt(center);
+      controls.setPivot(center);
+
+      gridHelper.visible = false;
+      axesHelper.visible = false;
+
+      console.log('📷 相机已调整:', { center, size, maxDim });
+    }
+  } catch (error) {
+    debug.error(LogCategory.LOADER, '自动加载测试数据失败', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    console.error('❌ 自动加载测试数据失败:', error);
+  }
+})();

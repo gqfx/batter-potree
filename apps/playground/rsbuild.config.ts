@@ -1,6 +1,23 @@
 import { defineConfig } from '@rsbuild/core';
 import { pluginTypeCheck } from '@rsbuild/plugin-type-check';
 import path from 'node:path';
+import fs from 'node:fs';
+
+// Copy Worker file to public directory
+const workerSourcePath = path.resolve(__dirname, '../../packages/viewer/dist/loaders/workers/BinaryDecoderWorker.js');
+const publicDir = path.resolve(__dirname, 'public');
+const workerDestPath = path.resolve(publicDir, 'BinaryDecoderWorker.js');
+
+// Ensure public directory exists and copy worker file
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+if (fs.existsSync(workerSourcePath)) {
+  fs.copyFileSync(workerSourcePath, workerDestPath);
+  console.log('[rsbuild config] Copied BinaryDecoderWorker.js to public directory');
+} else {
+  console.warn('[rsbuild config] Worker source file not found:', workerSourcePath);
+}
 
 export default defineConfig({
   plugins: [pluginTypeCheck()],

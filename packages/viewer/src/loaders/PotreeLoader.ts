@@ -1,6 +1,6 @@
 /**
  * Potree point cloud loader
- * Loads Potree format point clouds (1.x and 2.0)
+ * Loads Potree 2.0 format point clouds
  *
  * @module @better-potree/viewer/loaders
  * @example
@@ -22,7 +22,6 @@ import type {
 } from '@better-potree/core';
 import * as THREE from 'three';
 import { parseAttributes } from './parseAttributes.js';
-import { Version } from './Version.js';
 
 /**
  * Check if bounding box is in Potree 2.0 format (array-based)
@@ -172,7 +171,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
   /**
    * Load a Potree point cloud from URL
    *
-   * @param url - URL to the point cloud metadata file (cloud.js or metadata.json)
+   * @param url - URL to the point cloud metadata file (metadata.json)
    * @returns Promise that resolves with the loaded octree
    * @throws {Error} If metadata cannot be loaded or parsed
    *
@@ -185,24 +184,17 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
    * ```
    */
   async load(url: string): Promise<IPointCloudOctree> {
-    // Determine metadata file path
+    // Determine metadata file path (Potree 2.0 format only)
     let metadataUrl = url;
     if (url.endsWith('/')) {
-      metadataUrl = `${url}cloud.js`;
-    } else if (!url.endsWith('.js') && !url.endsWith('.json')) {
-      metadataUrl = `${url}/cloud.js`;
+      metadataUrl = `${url}metadata.json`;
+    } else if (!url.endsWith('.json')) {
+      metadataUrl = `${url}/metadata.json`;
     }
 
-    try {
-      // Try loading as cloud.js first
-      const metadata = await this.loadMetadata(metadataUrl);
-      return this.parseMetadata(url, metadata);
-    } catch (_error) {
-      // Try metadata.json (Potree 2.0 format)
-      const jsonUrl = metadataUrl.replace('cloud.js', 'metadata.json');
-      const metadata = await this.loadMetadata(jsonUrl);
-      return this.parseMetadata(url, metadata);
-    }
+    // Load Potree 2.0 metadata
+    const metadata = await this.loadMetadata(metadataUrl);
+    return this.parseMetadata(url, metadata);
   }
 
   /**
@@ -230,13 +222,6 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       text = await response.text();
     }
 
-    // Remove JSONP callback if present (for cloud.js format)
-    if (text.startsWith('Potree.') || text.startsWith('var ')) {
-      const start = text.indexOf('{');
-      const end = text.lastIndexOf('}');
-      text = text.substring(start, end + 1);
-    }
-
     return JSON.parse(text) as IPotreeMetadata;
   }
 
@@ -254,7 +239,10 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
     // Parse point attributes
     const pointAttributes = parseAttributes(metadata);
 
-    // Parse bounding box (supports both Potree 1.x and 2.0 formats)
+    console.log('[PotreeLoader] pointAttributes.byteSize:', pointAttributes.byteSize);
+    console.log('[PotreeLoader] pointAttributes.attributes:', pointAttributes.attributes.map(a => ({ name: a.name, byteSize: a.byteSize, type: a.type.name, numElements: a.numElements })));
+
+    // Parse bounding box
     const boundingBox = parseBoundingBox(metadata.boundingBox);
 
     // Parse tight bounding box (if available)
@@ -262,48 +250,31 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       ? parseBoundingBox(metadata.tightBoundingBox)
       : boundingBox.clone();
 
-    // Parse scale (supports both Potree 1.x number and 2.0 array formats)
+    // Parse scale
     const scale = parseScale(metadata.scale);
 
-    // Determine if this is Potree 2.0 format
-    const version = new Version(metadata.version);
-    const isPotree2 = version.newerThan('1.9');
-
-    // Determine octree directory
-    // For Potree 2.0: octree data is in root directory (no 'data' subdirectory)
-    // For Potree 1.x: octree data is in 'data' subdirectory
-    let octreeDir = metadata.octreeDir || '';
-
-    // Only default to 'data' for Potree 1.x remote URLs when octreeDir is not specified
-    if (!octreeDir && !this.config.customFileLoader && !isPotree2) {
-      octreeDir = 'data';
-    }
-
-    if (octreeDir && !octreeDir.endsWith('/')) {
-      octreeDir += '/';
-    }
+    // Potree 2.0: octree data is in root directory (no subdirectory)
+    const octreeDir = metadata.octreeDir || '';
 
     // Construct full URL
     let fullUrl = baseUrl;
-    if (fullUrl.endsWith('cloud.js') || fullUrl.endsWith('metadata.json')) {
+    if (fullUrl.endsWith('metadata.json')) {
       fullUrl = fullUrl.substring(0, fullUrl.lastIndexOf('/'));
     }
     if (!fullUrl.endsWith('/')) {
       fullUrl += '/';
     }
-    fullUrl += octreeDir;
+    if (octreeDir) {
+      fullUrl += octreeDir.endsWith('/') ? octreeDir : octreeDir + '/';
+    }
 
     // Create root node
     const root = this.createRootNode(boundingBox, metadata);
 
-    // Load hierarchy if auto-load is enabled
+    // Load hierarchy if auto-load is enabled (Potree 2.0 format)
     if (this.config.autoLoadHierarchy && metadata.hierarchy) {
-      if (isPotree2) {
-        // Potree 2.0: hierarchy.bin is in root directory, not in octreeDir
-        await this.loadHierarchy2(root, baseUrl, metadata);
-      } else {
-        await this.loadHierarchy(root, fullUrl, metadata);
-      }
+      // Potree 2.0: hierarchy.bin is in root directory
+      await this.loadHierarchy2(root, baseUrl, metadata);
     }
 
     // Create octree object
@@ -443,86 +414,6 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       // Add children to stack based on child mask
       // type 0 = internal node, type 1 = leaf node, type 2 = proxy (needs separate load)
       if (type === 0 || type === 1) {
-        for (let childIndex = 0; childIndex < 8; childIndex++) {
-          if ((childMask & (1 << childIndex)) !== 0) {
-            const childName = name + childIndex;
-            stack.push(childName);
-          }
-        }
-      }
-    }
-
-    return nodes;
-  }
-
-  /**
-   * Load hierarchy information for Potree 1.x/early 2.0
-   *
-   * @param root - Root node to populate
-   * @param baseUrl - Base URL for hierarchy files
-   * @param metadata - Metadata with hierarchy info
-   */
-  private async loadHierarchy(
-    root: IPointCloudOctreeNode,
-    baseUrl: string,
-    metadata: IPotreeMetadata,
-  ): Promise<void> {
-    // Potree 2.0 uses a binary hierarchy file
-    // baseUrl already includes octreeDir (usually 'data/'), so just append the filename
-    const hierarchyUrl = `${baseUrl}hierarchy.bin`;
-
-    try {
-      let buffer: ArrayBuffer;
-
-      if (this.config.customFileLoader) {
-        // Use custom file loader with normalized path
-        const normalizedPath = this.normalizePath(hierarchyUrl);
-        buffer = await this.config.customFileLoader(normalizedPath);
-      } else {
-        const response = await fetch(hierarchyUrl, this.config.fetchOptions);
-        if (!response.ok) {
-          return;
-        }
-        buffer = await response.arrayBuffer();
-      }
-
-      const nodes = this.parseHierarchyBinary(buffer, metadata.hierarchyStepSize ?? 5);
-
-      // Build tree structure from flat hierarchy
-      this.buildTreeFromHierarchy(root, nodes);
-    } catch (_error) {
-    }
-  }
-
-  /**
-   * Parse binary hierarchy file (Potree 2.0 format)
-   *
-   * @param buffer - Binary data
-   * @param _stepSize - Hierarchy step size (reserved for future use)
-   * @returns Array of hierarchy nodes
-   */
-  private parseHierarchyBinary(buffer: ArrayBuffer, _stepSize: number): HierarchyNode[] {
-    const view = new DataView(buffer);
-    const nodes: HierarchyNode[] = [];
-
-    // Each entry is 22 bytes: 1 byte type + 4 byte childMask + 4 byte numPoints + 8 byte byteOffset + 4 byte byteSize
-    const bytesPerNode = 22;
-    const numNodes = buffer.byteLength / bytesPerNode;
-
-    const stack: string[] = ['r'];
-
-    for (let i = 0; i < numNodes && stack.length > 0; i++) {
-      const offset = i * bytesPerNode;
-      const type = view.getUint8(offset);
-      const childMask = view.getUint8(offset + 1);
-      const numPoints = view.getUint32(offset + 2, true);
-
-      const name = stack.shift()!;
-      nodes.push({ name, numPoints, childMask });
-
-      // Add children to stack based on child mask
-      if (type === 0 || type === 1) {
-        // type 0 = internal node, type 1 = leaf node
         for (let childIndex = 0; childIndex < 8; childIndex++) {
           if ((childMask & (1 << childIndex)) !== 0) {
             const childName = name + childIndex;
