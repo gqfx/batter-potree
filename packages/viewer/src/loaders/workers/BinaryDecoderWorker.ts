@@ -216,10 +216,30 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       // Convert from uint16 [0-255] range to uint8 [0-255]
       const colors = new Uint8Array(numPoints * 4);
 
+      // Validate buffer size before reading
+      const requiredSize = numPoints * pointAttributes.byteSize;
+      if (buffer.byteLength < requiredSize) {
+        console.error(`[BinaryDecoder] Buffer too small for rgb: have ${buffer.byteLength}, need ${requiredSize}`);
+        throw new Error(`Buffer size mismatch: expected ${requiredSize} bytes, got ${buffer.byteLength} bytes`);
+      }
+
       for (let j = 0; j < numPoints; j++) {
-        const r = view.getUint16(inOffset + j * pointAttributes.byteSize + 0, true);
-        const g = view.getUint16(inOffset + j * pointAttributes.byteSize + 2, true);
-        const b = view.getUint16(inOffset + j * pointAttributes.byteSize + 4, true);
+        const offset = inOffset + j * pointAttributes.byteSize;
+
+        // Check if we can read 6 bytes (3 x uint16) from this offset
+        if (offset + 6 > buffer.byteLength) {
+          console.error(`[BinaryDecoder] RGB read would exceed buffer: offset=${offset}, bufferSize=${buffer.byteLength}`);
+          // Use default color (gray) for remaining points
+          colors[4 * j + 0] = 128;
+          colors[4 * j + 1] = 128;
+          colors[4 * j + 2] = 128;
+          colors[4 * j + 3] = 255;
+          continue;
+        }
+
+        const r = view.getUint16(offset + 0, true);
+        const g = view.getUint16(offset + 2, true);
+        const b = view.getUint16(offset + 4, true);
 
         colors[4 * j + 0] = Math.min(255, r); // R
         colors[4 * j + 1] = Math.min(255, g); // G

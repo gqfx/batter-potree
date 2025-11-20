@@ -722,10 +722,24 @@ function decodePointCloudData(event) {
       };
     } else if (pointAttribute.name === "rgb") {
       const colors = new Uint8Array(numPoints * 4);
+      const requiredSize = numPoints * pointAttributes.byteSize;
+      if (buffer.byteLength < requiredSize) {
+        console.error(`[BinaryDecoder] Buffer too small for rgb: have ${buffer.byteLength}, need ${requiredSize}`);
+        throw new Error(`Buffer size mismatch: expected ${requiredSize} bytes, got ${buffer.byteLength} bytes`);
+      }
       for (let j = 0; j < numPoints; j++) {
-        const r = view.getUint16(inOffset + j * pointAttributes.byteSize + 0, true);
-        const g = view.getUint16(inOffset + j * pointAttributes.byteSize + 2, true);
-        const b = view.getUint16(inOffset + j * pointAttributes.byteSize + 4, true);
+        const offset = inOffset + j * pointAttributes.byteSize;
+        if (offset + 6 > buffer.byteLength) {
+          console.error(`[BinaryDecoder] RGB read would exceed buffer: offset=${offset}, bufferSize=${buffer.byteLength}`);
+          colors[4 * j + 0] = 128;
+          colors[4 * j + 1] = 128;
+          colors[4 * j + 2] = 128;
+          colors[4 * j + 3] = 255;
+          continue;
+        }
+        const r = view.getUint16(offset + 0, true);
+        const g = view.getUint16(offset + 2, true);
+        const b = view.getUint16(offset + 4, true);
         colors[4 * j + 0] = Math.min(255, r);
         colors[4 * j + 1] = Math.min(255, g);
         colors[4 * j + 2] = Math.min(255, b);

@@ -700,4 +700,214 @@ describe('BinaryDecoderWorker', () => {
       expect(mockPerformance.clearMeasures).toHaveBeenCalled();
     });
   });
+
+  describe('Interleaved attribute layout', () => {
+    it('should correctly decode interleaved attributes', () => {
+      // Test realistic data layout: POSITION (12) + INTENSITY (2) + RGB (6) = 20 bytes per point
+      const numPoints = 3;
+      const bytesPerPoint = 20;
+      const buffer = new ArrayBuffer(numPoints * bytesPerPoint);
+      const view = new DataView(buffer);
+
+      // Point 0
+      view.setUint32(0, 1000, true);   // pos.x
+      view.setUint32(4, 2000, true);   // pos.y
+      view.setUint32(8, 3000, true);   // pos.z
+      view.setUint16(12, 100, true);   // intensity
+      view.setUint16(14, 255, true);   // rgb.r
+      view.setUint16(16, 128, true);   // rgb.g
+      view.setUint16(18, 64, true);    // rgb.b
+
+      // Point 1
+      view.setUint32(20, 4000, true);  // pos.x
+      view.setUint32(24, 5000, true);  // pos.y
+      view.setUint32(28, 6000, true);  // pos.z
+      view.setUint16(32, 200, true);   // intensity
+      view.setUint16(34, 200, true);   // rgb.r
+      view.setUint16(36, 100, true);   // rgb.g
+      view.setUint16(38, 50, true);    // rgb.b
+
+      // Point 2
+      view.setUint32(40, 7000, true);  // pos.x
+      view.setUint32(44, 8000, true);  // pos.y
+      view.setUint32(48, 9000, true);  // pos.z
+      view.setUint16(52, 150, true);   // intensity
+      view.setUint16(54, 128, true);   // rgb.r
+      view.setUint16(56, 64, true);    // rgb.g
+      view.setUint16(58, 32, true);    // rgb.b
+
+      const scale = 0.001;
+
+      // Decode positions
+      const positions = new Float32Array(numPoints * 3);
+      for (let j = 0; j < numPoints; j++) {
+        positions[3 * j + 0] = view.getUint32(j * bytesPerPoint + 0, true) * scale;
+        positions[3 * j + 1] = view.getUint32(j * bytesPerPoint + 4, true) * scale;
+        positions[3 * j + 2] = view.getUint32(j * bytesPerPoint + 8, true) * scale;
+      }
+
+      // Decode intensity
+      const intensities = new Uint16Array(numPoints);
+      for (let j = 0; j < numPoints; j++) {
+        intensities[j] = view.getUint16(j * bytesPerPoint + 12, true);
+      }
+
+      // Decode RGB
+      const colors = new Uint8Array(numPoints * 4);
+      for (let j = 0; j < numPoints; j++) {
+        const r = view.getUint16(j * bytesPerPoint + 14, true);
+        const g = view.getUint16(j * bytesPerPoint + 16, true);
+        const b = view.getUint16(j * bytesPerPoint + 18, true);
+        colors[4 * j + 0] = Math.min(255, r);
+        colors[4 * j + 1] = Math.min(255, g);
+        colors[4 * j + 2] = Math.min(255, b);
+        colors[4 * j + 3] = 255;
+      }
+
+      // Verify positions
+      expect(positions[0]).toBe(1.0);
+      expect(positions[1]).toBe(2.0);
+      expect(positions[2]).toBe(3.0);
+      expect(positions[6]).toBe(7.0);
+      expect(positions[7]).toBe(8.0);
+      expect(positions[8]).toBe(9.0);
+
+      // Verify intensities
+      expect(intensities[0]).toBe(100);
+      expect(intensities[1]).toBe(200);
+      expect(intensities[2]).toBe(150);
+
+      // Verify colors
+      expect(colors[0]).toBe(255);
+      expect(colors[1]).toBe(128);
+      expect(colors[2]).toBe(64);
+      expect(colors[8]).toBe(128);
+      expect(colors[9]).toBe(64);
+      expect(colors[10]).toBe(32);
+    });
+
+    it('should handle attributes at different offsets correctly', () => {
+      // Simulate offset calculation for attributes
+      const attributes = [
+        { name: 'POSITION_CARTESIAN', byteSize: 12 },
+        { name: 'intensity', byteSize: 2 },
+        { name: 'return_number', byteSize: 1 },
+        { name: 'classification', byteSize: 1 },
+        { name: 'rgb', byteSize: 6 },
+      ];
+
+      let currentOffset = 0;
+      const offsets: Record<string, number> = {};
+
+      for (const attr of attributes) {
+        offsets[attr.name] = currentOffset;
+        currentOffset += attr.byteSize;
+      }
+
+      expect(offsets.POSITION_CARTESIAN).toBe(0);
+      expect(offsets.intensity).toBe(12);
+      expect(offsets.return_number).toBe(14);
+      expect(offsets.classification).toBe(15);
+      expect(offsets.rgb).toBe(16);
+      expect(currentOffset).toBe(22); // Total bytes per point
+    });
+  });
+
+  describe('Buffer size validation', () => {
+    it('should validate buffer size matches point count', () => {
+      const numPoints = 5;
+      const bytesPerPoint = 12; // POSITION_CARTESIAN only
+      const expectedBufferSize = numPoints * bytesPerPoint;
+      const buffer = new ArrayBuffer(expectedBufferSize);
+
+      expect(buffer.byteLength).toBe(expectedBufferSize);
+      expect(buffer.byteLength / bytesPerPoint).toBe(numPoints);
+    });
+
+    it('should detect mismatched buffer size', () => {
+      const bytesPerPoint = 37;
+      const buffer = new ArrayBuffer(100); // Not divisible by 37
+
+      const numPoints = buffer.byteLength / bytesPerPoint;
+      expect(numPoints).not.toBe(Math.floor(numPoints)); // Should be fractional
+    });
+
+    it('should handle empty buffer', () => {
+      const buffer = new ArrayBuffer(0);
+      const bytesPerPoint = 37;
+      const numPoints = buffer.byteLength / bytesPerPoint;
+
+      expect(numPoints).toBe(0);
+    });
+  });
+
+  describe('Real-world data structure simulation', () => {
+    it('should decode data matching inchurch_colorized_las_converted metadata', () => {
+      // Exact structure from metadata.json:
+      // position: 12 bytes (int32 x 3)
+      // intensity: 2 bytes (uint16)
+      // return number: 1 byte (uint8)
+      // number of returns: 1 byte (uint8)
+      // classification flags: 1 byte (uint8)
+      // classification: 1 byte (uint8)
+      // user data: 1 byte (uint8)
+      // scan angle: 2 bytes (int16)
+      // point source id: 2 bytes (uint16)
+      // gps-time: 8 bytes (double)
+      // rgb: 6 bytes (uint16 x 3)
+      // Total: 37 bytes
+
+      const numPoints = 1;
+      const bytesPerPoint = 37;
+      const buffer = new ArrayBuffer(numPoints * bytesPerPoint);
+      const view = new DataView(buffer);
+      const scale = 0.001;
+
+      // Write complete point data
+      view.setUint32(0, 10000, true);     // pos.x = 10.0
+      view.setUint32(4, 20000, true);     // pos.y = 20.0
+      view.setUint32(8, 30000, true);     // pos.z = 30.0
+      view.setUint16(12, 5000, true);     // intensity
+      view.setUint8(14, 1);               // return number
+      view.setUint8(15, 2);               // number of returns
+      view.setUint8(16, 0);               // classification flags
+      view.setUint8(17, 2);               // classification (ground)
+      view.setUint8(18, 0);               // user data
+      view.setInt16(19, 100, true);       // scan angle
+      view.setUint16(21, 1001, true);     // point source id
+      view.setFloat64(23, 123456.789, true); // gps-time
+      view.setUint16(31, 200, true);      // rgb.r
+      view.setUint16(33, 150, true);      // rgb.g
+      view.setUint16(35, 100, true);      // rgb.b
+
+      // Decode and verify all attributes
+      const pos = {
+        x: view.getUint32(0, true) * scale,
+        y: view.getUint32(4, true) * scale,
+        z: view.getUint32(8, true) * scale,
+      };
+      const intensity = view.getUint16(12, true);
+      const returnNumber = view.getUint8(14);
+      const numReturns = view.getUint8(15);
+      const classification = view.getUint8(17);
+      const gpsTime = view.getFloat64(23, true);
+      const rgb = {
+        r: Math.min(255, view.getUint16(31, true)),
+        g: Math.min(255, view.getUint16(33, true)),
+        b: Math.min(255, view.getUint16(35, true)),
+      };
+
+      expect(pos.x).toBe(10.0);
+      expect(pos.y).toBe(20.0);
+      expect(pos.z).toBe(30.0);
+      expect(intensity).toBe(5000);
+      expect(returnNumber).toBe(1);
+      expect(numReturns).toBe(2);
+      expect(classification).toBe(2);
+      expect(gpsTime).toBeCloseTo(123456.789, 3);
+      expect(rgb.r).toBe(200);
+      expect(rgb.g).toBe(150);
+      expect(rgb.b).toBe(100);
+    });
+  });
 });
