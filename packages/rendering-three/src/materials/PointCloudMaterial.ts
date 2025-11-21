@@ -302,6 +302,7 @@ export class PointCloudMaterial extends THREE.ShaderMaterial {
       defines,
       vertexShader: getPointCloudVertexShader(),
       fragmentShader: getPointCloudFragmentShader(),
+      glslVersion: THREE.GLSL3, // Force GLSL ES 3.0
       transparent: opacity < 1.0,
       depthTest: true,
       depthWrite: true,

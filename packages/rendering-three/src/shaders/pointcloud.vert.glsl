@@ -1,5 +1,3 @@
-#version 300 es
-
 // Vertex shader for point cloud rendering (GLSL 3.00 ES)
 precision highp float;
 precision highp int;
