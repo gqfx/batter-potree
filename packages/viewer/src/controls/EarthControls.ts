@@ -86,7 +86,8 @@ interface DragState {
 export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   readonly viewer?: Viewer;
   readonly camera: THREE.Camera;
-  readonly renderer: THREE.WebGLRenderer;
+  readonly domElement: HTMLElement;
+  private readonly renderer?: THREE.WebGLRenderer;
 
   // Scene management
   private scene: any | null = null;
@@ -140,14 +141,19 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
       // New API: viewer-based construction
       this.viewer = viewerOrCamera;
       this.camera = viewerOrCamera.getCamera();
-      this.renderer = viewerOrCamera.getRenderer().getDomElement() as any;
+      this.domElement = viewerOrCamera.getRenderer().getDomElement();
+      const threeRenderer = viewerOrCamera.getRenderer().getThreeRenderer?.();
+      if (threeRenderer) {
+        Object.assign(this, { renderer: threeRenderer as THREE.WebGLRenderer });
+      }
     } else {
       // Legacy API: camera + domElement construction
       if (!domElement) {
         throw new Error('domElement is required when passing camera');
       }
       this.camera = viewerOrCamera;
-      this.renderer = domElement as any;
+      this.domElement = domElement;
+      // renderer remains undefined
     }
 
     // Initialize view from camera
@@ -187,22 +193,20 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    * Connect event listeners
    */
   private connect(): void {
-    const domElement = this.renderer.domElement;
-    domElement.addEventListener('mousedown', this.boundHandlers.mousedown);
-    domElement.addEventListener('dblclick', this.boundHandlers.dblclick);
-    domElement.addEventListener('wheel', this.boundHandlers.mousewheel);
-    domElement.addEventListener('contextmenu', this.boundHandlers.contextmenu);
+    this.domElement.addEventListener('mousedown', this.boundHandlers.mousedown);
+    this.domElement.addEventListener('dblclick', this.boundHandlers.dblclick);
+    this.domElement.addEventListener('wheel', this.boundHandlers.mousewheel);
+    this.domElement.addEventListener('contextmenu', this.boundHandlers.contextmenu);
   }
 
   /**
    * Disconnect event listeners
    */
   private disconnect(): void {
-    const domElement = this.renderer.domElement;
-    domElement.removeEventListener('mousedown', this.boundHandlers.mousedown);
-    domElement.removeEventListener('dblclick', this.boundHandlers.dblclick);
-    domElement.removeEventListener('wheel', this.boundHandlers.mousewheel);
-    domElement.removeEventListener('contextmenu', this.boundHandlers.contextmenu);
+    this.domElement.removeEventListener('mousedown', this.boundHandlers.mousedown);
+    this.domElement.removeEventListener('dblclick', this.boundHandlers.dblclick);
+    this.domElement.removeEventListener('wheel', this.boundHandlers.mousewheel);
+    this.domElement.removeEventListener('contextmenu', this.boundHandlers.contextmenu);
     document.removeEventListener('mousemove', this.boundHandlers.drag);
     document.removeEventListener('mouseup', this.boundHandlers.drop);
   }
@@ -220,6 +224,11 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
       const mouse = { x: event.clientX, y: event.clientY };
       const camera = this.camera;
       const pointclouds = this.viewer.getPointClouds();
+
+      if (!this.renderer) {
+        console.warn('[EarthControls] Cannot get point cloud intersection without renderer');
+        return;
+      }
 
       const intersection = getMousePointCloudIntersection(mouse, camera, this.renderer, pointclouds, {
         pickClipped: false,
@@ -296,11 +305,10 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
 
       const camera = this.camera;
       const mouse = this.dragState.end;
-      const domElement = this.renderer.domElement || this.renderer;
 
       if (this.dragState.mouse === MouseButton.LEFT) {
         // Pan: Move camera based on plane intersection
-        const ray = mouseToRay(mouse, camera, domElement.clientWidth, domElement.clientHeight);
+        const ray = mouseToRay(mouse, camera, this.domElement.clientWidth, this.domElement.clientHeight);
         const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), this.pivot);
 
         const distanceToPlane = ray.distanceToPlane(plane);
@@ -325,8 +333,8 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
       } else if (this.dragState.mouse === MouseButton.RIGHT) {
         // Rotate: Orbit around pivot
         const ndrag = {
-          x: this.dragState.lastDrag.x / this.renderer.domElement.clientWidth,
-          y: this.dragState.lastDrag.y / this.renderer.domElement.clientHeight,
+          x: this.dragState.lastDrag.x / this.domElement.clientWidth,
+          y: this.dragState.lastDrag.y / this.domElement.clientHeight,
         };
 
         const yawDelta = -ndrag.x * this.rotationSpeed * 0.5;
@@ -406,7 +414,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    * @param mouse - Mouse position
    */
   private zoomToLocation(mouse: { x: number; y: number }): void {
-    if (!this.scene || !this.viewer) return;
+    if (!this.scene || !this.viewer || !this.renderer) return;
 
     const camera = this.camera;
     const pointclouds = this.viewer.getPointClouds();
@@ -485,7 +493,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
     TWEEN.update();
 
     // Compute zoom (only if viewer is available)
-    if (this.wheelDelta !== 0 && this.viewer) {
+    if (this.wheelDelta !== 0 && this.viewer && this.renderer) {
       const mouse = this.getMousePosition();
       const pointclouds = this.viewer.getPointClouds();
 
@@ -517,9 +525,8 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
     // Update pivot indicator
     if (this.pivotIndicator.visible) {
       const distance = this.pivotIndicator.position.distanceTo(this.view.position);
-      const domElement = this.renderer.domElement || this.renderer;
-      const pixelWidth = (domElement as HTMLElement).clientWidth;
-      const pixelHeight = (domElement as HTMLElement).clientHeight;
+      const pixelWidth = this.domElement.clientWidth;
+      const pixelHeight = this.domElement.clientHeight;
       const pr = projectedRadius(1, camera, distance, pixelWidth, pixelHeight);
       const scale = 10 / pr;
       this.pivotIndicator.scale.set(scale, scale, scale);
@@ -553,10 +560,9 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   private getMousePosition(): { x: number; y: number } {
     // TODO: Track mouse position in a mousemove handler
     // For now, return center of screen
-    const domElement = this.renderer.domElement || this.renderer;
     return {
-      x: (domElement as HTMLElement).clientWidth / 2,
-      y: (domElement as HTMLElement).clientHeight / 2,
+      x: this.domElement.clientWidth / 2,
+      y: this.domElement.clientHeight / 2,
     };
   }
 
