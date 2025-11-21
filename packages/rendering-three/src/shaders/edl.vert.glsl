@@ -1,5 +1,3 @@
-#version 300 es
-
 // EDL vertex shader for full-screen quad rendering (GLSL 3.00 ES)
 precision highp float;
 precision highp int;

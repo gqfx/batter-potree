@@ -1,5 +1,3 @@
-#version 300 es
-
 // EDL fragment shader (GLSL 3.00 ES)
 // Algorithm by Christian Boucheny
 // Adapted from CloudCompare EDL implementation:

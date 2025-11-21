@@ -97,6 +97,7 @@ export class EDLMaterial extends THREE.ShaderMaterial {
       defines,
       vertexShader: getEDLVertexShader(),
       fragmentShader: getEDLFragmentShader(),
+      glslVersion: THREE.GLSL3, // Force GLSL ES 3.0
       transparent: true,
       depthTest: false,
       depthWrite: false,
