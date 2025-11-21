@@ -3,8 +3,12 @@ precision highp float;
 precision highp int;
 
 // Uniforms
-uniform mat4 viewMatrix;
-uniform mat4 projectionMatrix;
+// Note: Three.js automatically provides these built-in uniforms:
+//   - mat4 modelMatrix
+//   - mat4 modelViewMatrix
+//   - mat4 projectionMatrix
+//   - mat4 viewMatrix
+//   - vec3 cameraPosition
 uniform float uOpacity;
 uniform float near;
 uniform float far;

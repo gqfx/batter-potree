@@ -3,12 +3,14 @@ precision highp float;
 precision highp int;
 
 // Vertex attributes
-in vec3 position;
-in vec2 uv;
+// Note: Three.js automatically provides:
+//   - vec3 position
+//   - vec2 uv
 
 // Uniforms
-uniform mat4 projectionMatrix;
-uniform mat4 modelViewMatrix;
+// Note: Three.js automatically provides:
+//   - mat4 projectionMatrix
+//   - mat4 modelViewMatrix
 
 // Varyings - outputs to fragment shader
 out vec2 vUv;

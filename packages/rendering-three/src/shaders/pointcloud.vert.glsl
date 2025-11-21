@@ -3,21 +3,27 @@ precision highp float;
 precision highp int;
 
 // Vertex attributes
-in vec3 position;
+// Note: Three.js automatically provides these built-in attributes:
+//   - vec3 position
+//   - vec3 normal (if geometry has normals)
+//   - vec2 uv (if geometry has UVs)
+// We declare custom point cloud attributes here:
 in vec3 color;
 in float intensity;
 in float classification;
 in float returnNumber;
 in float numberOfReturns;
-in vec3 normal;
 in float gpsTime;
 in float pointSourceID;
 
 // Uniforms - matrices
-uniform mat4 modelMatrix;
-uniform mat4 modelViewMatrix;
-uniform mat4 projectionMatrix;
-uniform mat4 viewMatrix;
+// Note: Three.js automatically provides these built-in uniforms:
+//   - mat4 modelMatrix
+//   - mat4 modelViewMatrix
+//   - mat4 projectionMatrix
+//   - mat4 viewMatrix
+//   - mat3 normalMatrix
+//   - vec3 cameraPosition
 
 // Uniforms - screen
 uniform float uScreenWidth;
