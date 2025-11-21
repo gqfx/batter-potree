@@ -5,6 +5,7 @@
 import type {
   EDLConfig,
   IPointCloudOctree,
+  IPointCloudOctreeNode,
   IRenderer,
   IScene,
   IWorkerDecodeResponse,
@@ -1451,19 +1452,29 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       // octree.updateVisibilityTexture?.(visibleNodes.map(vn => vn.node));
 
       // Request loading for unloaded nodes
-      let requestedLoads = 0;
+      // 关键修复：限制每帧的加载请求数量（参考原版 Potree 的 maxNodesLoading 机制）
+      // 这可以防止一次性发起数万个请求
+      const MAX_LOADS_PER_FRAME_PER_CLOUD = 5; // 与原版 Potree 保持一致
+
+      // 收集未加载的节点，按优先级排序
+      const unloadedNodes: Array<{ node: IPointCloudOctreeNode; priority: number }> = [];
       for (const visibleNode of visibleNodes) {
         const node = visibleNode.node;
-
-        // Only load if not already loaded and not currently loading
         if (!node.loaded && !node.loading) {
-          // Calculate priority based on traversal priority
           const priority = this.calculateLoadPriority(visibleNode);
-
-          // Request load from StreamingSystem
-          this.streamingSystem.requestLoad(octree, node, priority);
-          requestedLoads++;
+          unloadedNodes.push({ node, priority });
         }
+      }
+
+      // 按优先级降序排序（优先级高的在前）
+      unloadedNodes.sort((a, b) => b.priority - a.priority);
+
+      // 只请求前 MAX_LOADS_PER_FRAME_PER_CLOUD 个节点
+      let requestedLoads = 0;
+      const nodesToLoad = unloadedNodes.slice(0, MAX_LOADS_PER_FRAME_PER_CLOUD);
+      for (const { node, priority } of nodesToLoad) {
+        this.streamingSystem.requestLoad(octree, node, priority);
+        requestedLoads++;
       }
 
       if (requestedLoads > 0 && (!this._lastVisibleNodesDebugTime || now - this._lastVisibleNodesDebugTime > 5000)) {

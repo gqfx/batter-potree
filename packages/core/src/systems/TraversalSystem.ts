@@ -662,11 +662,15 @@ export class TraversalSystem implements ISystem {
       const screenSize = this.calculateScreenSize(node, distance);
 
       // LOD 判断：是否应该继续细分
+      // 关键修复：只有节点已加载时才能访问其子节点
+      // 这是 Potree 的核心逻辑 - 避免遍历到未加载的深层节点
+      const hasLoadedChildren = node.loaded && node.children.some((child) => child !== null);
+
       // 对于前 forceLoadDepth 层，强制细分（如果有子节点）
       const isForceLoadLevel = node.level < this.config.forceLoadDepth;
       const shouldSubdivide =
         node.level < this.config.maxLevel &&
-        node.children.some((child) => child !== null) &&
+        hasLoadedChildren &&
         (isForceLoadLevel || screenSize >= this.config.minScreenSize);
 
       if (!shouldSubdivide) {
@@ -682,6 +686,7 @@ export class TraversalSystem implements ISystem {
         numVisiblePoints += node.numPoints;
       } else {
         // 继续细分，将子节点加入优先级队列
+        // 只有在节点已加载时才能安全地访问子节点
         for (const child of node.children) {
           if (child) {
             const childWeight = this.computeWeight(child, cameraPosition);
