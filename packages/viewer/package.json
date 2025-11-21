@@ -32,7 +32,8 @@
   "dependencies": {
     "@better-potree/core": "workspace:*",
     "@better-potree/rendering": "workspace:*",
-    "@better-potree/rendering-three": "workspace:*"
+    "@better-potree/rendering-three": "workspace:*",
+    "@tweenjs/tween.js": "^25.0.0"
   },
   "peerDependencies": {
     "three": "~0.180.0"

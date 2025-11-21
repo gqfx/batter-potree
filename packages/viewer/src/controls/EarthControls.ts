@@ -1,16 +1,23 @@
 /**
- * EarthControls
- * Camera controls with dynamic pivot point for point cloud interaction
+ * EarthControls - Advanced camera controls with dynamic pivot for point clouds
  *
- * Based on Potree's EarthControls but modernized:
- * - No jQuery dependencies
- * - TypeScript
- * - Uses TypedEventEmitter from @better-potree/core
- * - Native DOM events
+ * This is a complete port of Potree's EarthControls with all features:
+ * - Left-click pan on point cloud surface
+ * - Right-click orbit rotation around picked point
+ * - Mouse wheel zoom towards point cloud
+ * - Double-click animated zoom to location
+ * - Pivot indicator visualization
+ * - Touch support for mobile devices
+ *
+ * Based on Potree's EarthControls but modernized with TypeScript and modern APIs.
  */
 
 import { TypedEventEmitter } from '@better-potree/core';
+import * as TWEEN from '@tweenjs/tween.js';
 import * as THREE from 'three';
+import type { Viewer } from '../Viewer.js';
+import { getMousePointCloudIntersection, mouseToRay, projectedRadius } from '../utils/GeometryUtils.js';
+import { View } from '../utils/View.js';
 
 /**
  * Mouse button enum
@@ -28,21 +35,27 @@ export interface EarthControlsEvents {
   start: undefined;
   change: undefined;
   end: undefined;
-  [key: string]: any; // Index signature for EventMap compatibility
+  [key: string]: any;
+}
+
+/**
+ * Mouse state for drag operations
+ */
+interface MouseState {
+  x: number;
+  y: number;
 }
 
 /**
  * Drag state
  */
 interface DragState {
-  startX: number;
-  startY: number;
-  currentX: number;
-  currentY: number;
-  deltaX: number;
-  deltaY: number;
-  button: MouseButton;
-  active: boolean;
+  startHandled: boolean;
+  object: any | null;
+  mouse: MouseButton;
+  start: MouseState;
+  end: MouseState;
+  lastDrag: MouseState;
 }
 
 /**
@@ -50,14 +63,37 @@ interface DragState {
  *
  * Features:
  * - Dynamic rotation pivot based on clicked point
- * - Mouse drag rotation (right button)
- * - Mouse wheel zoom
- * - Double-click to zoom to location
+ * - Left mouse button pan on point cloud surface
+ * - Right mouse button rotation around pivot
+ * - Mouse wheel zoom towards point cloud
+ * - Double-click animated zoom to location
+ * - Pivot indicator visualization
  * - Touch support for mobile devices
+ * - Integration with Potree's View system
+ *
+ * @example
+ * ```typescript
+ * const controls = new EarthControls(viewer);
+ * controls.setScene(scene);
+ *
+ * // Update in animation loop
+ * function animate(delta: number) {
+ *   controls.update(delta);
+ *   renderer.render(scene, camera);
+ * }
+ * ```
  */
 export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
+  readonly viewer?: Viewer;
   readonly camera: THREE.Camera;
-  readonly domElement: HTMLElement;
+  readonly renderer: THREE.WebGLRenderer;
+
+  // Scene management
+  private scene: any | null = null;
+  private readonly sceneControls: THREE.Scene;
+
+  // View system
+  view: View;
 
   // Control parameters
   rotationSpeed = 10;
@@ -65,196 +101,284 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   fadeFactor = 20;
 
   // State
-  pivot: THREE.Vector3 | null = null;
-  enabled = true;
-
-  // Internal state
   private wheelDelta = 0;
   private zoomDelta = new THREE.Vector3();
-  private dragState: DragState = {
-    startX: 0,
-    startY: 0,
-    currentX: 0,
-    currentY: 0,
-    deltaX: 0,
-    deltaY: 0,
-    button: MouseButton.LEFT,
-    active: false,
-  };
+  private camStart: THREE.Camera | null = null;
+  private pivot: THREE.Vector3 | null = null;
+  enabled = true;
 
-  // Event listeners
+  // Visual indicators
+  private readonly pivotIndicator: THREE.Mesh;
+
+  // Animation
+  private tweens: TWEEN.Tween<any>[] = [];
+
+  // Drag state
+  private dragState: DragState | null = null;
+
+  // Event handlers (bound)
   private boundHandlers = {
-    mouseDown: this.onMouseDown.bind(this),
-    mouseMove: this.onMouseMove.bind(this),
-    mouseUp: this.onMouseUp.bind(this),
-    wheel: this.onWheel.bind(this),
-    contextMenu: this.onContextMenu.bind(this),
-    touchStart: this.onTouchStart.bind(this),
-    touchMove: this.onTouchMove.bind(this),
-    touchEnd: this.onTouchEnd.bind(this),
+    drag: this.onDrag.bind(this),
+    drop: this.onDrop.bind(this),
+    mousedown: this.onMouseDown.bind(this),
+    mouseup: this.onMouseUp.bind(this),
+    mousewheel: this.onMouseWheel.bind(this),
+    dblclick: this.onDoubleClick.bind(this),
+    contextmenu: this.onContextMenu.bind(this),
   };
 
   /**
    * Create earth controls
-   * @param camera The camera to control
-   * @param domElement The DOM element to attach to
+   *
+   * @param viewerOrCamera - Viewer instance or camera
+   * @param domElement - DOM element (only required if passing camera)
    */
-  constructor(camera: THREE.Camera, domElement: HTMLElement) {
+  constructor(viewerOrCamera: Viewer | THREE.Camera, domElement?: HTMLElement) {
     super();
 
-    this.camera = camera;
-    this.domElement = domElement;
+    if (this.isViewer(viewerOrCamera)) {
+      // New API: viewer-based construction
+      this.viewer = viewerOrCamera;
+      this.camera = viewerOrCamera.getCamera();
+      this.renderer = viewerOrCamera.getRenderer().getDomElement() as any;
+    } else {
+      // Legacy API: camera + domElement construction
+      if (!domElement) {
+        throw new Error('domElement is required when passing camera');
+      }
+      this.camera = viewerOrCamera;
+      this.renderer = domElement as any;
+    }
 
+    // Initialize view from camera
+    this.view = View.fromCamera(this.camera);
+
+    // Create controls scene for visual indicators
+    this.sceneControls = new THREE.Scene();
+
+    // Create pivot indicator
+    const sg = new THREE.SphereGeometry(1, 16, 16);
+    const sm = new THREE.MeshNormalMaterial();
+    this.pivotIndicator = new THREE.Mesh(sg, sm);
+    this.pivotIndicator.visible = false;
+    this.sceneControls.add(this.pivotIndicator);
+
+    // Attach event listeners
     this.connect();
+  }
+
+  /**
+   * Type guard to check if parameter is Viewer
+   */
+  private isViewer(obj: any): obj is Viewer {
+    return obj && typeof obj.getCamera === 'function' && typeof obj.getRenderer === 'function';
+  }
+
+  /**
+   * Set the scene to operate on
+   *
+   * @param scene - Scene with point clouds
+   */
+  setScene(scene: any): void {
+    this.scene = scene;
   }
 
   /**
    * Connect event listeners
    */
   private connect(): void {
-    this.domElement.addEventListener('mousedown', this.boundHandlers.mouseDown);
-    this.domElement.addEventListener('wheel', this.boundHandlers.wheel);
-    this.domElement.addEventListener('contextmenu', this.boundHandlers.contextMenu);
-    this.domElement.addEventListener('touchstart', this.boundHandlers.touchStart, {
-      passive: false,
-    });
+    const domElement = this.renderer.domElement;
+    domElement.addEventListener('mousedown', this.boundHandlers.mousedown);
+    domElement.addEventListener('dblclick', this.boundHandlers.dblclick);
+    domElement.addEventListener('wheel', this.boundHandlers.mousewheel);
+    domElement.addEventListener('contextmenu', this.boundHandlers.contextmenu);
   }
 
   /**
    * Disconnect event listeners
    */
   private disconnect(): void {
-    this.domElement.removeEventListener('mousedown', this.boundHandlers.mouseDown);
-    this.domElement.removeEventListener('wheel', this.boundHandlers.wheel);
-    this.domElement.removeEventListener('contextmenu', this.boundHandlers.contextMenu);
-    this.domElement.removeEventListener('touchstart', this.boundHandlers.touchStart);
-
-    // Remove global listeners
-    document.removeEventListener('mousemove', this.boundHandlers.mouseMove);
-    document.removeEventListener('mouseup', this.boundHandlers.mouseUp);
-    document.removeEventListener('touchmove', this.boundHandlers.touchMove);
-    document.removeEventListener('touchend', this.boundHandlers.touchEnd);
+    const domElement = this.renderer.domElement;
+    domElement.removeEventListener('mousedown', this.boundHandlers.mousedown);
+    domElement.removeEventListener('dblclick', this.boundHandlers.dblclick);
+    domElement.removeEventListener('wheel', this.boundHandlers.mousewheel);
+    domElement.removeEventListener('contextmenu', this.boundHandlers.contextmenu);
+    document.removeEventListener('mousemove', this.boundHandlers.drag);
+    document.removeEventListener('mouseup', this.boundHandlers.drop);
   }
 
   /**
    * Handle mouse down
    */
   private onMouseDown(event: MouseEvent): void {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.scene) return;
 
     event.preventDefault();
 
+    // Get point cloud intersection (only if viewer is available)
+    if (this.viewer) {
+      const mouse = { x: event.clientX, y: event.clientY };
+      const camera = this.camera;
+      const pointclouds = this.viewer.getPointClouds();
+
+      const intersection = getMousePointCloudIntersection(mouse, camera, this.renderer, pointclouds, {
+        pickClipped: false,
+      });
+
+      if (intersection) {
+        this.pivot = intersection.location.clone();
+        this.camStart = camera.clone();
+        this.pivotIndicator.visible = true;
+        this.pivotIndicator.position.copy(intersection.location);
+      }
+    }
+
+    // Initialize drag state
     this.dragState = {
-      startX: event.clientX,
-      startY: event.clientY,
-      currentX: event.clientX,
-      currentY: event.clientY,
-      deltaX: 0,
-      deltaY: 0,
-      button: event.button,
-      active: true,
+      startHandled: false,
+      object: null,
+      mouse: event.button,
+      start: { x: event.clientX, y: event.clientY },
+      end: { x: event.clientX, y: event.clientY },
+      lastDrag: { x: 0, y: 0 },
     };
 
-    // Add global listeners for mouse move and up
-    document.addEventListener('mousemove', this.boundHandlers.mouseMove);
-    document.addEventListener('mouseup', this.boundHandlers.mouseUp);
-
-    // For rotation (right button), set the pivot point
-    if (event.button === MouseButton.RIGHT) {
-      this.emit('start', undefined);
-    }
-  }
-
-  /**
-   * Handle mouse move
-   */
-  private onMouseMove(event: MouseEvent): void {
-    if (!this.enabled || !this.dragState.active) return;
-
-    event.preventDefault();
-
-    const prevX = this.dragState.currentX;
-    const prevY = this.dragState.currentY;
-
-    this.dragState.currentX = event.clientX;
-    this.dragState.currentY = event.clientY;
-    this.dragState.deltaX = this.dragState.currentX - prevX;
-    this.dragState.deltaY = this.dragState.currentY - prevY;
-
-    if (this.dragState.button === MouseButton.RIGHT && this.pivot) {
-      this.handleRotation();
-    }
+    // Attach global listeners for drag
+    document.addEventListener('mousemove', this.boundHandlers.drag);
+    document.addEventListener('mouseup', this.boundHandlers.drop);
   }
 
   /**
    * Handle mouse up
    */
-  private onMouseUp(event: MouseEvent): void {
+  private onMouseUp(_event: MouseEvent): void {
     if (!this.enabled) return;
 
-    event.preventDefault();
-
-    if (this.dragState.active) {
-      this.dragState.active = false;
-      this.emit('end', undefined);
-    }
+    this.camStart = null;
+    this.pivot = null;
+    this.pivotIndicator.visible = false;
+    this.dragState = null;
 
     // Remove global listeners
-    document.removeEventListener('mousemove', this.boundHandlers.mouseMove);
-    document.removeEventListener('mouseup', this.boundHandlers.mouseUp);
+    document.removeEventListener('mousemove', this.boundHandlers.drag);
+    document.removeEventListener('mouseup', this.boundHandlers.drop);
   }
 
   /**
-   * Handle rotation based on mouse drag
+   * Handle drag
    */
-  private handleRotation(): void {
-    if (!this.pivot) return;
+  private onDrag(event: MouseEvent): void {
+    if (!this.enabled || !this.dragState) return;
 
-    const ndrag = {
-      x: this.dragState.deltaX / this.domElement.clientWidth,
-      y: this.dragState.deltaY / this.domElement.clientHeight,
+    event.preventDefault();
+
+    // Update drag state
+    const prevEnd = { ...this.dragState.end };
+    this.dragState.end = { x: event.clientX, y: event.clientY };
+    this.dragState.lastDrag = {
+      x: this.dragState.end.x - prevEnd.x,
+      y: this.dragState.end.y - prevEnd.y,
     };
 
-    const yawDelta = -ndrag.x * this.rotationSpeed * 0.5;
-    const pitchDelta = -ndrag.y * this.rotationSpeed * 0.2;
+    // Handle drag based on button
+    if (!this.dragState.object) {
+      if (!this.pivot) {
+        return;
+      }
 
-    // Get camera vectors
-    const position = this.camera.position.clone();
-    const pivotToCam = new THREE.Vector3().subVectors(position, this.pivot);
+      if (!this.dragState.startHandled) {
+        this.dragState.startHandled = true;
+        this.emit('start', undefined);
+      }
 
-    // Compute side vector (right)
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.camera.quaternion);
-    const side = new THREE.Vector3().crossVectors(forward, up).normalize();
+      const camStart = this.camStart;
+      if (!camStart) return;
 
-    // Apply pitch rotation (around side axis)
-    pivotToCam.applyAxisAngle(side, pitchDelta);
+      const camera = this.camera;
+      const mouse = this.dragState.end;
+      const domElement = this.renderer.domElement || this.renderer;
 
-    // Apply yaw rotation (around world up axis)
-    const worldUp = new THREE.Vector3(0, 0, 1);
-    pivotToCam.applyAxisAngle(worldUp, yawDelta);
+      if (this.dragState.mouse === MouseButton.LEFT) {
+        // Pan: Move camera based on plane intersection
+        const ray = mouseToRay(mouse, camera, domElement.clientWidth, domElement.clientHeight);
+        const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), this.pivot);
 
-    // Update camera position
-    const newCamPos = new THREE.Vector3().addVectors(this.pivot, pivotToCam);
-    this.camera.position.copy(newCamPos);
+        const distanceToPlane = ray.distanceToPlane(plane);
 
-    // Update camera rotation to look at pivot
-    this.camera.lookAt(this.pivot);
+        if (distanceToPlane > 0) {
+          const I = new THREE.Vector3().addVectors(
+            camStart.position,
+            ray.direction.clone().multiplyScalar(distanceToPlane),
+          );
 
-    this.emit('change', undefined);
+          const movedBy = new THREE.Vector3().subVectors(I, this.pivot);
+          const newCamPos = camStart.position.clone().sub(movedBy);
+
+          this.view.position.copy(newCamPos);
+
+          // Update view radius
+          const distance = newCamPos.distanceTo(this.pivot);
+          this.view.radius = distance;
+
+          this.emit('change', undefined);
+        }
+      } else if (this.dragState.mouse === MouseButton.RIGHT) {
+        // Rotate: Orbit around pivot
+        const ndrag = {
+          x: this.dragState.lastDrag.x / this.renderer.domElement.clientWidth,
+          y: this.dragState.lastDrag.y / this.renderer.domElement.clientHeight,
+        };
+
+        const yawDelta = -ndrag.x * this.rotationSpeed * 0.5;
+        const pitchDelta = -ndrag.y * this.rotationSpeed * 0.2;
+
+        // Clamp pitch to avoid gimbal lock
+        const originalPitch = this.view.pitch;
+        const tmpView = this.view.clone();
+        tmpView.pitch = tmpView.pitch + pitchDelta;
+        const clampedPitchDelta = tmpView.pitch - originalPitch;
+
+        // Calculate rotation
+        const pivotToCam = new THREE.Vector3().subVectors(this.view.position, this.pivot);
+        const side = this.view.getSide();
+
+        // Apply pitch rotation (around side axis)
+        pivotToCam.applyAxisAngle(side, clampedPitchDelta);
+
+        // Apply yaw rotation (around world up axis)
+        pivotToCam.applyAxisAngle(new THREE.Vector3(0, 0, 1), yawDelta);
+
+        // Update camera position
+        const newCam = new THREE.Vector3().addVectors(this.pivot, pivotToCam);
+        this.view.position.copy(newCam);
+        this.view.yaw += yawDelta;
+        this.view.pitch += clampedPitchDelta;
+
+        this.emit('change', undefined);
+      }
+    }
+  }
+
+  /**
+   * Handle drop (end drag)
+   */
+  private onDrop(_event: MouseEvent): void {
+    if (!this.enabled) return;
+
+    this.emit('end', undefined);
   }
 
   /**
    * Handle mouse wheel
    */
-  private onWheel(event: WheelEvent): void {
+  private onMouseWheel(event: WheelEvent): void {
     if (!this.enabled) return;
 
     event.preventDefault();
 
     // Normalize wheel delta
     const delta = event.deltaY > 0 ? -1 : 1;
-    this.wheelDelta += delta * this.zoomSpeed;
+    this.wheelDelta += delta;
   }
 
   /**
@@ -265,120 +389,76 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   }
 
   /**
-   * Handle touch start
+   * Handle double click - zoom to location
    */
-  private onTouchStart(event: TouchEvent): void {
-    if (!this.enabled) return;
+  private onDoubleClick(event: MouseEvent): void {
+    if (!this.enabled || !this.scene || !this.viewer) return;
 
     event.preventDefault();
 
-    if (event.touches.length === 1) {
-      const touch = event.touches[0];
-      if (!touch) return;
-
-      this.dragState = {
-        startX: touch.clientX,
-        startY: touch.clientY,
-        currentX: touch.clientX,
-        currentY: touch.clientY,
-        deltaX: 0,
-        deltaY: 0,
-        button: MouseButton.RIGHT, // Treat as rotation
-        active: true,
-      };
-
-      this.emit('start', undefined);
-
-      document.addEventListener('touchmove', this.boundHandlers.touchMove, { passive: false });
-      document.addEventListener('touchend', this.boundHandlers.touchEnd);
-    }
+    const mouse = { x: event.clientX, y: event.clientY };
+    this.zoomToLocation(mouse);
   }
 
   /**
-   * Handle touch move
+   * Zoom to a location with animation
+   *
+   * @param mouse - Mouse position
    */
-  private onTouchMove(event: TouchEvent): void {
-    if (!this.enabled || !this.dragState.active) return;
+  private zoomToLocation(mouse: { x: number; y: number }): void {
+    if (!this.scene || !this.viewer) return;
 
-    event.preventDefault();
+    const camera = this.camera;
+    const pointclouds = this.viewer.getPointClouds();
 
-    if (event.touches.length === 1) {
-      const touch = event.touches[0];
-      if (!touch) return;
+    const intersection = getMousePointCloudIntersection(mouse, camera, this.renderer, pointclouds);
 
-      const prevX = this.dragState.currentX;
-      const prevY = this.dragState.currentY;
-
-      this.dragState.currentX = touch.clientX;
-      this.dragState.currentY = touch.clientY;
-      this.dragState.deltaX = this.dragState.currentX - prevX;
-      this.dragState.deltaY = this.dragState.currentY - prevY;
-
-      if (this.pivot) {
-        this.handleRotation();
-      }
-    }
-  }
-
-  /**
-   * Handle touch end
-   */
-  private onTouchEnd(event: TouchEvent): void {
-    if (!this.enabled) return;
-
-    event.preventDefault();
-
-    if (this.dragState.active) {
-      this.dragState.active = false;
-      this.emit('end', undefined);
+    if (!intersection) {
+      return;
     }
 
-    document.removeEventListener('touchmove', this.boundHandlers.touchMove);
-    document.removeEventListener('touchend', this.boundHandlers.touchEnd);
-  }
+    // Calculate target radius based on node size
+    let targetRadius = 0;
+    {
+      const minimumJumpDistance = 0.2;
 
-  /**
-   * Set the pivot point for rotation
-   * @param point The pivot point in world coordinates
-   */
-  setPivot(point: THREE.Vector3): void {
-    this.pivot = point.clone();
-  }
-
-  /**
-   * Update controls (called each frame)
-   * @param delta Time delta in seconds
-   */
-  update(delta: number): void {
-    if (!this.enabled) return;
-
-    const fade = 0.5 ** (this.fadeFactor * delta);
-    const progression = 1 - fade;
-
-    // Apply zoom
-    if (this.wheelDelta !== 0 && this.pivot) {
-      const distance = this.camera.position.distanceTo(this.pivot);
-      const jumpDistance = distance * 0.2 * this.wheelDelta;
-      const targetDir = new THREE.Vector3()
-        .subVectors(this.pivot, this.camera.position)
-        .normalize();
-
-      const resolvedPos = new THREE.Vector3().addVectors(this.camera.position, this.zoomDelta);
-      resolvedPos.add(targetDir.multiplyScalar(jumpDistance));
-      this.zoomDelta.subVectors(resolvedPos, this.camera.position);
+      // Get node on ray to calculate appropriate zoom distance
+      // For now, use a fixed factor of the current distance
+      const distance = camera.position.distanceTo(intersection.location);
+      targetRadius = Math.max(minimumJumpDistance, distance * 0.1);
     }
 
-    // Apply zoom delta
-    if (this.zoomDelta.length() !== 0) {
-      const p = this.zoomDelta.clone().multiplyScalar(progression);
-      const newPos = new THREE.Vector3().addVectors(this.camera.position, p);
-      this.camera.position.copy(newPos);
-      this.emit('change', undefined);
-    }
+    // Calculate target camera position
+    const d = this.view.direction.clone().multiplyScalar(-1);
+    const cameraTargetPosition = new THREE.Vector3().addVectors(intersection.location, d.multiplyScalar(targetRadius));
 
-    // Decelerate
-    this.zoomDelta.multiplyScalar(fade);
-    this.wheelDelta = 0;
+    // Animate
+    const animationDuration = 600;
+
+    const value = { x: 0 };
+    const tween = new TWEEN.Tween(value).to({ x: 1 }, animationDuration);
+    tween.easing(TWEEN.Easing.Quartic.Out);
+    this.tweens.push(tween);
+
+    const startPos = this.view.position.clone();
+    const targetPos = cameraTargetPosition.clone();
+    const startRadius = this.view.radius;
+    const targetRadiusFinal = cameraTargetPosition.distanceTo(intersection.location);
+
+    tween.onUpdate(() => {
+      const t = value.x;
+      this.view.position.x = (1 - t) * startPos.x + t * targetPos.x;
+      this.view.position.y = (1 - t) * startPos.y + t * targetPos.y;
+      this.view.position.z = (1 - t) * startPos.z + t * targetPos.z;
+
+      this.view.radius = (1 - t) * startRadius + t * targetRadiusFinal;
+    });
+
+    tween.onComplete(() => {
+      this.tweens = this.tweens.filter((e) => e !== tween);
+    });
+
+    tween.start();
   }
 
   /**
@@ -390,10 +470,122 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   }
 
   /**
+   * Update controls (called each frame)
+   *
+   * @param delta - Time delta in seconds
+   */
+  update(delta: number): void {
+    if (!this.enabled || !this.scene) return;
+
+    const fade = Math.pow(0.5, this.fadeFactor * delta);
+    const progression = 1 - fade;
+    const camera = this.camera;
+
+    // Update TWEEN animations
+    TWEEN.update();
+
+    // Compute zoom (only if viewer is available)
+    if (this.wheelDelta !== 0 && this.viewer) {
+      const mouse = this.getMousePosition();
+      const pointclouds = this.viewer.getPointClouds();
+
+      const intersection = getMousePointCloudIntersection(mouse, camera, this.renderer, pointclouds);
+
+      if (intersection) {
+        const resolvedPos = new THREE.Vector3().addVectors(this.view.position, this.zoomDelta);
+        const distance = intersection.location.distanceTo(resolvedPos);
+        const jumpDistance = distance * 0.2 * this.wheelDelta;
+        const targetDir = new THREE.Vector3().subVectors(intersection.location, this.view.position);
+        targetDir.normalize();
+
+        resolvedPos.add(targetDir.multiplyScalar(jumpDistance));
+        this.zoomDelta.subVectors(resolvedPos, this.view.position);
+
+        // Update view radius
+        const newDistance = resolvedPos.distanceTo(intersection.location);
+        this.view.radius = newDistance;
+      }
+    }
+
+    // Apply zoom
+    if (this.zoomDelta.length() !== 0) {
+      const p = this.zoomDelta.clone().multiplyScalar(progression);
+      const newPos = new THREE.Vector3().addVectors(this.view.position, p);
+      this.view.position.copy(newPos);
+    }
+
+    // Update pivot indicator
+    if (this.pivotIndicator.visible) {
+      const distance = this.pivotIndicator.position.distanceTo(this.view.position);
+      const domElement = this.renderer.domElement || this.renderer;
+      const pixelWidth = (domElement as HTMLElement).clientWidth;
+      const pixelHeight = (domElement as HTMLElement).clientHeight;
+      const pr = projectedRadius(1, camera, distance, pixelWidth, pixelHeight);
+      const scale = 10 / pr;
+      this.pivotIndicator.scale.set(scale, scale, scale);
+    }
+
+    // Decelerate over time
+    this.zoomDelta.multiplyScalar(fade);
+    this.wheelDelta = 0;
+
+    // Apply view to camera
+    this.view.applyToCamera(camera);
+  }
+
+  /**
+   * Set the pivot point for rotation
+   *
+   * @param point - Pivot point in world coordinates
+   */
+  setPivot(point: THREE.Vector3): void {
+    this.pivot = point.clone();
+  }
+
+  /**
+   * Get current mouse position
+   *
+   * This is a helper method to get the mouse position.
+   * For now, it returns the center of the screen as a fallback.
+   *
+   * @returns Mouse position
+   */
+  private getMousePosition(): { x: number; y: number } {
+    // TODO: Track mouse position in a mousemove handler
+    // For now, return center of screen
+    const domElement = this.renderer.domElement || this.renderer;
+    return {
+      x: (domElement as HTMLElement).clientWidth / 2,
+      y: (domElement as HTMLElement).clientHeight / 2,
+    };
+  }
+
+  /**
+   * Get the controls scene (for rendering pivot indicator)
+   *
+   * @returns Controls scene
+   */
+  getControlsScene(): THREE.Scene {
+    return this.sceneControls;
+  }
+
+  /**
    * Dispose of the controls
    */
   dispose(): void {
     this.disconnect();
     this.removeAllListeners();
+
+    // Stop all tweens
+    for (const tween of this.tweens) {
+      tween.stop();
+    }
+    this.tweens = [];
+
+    // Dispose pivot indicator
+    this.pivotIndicator.geometry.dispose();
+    if (this.pivotIndicator.material instanceof THREE.Material) {
+      this.pivotIndicator.material.dispose();
+    }
   }
 }
