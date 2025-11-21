@@ -658,7 +658,11 @@ function decodePointCloudData(event) {
   console.log("[BinaryDecoder] Input buffer.byteLength:", buffer.byteLength);
   console.log("[BinaryDecoder] pointAttributes.byteSize:", pointAttributes.byteSize);
   console.log("[BinaryDecoder] pointAttributes.attributes:", pointAttributes.attributes.map((a) => ({ name: a.name, byteSize: a.byteSize })));
-  const numPoints = buffer.byteLength / pointAttributes.byteSize;
+  const numPoints = Math.floor(buffer.byteLength / pointAttributes.byteSize);
+  const expectedBufferSize = numPoints * pointAttributes.byteSize;
+  if (buffer.byteLength !== expectedBufferSize) {
+    console.warn(`[BinaryDecoder] Buffer size mismatch: have ${buffer.byteLength} bytes, expected ${expectedBufferSize} bytes for ${numPoints} points. Ignoring ${buffer.byteLength - expectedBufferSize} trailing bytes.`);
+  }
   console.log("[BinaryDecoder] Calculated numPoints:", numPoints);
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
@@ -690,16 +694,29 @@ function decodePointCloudData(event) {
     const attrOffset = getAttributeOffset(pointAttribute.name);
     if (pointAttribute.name === "POSITION_CARTESIAN") {
       const positions = new Float32Array(numPoints * 3);
+      const requiredSize = numPoints * pointAttributes.byteSize;
+      if (buffer.byteLength < requiredSize) {
+        console.error(`[BinaryDecoder] Buffer too small for POSITION_CARTESIAN: have ${buffer.byteLength}, need ${requiredSize}`);
+        throw new Error(`Buffer size mismatch: expected ${requiredSize} bytes, got ${buffer.byteLength} bytes`);
+      }
       for (let j = 0; j < numPoints; j++) {
+        const posOffset = attrOffset + j * pointAttributes.byteSize;
+        if (posOffset + 12 > buffer.byteLength) {
+          console.error(`[BinaryDecoder] POSITION_CARTESIAN read would exceed buffer: offset=${posOffset}, bufferSize=${buffer.byteLength}, point=${j}/${numPoints}`);
+          positions[3 * j + 0] = 0;
+          positions[3 * j + 1] = 0;
+          positions[3 * j + 2] = 0;
+          continue;
+        }
         let x, y, z;
         if (version.newerThan("1.3")) {
-          x = view.getUint32(attrOffset + j * pointAttributes.byteSize + 0, true) * scale;
-          y = view.getUint32(attrOffset + j * pointAttributes.byteSize + 4, true) * scale;
-          z = view.getUint32(attrOffset + j * pointAttributes.byteSize + 8, true) * scale;
+          x = view.getUint32(posOffset + 0, true) * scale;
+          y = view.getUint32(posOffset + 4, true) * scale;
+          z = view.getUint32(posOffset + 8, true) * scale;
         } else {
-          x = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 0, true) + nodeOffset[0];
-          y = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 4, true) + nodeOffset[1];
-          z = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 8, true) + nodeOffset[2];
+          x = view.getFloat32(posOffset + 0, true) + nodeOffset[0];
+          y = view.getFloat32(posOffset + 4, true) + nodeOffset[1];
+          z = view.getFloat32(posOffset + 8, true) + nodeOffset[2];
         }
         positions[3 * j + 0] = x;
         positions[3 * j + 1] = y;
@@ -720,11 +737,31 @@ function decodePointCloudData(event) {
       };
     } else if (pointAttribute.name === "rgba") {
       const colors = new Uint8Array(numPoints * 4);
-      for (let j = 0; j < numPoints; j++) {
-        colors[4 * j + 0] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 0);
-        colors[4 * j + 1] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 1);
-        colors[4 * j + 2] = view.getUint8(attrOffset + j * pointAttributes.byteSize + 2);
-        colors[4 * j + 3] = 255;
+      const requiredSize = numPoints * pointAttributes.byteSize;
+      if (buffer.byteLength < requiredSize) {
+        console.error(`[BinaryDecoder] Buffer too small for rgba: have ${buffer.byteLength}, need ${requiredSize}`);
+        for (let j = 0; j < numPoints; j++) {
+          colors[4 * j + 0] = 128;
+          colors[4 * j + 1] = 128;
+          colors[4 * j + 2] = 128;
+          colors[4 * j + 3] = 255;
+        }
+      } else {
+        for (let j = 0; j < numPoints; j++) {
+          const offset = attrOffset + j * pointAttributes.byteSize;
+          if (offset + 3 > buffer.byteLength) {
+            console.error(`[BinaryDecoder] RGBA read would exceed buffer: offset=${offset}, bufferSize=${buffer.byteLength}, point=${j}/${numPoints}`);
+            colors[4 * j + 0] = 128;
+            colors[4 * j + 1] = 128;
+            colors[4 * j + 2] = 128;
+            colors[4 * j + 3] = 255;
+            continue;
+          }
+          colors[4 * j + 0] = view.getUint8(offset + 0);
+          colors[4 * j + 1] = view.getUint8(offset + 1);
+          colors[4 * j + 2] = view.getUint8(offset + 2);
+          colors[4 * j + 3] = 255;
+        }
       }
       attributeBuffers[pointAttribute.name] = {
         buffer: colors.buffer,
@@ -773,13 +810,31 @@ function decodePointCloudData(event) {
       };
     } else if (pointAttribute.name === "NORMAL") {
       const normals = new Float32Array(numPoints * 3);
-      for (let j = 0; j < numPoints; j++) {
-        const x = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 0, true);
-        const y = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 4, true);
-        const z = view.getFloat32(attrOffset + j * pointAttributes.byteSize + 8, true);
-        normals[3 * j + 0] = x;
-        normals[3 * j + 1] = y;
-        normals[3 * j + 2] = z;
+      const requiredSize = numPoints * pointAttributes.byteSize;
+      if (buffer.byteLength < requiredSize) {
+        console.error(`[BinaryDecoder] Buffer too small for NORMAL: have ${buffer.byteLength}, need ${requiredSize}`);
+        for (let j = 0; j < numPoints; j++) {
+          normals[3 * j + 0] = 0;
+          normals[3 * j + 1] = 0;
+          normals[3 * j + 2] = 1;
+        }
+      } else {
+        for (let j = 0; j < numPoints; j++) {
+          const normOffset = attrOffset + j * pointAttributes.byteSize;
+          if (normOffset + 12 > buffer.byteLength) {
+            console.error(`[BinaryDecoder] NORMAL read would exceed buffer: offset=${normOffset}, bufferSize=${buffer.byteLength}, point=${j}/${numPoints}`);
+            normals[3 * j + 0] = 0;
+            normals[3 * j + 1] = 0;
+            normals[3 * j + 2] = 1;
+            continue;
+          }
+          const x = view.getFloat32(normOffset + 0, true);
+          const y = view.getFloat32(normOffset + 4, true);
+          const z = view.getFloat32(normOffset + 8, true);
+          normals[3 * j + 0] = x;
+          normals[3 * j + 1] = y;
+          normals[3 * j + 2] = z;
+        }
       }
       attributeBuffers[pointAttribute.name] = {
         buffer: normals.buffer,
@@ -819,16 +874,29 @@ function decodePointCloudData(event) {
         }
       }
       for (let j = 0; j < numPoints; j++) {
-        let value = getter(attrOffset + j * pointAttributes.byteSize, true);
-        if (typeof value === "bigint") {
-          value = Number(value);
+        const readOffset = attrOffset + j * pointAttributes.byteSize;
+        if (readOffset + pointAttribute.type.size > buffer.byteLength) {
+          console.error(`[BinaryDecoder] Generic attribute read would exceed buffer: attribute=${pointAttribute.name}, offset=${readOffset}, size=${pointAttribute.type.size}, bufferSize=${buffer.byteLength}, point=${j}/${numPoints}`);
+          f32[j] = 0;
+          preciseBuffer[j] = 0;
+          continue;
         }
-        if (!Number.isNaN(value)) {
-          min = Math.min(min, value);
-          max = Math.max(max, value);
+        try {
+          let value = getter(readOffset, true);
+          if (typeof value === "bigint") {
+            value = Number(value);
+          }
+          if (!Number.isNaN(value)) {
+            min = Math.min(min, value);
+            max = Math.max(max, value);
+          }
+          f32[j] = (value - offset) * attrScale;
+          preciseBuffer[j] = value;
+        } catch (error) {
+          console.error(`[BinaryDecoder] Error reading attribute ${pointAttribute.name} at point ${j}:`, error);
+          f32[j] = 0;
+          preciseBuffer[j] = 0;
         }
-        f32[j] = (value - offset) * attrScale;
-        preciseBuffer[j] = value;
       }
       const attributeWithRange = pointAttribute;
       attributeWithRange.range = [min, max];

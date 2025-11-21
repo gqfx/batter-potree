@@ -484,6 +484,7 @@ export class StreamingSystem implements ISystem {
         spacing: request.octree.spacing,
         hasChildren: request.node.children.some((c) => c !== null) ? 1 : 0,
         name: request.node.name,
+        numPoints: request.node.numPoints, // ✅ Potree 2.0: 传递元数据中的 numPoints
       };
 
       // 使用 WorkerPool 执行解码

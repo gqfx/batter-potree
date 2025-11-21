@@ -203,6 +203,7 @@ export interface IWorkerDecodeRequest {
   spacing: number;
   hasChildren: number;
   name: string;
+  numPoints: number; // Potree 2.0: 从元数据中读取的点数
 }
 
 /**
