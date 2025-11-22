@@ -142,12 +142,9 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
   const pointAttributes = event.data.pointAttributes;
   const numPoints = event.data.numPoints; // ✅ Potree 2.0: 使用元数据中的 numPoints
 
-  // ✅ Potree 2.0: 在 worker 内部重新计算 bytesPerPoint
-  // 因为 pointAttributes.byteSize 可能不包含 padding/alignment
-  let bytesPerPoint = 0;
-  for (const pointAttribute of pointAttributes.attributes) {
-    bytesPerPoint += pointAttribute.byteSize;
-  }
+  // ✅ 使用 pointAttributes.byteSize 作为每个点的总字节大小
+  // Potree 数据是交错存储的，pointAttributes.byteSize 已经包含了所有属性
+  const bytesPerPoint = pointAttributes.byteSize;
 
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
