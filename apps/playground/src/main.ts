@@ -69,6 +69,7 @@ debug.info(LogCategory.VIEWER, 'Viewer API created', {
 (window as any).threeScene = scene;
 (window as any).threeCamera = camera;
 (window as any).threeRenderer = renderer;
+(window as any).earthControls = null; // 稍后会设置
 
 // 检查 Worker Pool 状态
 const streamingSystem = viewer.getStreamingSystem();
@@ -108,11 +109,21 @@ try {
 
 // 创建控制器
 debug.info(LogCategory.CAMERA, 'Creating EarthControls...');
-const controls = new EarthControls(camera, canvas);
+// 使用 viewer 构造 EarthControls，这样可以获取 renderer 和点云交互
+const controls = new EarthControls(viewer);
 controls.rotationSpeed = 0.5;
 controls.zoomSpeed = 1.0;
 controls.fadeFactor = 10;
-debug.info(LogCategory.CAMERA, 'EarthControls created');
+// 设置场景，EarthControls 需要场景来进行点云交互
+controls.setScene(scene.getThreeScene());
+// 暴露控制器到全局
+(window as any).earthControls = controls;
+debug.info(LogCategory.CAMERA, 'EarthControls created', {
+  enabled: controls.enabled,
+  hasScene: !!(controls as any).scene,
+  hasViewer: !!(controls as any).viewer,
+  hasRenderer: !!(controls as any).renderer,
+});
 
 // 创建加载器
 const loader = new PotreeLoader();
@@ -186,50 +197,20 @@ viewer.on('render', () => {
       completedRequests: streamingStats?.completedLoads ?? 0,
     });
   } catch (error) {
-    console.error('[DEBUG] render 事件处理出错:', error);
+    // 不输出日志，避免控制台刷屏
+    // console.error('[DEBUG] render 事件处理出错:', error);
   }
 });
 
-// 每秒输出一次渲染状态（用于调试）
-let lastDebugTime = 0;
-viewer.on('update', () => {
-  const now = performance.now();
-  if (now - lastDebugTime > 2000) { // 每2秒
-    lastDebugTime = now;
-
-    try {
-      const pointClouds = viewer.getPointClouds();
-      const traversal = viewer.getTraversalSystem();
-      const streaming = viewer.getStreamingSystem();
-      const result = traversal?.getLastResult();
-      const streamingStats = streaming?.getStats();
-
-      debug.info(LogCategory.RENDER, '渲染状态检查', {
-        pointCloudCount: pointClouds?.length ?? 0,
-        visibleNodes: result?.visibleNodes?.length ?? 0,
-        totalPoints: result?.totalPoints ?? 0,
-        pendingRequests: streamingStats?.pendingRequests ?? 0,
-        activeLoads: streamingStats?.activeLoads ?? 0,
-        completedLoads: streamingStats?.completedLoads ?? 0,
-        failedLoads: streamingStats?.failedLoads ?? 0,
-      });
-
-      // 检查点云是否在场景中
-      if (pointClouds && pointClouds.length > 0) {
-        const pc = pointClouds[0];
-        debug.debug(LogCategory.RENDER, '点云详情', {
-          url: pc.url,
-          rootLoaded: pc.root?.loaded,
-          rootLoading: pc.root?.loading,
-          rootNumPoints: pc.root?.numPoints,
-          rootChildren: pc.root?.children?.filter(c => c !== null).length ?? 0,
-        });
-      }
-    } catch (error) {
-      console.error('[DEBUG] 渲染状态检查出错:', error);
-    }
-  }
-});
+// 暂时禁用每秒渲染状态输出，避免控制台刷屏
+// let lastDebugTime = 0;
+// viewer.on('update', () => {
+//   const now = performance.now();
+//   if (now - lastDebugTime > 2000) { // 每2秒
+//     lastDebugTime = now;
+//     ...
+//   }
+// });
 
 debug.info(LogCategory.VIEWER, 'Viewer event listeners configured');
 
