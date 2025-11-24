@@ -149,7 +149,10 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
   const nodeOffset = event.data.offset;
-  const scale = event.data.scale;
+  // ✅ 修复: scale 应该是数组 [x, y, z] 或单一值
+  const scaleArray = Array.isArray(event.data.scale)
+    ? event.data.scale
+    : [event.data.scale, event.data.scale, event.data.scale];
 
   const tightBoxMin: [number, number, number] = [
     Number.POSITIVE_INFINITY,
@@ -203,9 +206,10 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
         let x: number, y: number, z: number;
 
         if (version.newerThan('1.3')) {
-          x = view.getUint32(posOffset + 0, true) * scale;
-          y = view.getUint32(posOffset + 4, true) * scale;
-          z = view.getUint32(posOffset + 8, true) * scale;
+          // ✅ 修复: Potree 2.0 使用 Int32 (有符号整数) 并分别应用 scale
+          x = view.getInt32(posOffset + 0, true) * scaleArray[0];
+          y = view.getInt32(posOffset + 4, true) * scaleArray[1];
+          z = view.getInt32(posOffset + 8, true) * scaleArray[2];
         } else {
           x = view.getFloat32(posOffset + 0, true) + nodeOffset[0];
           y = view.getFloat32(posOffset + 4, true) + nodeOffset[1];
@@ -263,7 +267,7 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
       };
     } else if (pointAttribute.name === 'rgb') {
       // Decode RGB color data (uint16 x 3 → uint8 x 4)
-      // Convert from uint16 [0-255] range to uint8 [0-255]
+      // ✅ 修复: 参考 potree-core 的处理方式
       const colors = new Uint8Array(numPoints * 4);
 
       for (let j = 0; j < numPoints; j++) {
@@ -284,9 +288,10 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
         const g = view.getUint16(offset + 2, true);
         const b = view.getUint16(offset + 4, true);
 
-        colors[4 * j + 0] = Math.min(255, r); // R
-        colors[4 * j + 1] = Math.min(255, g); // G
-        colors[4 * j + 2] = Math.min(255, b); // B
+        // ✅ 修复: 如果值 > 255,则除以 256;否则直接使用
+        colors[4 * j + 0] = r > 255 ? r / 256 : r; // R
+        colors[4 * j + 1] = g > 255 ? g / 256 : g; // G
+        colors[4 * j + 2] = b > 255 ? b / 256 : b; // B
         colors[4 * j + 3] = 255; // Alpha
       }
 

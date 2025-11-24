@@ -656,14 +656,11 @@ function decodePointCloudData(event) {
   const buffer = event.data.buffer;
   const pointAttributes = event.data.pointAttributes;
   const numPoints = event.data.numPoints;
-  let bytesPerPoint = 0;
-  for (const pointAttribute of pointAttributes.attributes) {
-    bytesPerPoint += pointAttribute.byteSize;
-  }
+  const bytesPerPoint = pointAttributes.byteSize;
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
   const nodeOffset = event.data.offset;
-  const scale = event.data.scale;
+  const scaleArray = Array.isArray(event.data.scale) ? event.data.scale : [event.data.scale, event.data.scale, event.data.scale];
   const tightBoxMin = [
     Number.POSITIVE_INFINITY,
     Number.POSITIVE_INFINITY,
@@ -701,9 +698,9 @@ function decodePointCloudData(event) {
         }
         let x, y, z;
         if (version.newerThan("1.3")) {
-          x = view.getUint32(posOffset + 0, true) * scale;
-          y = view.getUint32(posOffset + 4, true) * scale;
-          z = view.getUint32(posOffset + 8, true) * scale;
+          x = view.getInt32(posOffset + 0, true) * scaleArray[0];
+          y = view.getInt32(posOffset + 4, true) * scaleArray[1];
+          z = view.getInt32(posOffset + 8, true) * scaleArray[2];
         } else {
           x = view.getFloat32(posOffset + 0, true) + nodeOffset[0];
           y = view.getFloat32(posOffset + 4, true) + nodeOffset[1];
@@ -762,9 +759,9 @@ function decodePointCloudData(event) {
         const r = view.getUint16(offset + 0, true);
         const g = view.getUint16(offset + 2, true);
         const b = view.getUint16(offset + 4, true);
-        colors[4 * j + 0] = Math.min(255, r);
-        colors[4 * j + 1] = Math.min(255, g);
-        colors[4 * j + 2] = Math.min(255, b);
+        colors[4 * j + 0] = r > 255 ? r / 256 : r;
+        colors[4 * j + 1] = g > 255 ? g / 256 : g;
+        colors[4 * j + 2] = b > 255 ? b / 256 : b;
         colors[4 * j + 3] = 255;
       }
       attributeBuffers["rgba"] = {
@@ -894,11 +891,11 @@ function decodePointCloudData(event) {
       for (const sourceName of attributes) {
         const sourceBuffer = attributeBuffers[sourceName];
         if (!sourceBuffer) continue;
-        const { offset, scale: scale2 } = sourceBuffer;
+        const { offset, scale } = sourceBuffer;
         const sourceView = new DataView(sourceBuffer.buffer);
         for (let j = 0; j < numPoints; j++) {
           const value = sourceView.getFloat32(j * 4, true);
-          vectorData[j * numVectorElements + iElement] = value / scale2 + offset;
+          vectorData[j * numVectorElements + iElement] = value / scale + offset;
         }
         iElement++;
       }

@@ -199,7 +199,7 @@ export interface IWorkerDecodeRequest {
   pointAttributes: IPointAttributes;
   version: string;
   offset: [number, number, number];
-  scale: number;
+  scale: number | [number, number, number]; // 支持单一值或数组 [x, y, z]
   spacing: number;
   hasChildren: number;
   name: string;
