@@ -140,11 +140,25 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 
   const buffer = event.data.buffer;
   const pointAttributes = event.data.pointAttributes;
-  const numPoints = event.data.numPoints; // ✅ Potree 2.0: 使用元数据中的 numPoints
 
   // ✅ 使用 pointAttributes.byteSize 作为每个点的总字节大小
   // Potree 数据是交错存储的，pointAttributes.byteSize 已经包含了所有属性
   const bytesPerPoint = pointAttributes.byteSize;
+
+  // ✅ 修复：根据实际 buffer 大小计算点数，而不是完全依赖元数据
+  // 元数据中的 numPoints 可能与实际 buffer 不匹配
+  const actualNumPoints = Math.floor(buffer.byteLength / bytesPerPoint);
+  const metadataNumPoints = event.data.numPoints;
+
+  // 使用实际 buffer 可容纳的点数和元数据点数中的较小值
+  const numPoints = metadataNumPoints !== undefined
+    ? Math.min(metadataNumPoints, actualNumPoints)
+    : actualNumPoints;
+
+  // 调试信息：检测不匹配的情况
+  if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
+    console.warn(`[BinaryDecoder] Point count mismatch: metadata=${metadataNumPoints}, actual=${actualNumPoints} (buffer=${buffer.byteLength}, bytesPerPoint=${bytesPerPoint}), using=${numPoints}`);
+  }
 
   const view = new DataView(buffer);
   const version = new Version(event.data.version);

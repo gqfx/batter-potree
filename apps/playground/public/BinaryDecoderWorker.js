@@ -655,8 +655,13 @@ function decodePointCloudData(event) {
   performance.mark("binary-decoder-start");
   const buffer = event.data.buffer;
   const pointAttributes = event.data.pointAttributes;
-  const numPoints = event.data.numPoints;
   const bytesPerPoint = pointAttributes.byteSize;
+  const actualNumPoints = Math.floor(buffer.byteLength / bytesPerPoint);
+  const metadataNumPoints = event.data.numPoints;
+  const numPoints = metadataNumPoints !== void 0 ? Math.min(metadataNumPoints, actualNumPoints) : actualNumPoints;
+  if (metadataNumPoints !== void 0 && metadataNumPoints !== actualNumPoints) {
+    console.warn(`[BinaryDecoder] Point count mismatch: metadata=${metadataNumPoints}, actual=${actualNumPoints} (buffer=${buffer.byteLength}, bytesPerPoint=${bytesPerPoint}), using=${numPoints}`);
+  }
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
   const nodeOffset = event.data.offset;
