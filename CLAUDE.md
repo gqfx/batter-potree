@@ -195,7 +195,81 @@ fetch(url, {
 
 ## 最近的关键修复
 
-### 修复 1: BinaryDecoderWorker 属性偏移计算错误 (2025-11-20)
+### 修复 1: Potree 2.0 proxy 节点支持和点数计算修复 (2025-11-25)
+
+**问题**：
+- Potree 2.0 点云加载时出现 404 错误
+- DataView bounds 错误：元数据中的 `numPoints` 可能与实际 buffer 大小不匹配
+
+**修复 1 - 添加 Potree 2.0 proxy 节点支持** (`f4c737a`):
+
+Potree 2.0 使用三种节点类型进行分层加载：
+- **type 0**: 普通节点（octree.bin 中有数据）
+- **type 1**: 叶子节点（octree.bin 中有数据，无子节点）
+- **type 2**: proxy 节点（层级未加载，需要从 hierarchy.bin 加载）
+
+在 `IPointCloudOctreeNode` 接口中添加了以下字段：
+
+```typescript
+export interface IPointCloudOctreeNode {
+  // ...existing fields
+
+  /**
+   * Node type (Potree 2.0):
+   * - 0: normal node
+   * - 1: leaf node
+   * - 2: proxy node (需要加载 hierarchy chunk)
+   */
+  nodeType?: number;
+
+  /**
+   * hierarchy.bin 中的字节偏移（proxy 节点）
+   */
+  hierarchyByteOffset?: number | bigint;
+
+  /**
+   * hierarchy.bin 中的字节大小（proxy 节点）
+   */
+  hierarchyByteSize?: number | bigint;
+}
+```
+
+**修复 2 - BinaryDecoderWorker 点数计算防止越界** (`e0baac7`):
+
+根本问题：元数据中的 `numPoints` 可能大于实际 buffer 能容纳的点数。
+
+```typescript
+// ❌ 错误：直接使用元数据中的 numPoints
+const numPoints = event.data.numPoints;
+
+// ✅ 正确：根据实际 buffer 大小计算点数
+const bytesPerPoint = pointAttributes.byteSize;
+const actualNumPoints = Math.floor(buffer.byteLength / bytesPerPoint);
+const metadataNumPoints = event.data.numPoints;
+
+// 使用两者中的较小值，确保不会越界
+const numPoints = metadataNumPoints !== undefined
+  ? Math.min(metadataNumPoints, actualNumPoints)
+  : actualNumPoints;
+
+// 添加不匹配警告
+if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
+  console.warn(`Point count mismatch: metadata=${metadataNumPoints}, actual=${actualNumPoints}`);
+}
+```
+
+**影响**：
+- ✅ 解决了 Potree 2.0 点云的 404 错误
+- ✅ 彻底修复了 DataView bounds 错误
+- ✅ 支持 Potree 2.0 的分层加载机制
+
+**相关文件**：
+- `packages/core/src/types/potree.ts`
+- `packages/viewer/src/loaders/workers/BinaryDecoderWorker.ts`
+
+---
+
+### 修复 2: BinaryDecoderWorker 属性偏移计算错误 (2025-11-20)
 
 **问题**：
 - DataView bounds 错误持续出现
@@ -221,7 +295,7 @@ fetch(url, {
 
 ---
 
-### 修复 2: ThreeJsRenderer 接口对齐 (2025-11-19)
+### 修复 3: ThreeJsRenderer 接口对齐 (2025-11-19)
 
 **问题**：
 - `Viewer.ts` 调用 `renderer.render(scene, camera)` 时类型不匹配
@@ -235,7 +309,7 @@ fetch(url, {
 
 ---
 
-### 修复 3: Shader 编译错误 (早期)
+### 修复 4: Shader 编译错误 (早期)
 
 **问题**：
 - GLSL 着色器编译失败
@@ -327,8 +401,8 @@ pnpm dev
 ## 常见问题排查
 
 ### 问题 1: DataView bounds 错误
-**原因**: 属性偏移计算错误
-**解决**: 参考"属性偏移计算"章节
+**原因**: 属性偏移计算错误或点数计算错误
+**解决**: 参考"属性偏移计算"章节和"修复 1"中的点数计算修复
 
 ### 问题 2: Shader 编译失败
 **原因**: `#version` 指令位置错误
@@ -343,11 +417,13 @@ pnpm dev
 - HTTP Range 请求未支持
 - 元数据解析错误
 - 属性格式不匹配
+- Potree 2.0 proxy 节点未正确处理
 
 **排查步骤**:
 1. 检查网络请求（DevTools Network 标签）
 2. 检查控制台错误
 3. 验证点云文件格式（Potree 1.x vs 2.0）
+4. 检查 proxy 节点类型和 hierarchy 加载
 
 ---
 
@@ -428,4 +504,4 @@ chore: 更新构建配置
 
 ---
 
-*最后更新: 2025-11-20*
+*最后更新: 2025-11-25*
