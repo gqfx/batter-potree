@@ -145,6 +145,26 @@ export interface IPointCloudOctreeNode {
   loading: boolean;
 
   /**
+   * Node type (Potree 2.0):
+   * - 0: normal node (has data in octree.bin)
+   * - 1: leaf node (has data in octree.bin, no children)
+   * - 2: proxy node (hierarchy not loaded yet, need to load hierarchy chunk)
+   */
+  nodeType?: number;
+
+  /**
+   * Byte offset in hierarchy.bin for proxy nodes (Potree 2.0)
+   * When nodeType=2, this indicates where to load the hierarchy chunk
+   */
+  hierarchyByteOffset?: number | bigint;
+
+  /**
+   * Byte size in hierarchy.bin for proxy nodes (Potree 2.0)
+   * When nodeType=2, this indicates the size of the hierarchy chunk
+   */
+  hierarchyByteSize?: number | bigint;
+
+  /**
    * Visibility texture offset for GPU LOD traversal
    * Set during traversal to indicate node position in visibility texture
    */
