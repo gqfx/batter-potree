@@ -16,7 +16,7 @@ import { TypedEventEmitter } from '@better-potree/core';
 import * as TWEEN from '@tweenjs/tween.js';
 import * as THREE from 'three';
 import type { Viewer } from '../Viewer.js';
-import { getMousePointCloudIntersection, mouseToRay, projectedRadius } from '../utils/GeometryUtils.js';
+import { getMousePointCloudIntersection, projectedRadius } from '../utils/GeometryUtils.js';
 import { View } from '../utils/View.js';
 
 /**
@@ -101,8 +101,17 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   zoomSpeed = 1;
   fadeFactor = 20;
 
+  // Control disable flags
+  /** Disable camera rotation */
+  disableRotation = false;
+  /** Disable camera zoom */
+  disableZoom = false;
+  /** Disable camera panning */
+  disableMove = false;
+
   // State
   private wheelDelta = 0;
+  private currentMousePosition: { x: number; y: number } | null = null;
   private zoomDelta = new THREE.Vector3();
   private camStart: THREE.Camera | null = null;
   private pivot: THREE.Vector3 | null = null;
@@ -123,6 +132,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
     drop: this.onDrop.bind(this),
     mousedown: this.onMouseDown.bind(this),
     mouseup: this.onMouseUp.bind(this),
+    mousemove: this.onMouseMove.bind(this),
     mousewheel: this.onMouseWheel.bind(this),
     dblclick: this.onDoubleClick.bind(this),
     contextmenu: this.onContextMenu.bind(this),
@@ -194,6 +204,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    */
   private connect(): void {
     this.domElement.addEventListener('mousedown', this.boundHandlers.mousedown);
+    this.domElement.addEventListener('mousemove', this.boundHandlers.mousemove);
     this.domElement.addEventListener('dblclick', this.boundHandlers.dblclick);
     this.domElement.addEventListener('wheel', this.boundHandlers.mousewheel);
     this.domElement.addEventListener('contextmenu', this.boundHandlers.contextmenu);
@@ -204,11 +215,19 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    */
   private disconnect(): void {
     this.domElement.removeEventListener('mousedown', this.boundHandlers.mousedown);
+    this.domElement.removeEventListener('mousemove', this.boundHandlers.mousemove);
     this.domElement.removeEventListener('dblclick', this.boundHandlers.dblclick);
     this.domElement.removeEventListener('wheel', this.boundHandlers.mousewheel);
     this.domElement.removeEventListener('contextmenu', this.boundHandlers.contextmenu);
     document.removeEventListener('mousemove', this.boundHandlers.drag);
     document.removeEventListener('mouseup', this.boundHandlers.drop);
+  }
+
+  /**
+   * Handle mouse move (for tracking position)
+   */
+  private onMouseMove(event: MouseEvent): void {
+    this.currentMousePosition = { x: event.clientX, y: event.clientY };
   }
 
   /**
@@ -239,6 +258,12 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         this.camStart = camera.clone();
         this.pivotIndicator.visible = true;
         this.pivotIndicator.position.copy(intersection.location);
+      } else {
+        // Fallback to render center when no point cloud intersection
+        const location = this.getRenderCenterVector();
+        this.pivot = location.clone();
+        this.camStart = camera.clone();
+        this.pivotIndicator.visible = false;
       }
     }
 
@@ -303,35 +328,12 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
       const camStart = this.camStart;
       if (!camStart) return;
 
-      const camera = this.camera;
-      const mouse = this.dragState.end;
-
       if (this.dragState.mouse === MouseButton.LEFT) {
-        // Pan: Move camera based on plane intersection
-        const ray = mouseToRay(mouse, camera, this.domElement.clientWidth, this.domElement.clientHeight);
-        const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), this.pivot);
-
-        const distanceToPlane = ray.distanceToPlane(plane);
-
-        if (distanceToPlane > 0) {
-          const I = new THREE.Vector3().addVectors(
-            camStart.position,
-            ray.direction.clone().multiplyScalar(distanceToPlane),
-          );
-
-          const movedBy = new THREE.Vector3().subVectors(I, this.pivot);
-          const newCamPos = camStart.position.clone().sub(movedBy);
-
-          this.view.position.copy(newCamPos);
-
-          // Update view radius
-          const distance = newCamPos.distanceTo(this.pivot);
-          this.view.radius = distance;
-
-          this.emit('change', undefined);
+        // Rotate: Orbit around pivot (LEFT button)
+        if (this.disableRotation) {
+          return;
         }
-      } else if (this.dragState.mouse === MouseButton.RIGHT) {
-        // Rotate: Orbit around pivot
+
         const ndrag = {
           x: this.dragState.lastDrag.x / this.domElement.clientWidth,
           y: this.dragState.lastDrag.y / this.domElement.clientHeight,
@@ -363,6 +365,28 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         this.view.pitch += clampedPitchDelta;
 
         this.emit('change', undefined);
+      } else if (this.dragState.mouse === MouseButton.RIGHT) {
+        // Pan: Move camera using View.pan() (RIGHT button)
+        if (this.disableMove) {
+          return;
+        }
+
+        const ndrag = {
+          x: this.dragState.lastDrag.x / this.domElement.clientWidth,
+          y: this.dragState.lastDrag.y / this.domElement.clientHeight,
+        };
+
+        const panDistance = this.view.radius * 3;
+        const px = -ndrag.x * panDistance;
+        const py = ndrag.y * panDistance;
+
+        this.view.pan(px, py);
+
+        // Update view radius
+        const distance = this.view.position.distanceTo(this.pivot);
+        this.view.radius = distance;
+
+        this.emit('change', undefined);
       }
     }
   }
@@ -370,9 +394,13 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   /**
    * Handle drop (end drag)
    */
-  private onDrop(_event: MouseEvent): void {
+  private onDrop(event: MouseEvent): void {
     if (!this.enabled) return;
 
+    // First call onMouseUp to cleanup state
+    this.onMouseUp(event);
+
+    // Then emit end event
     this.emit('end', undefined);
   }
 
@@ -380,7 +408,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    * Handle mouse wheel
    */
   private onMouseWheel(event: WheelEvent): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.disableZoom) return;
 
     event.preventDefault();
 
@@ -400,7 +428,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    * Handle double click - zoom to location
    */
   private onDoubleClick(event: MouseEvent): void {
-    if (!this.enabled || !this.scene || !this.viewer) return;
+    if (!this.enabled || !this.scene || !this.viewer || this.disableZoom) return;
 
     event.preventDefault();
 
@@ -500,6 +528,7 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
       const intersection = getMousePointCloudIntersection(mouse, camera, this.renderer, pointclouds);
 
       if (intersection) {
+        // Zoom towards point cloud intersection
         const resolvedPos = new THREE.Vector3().addVectors(this.view.position, this.zoomDelta);
         const distance = intersection.location.distanceTo(resolvedPos);
         const jumpDistance = distance * 0.2 * this.wheelDelta;
@@ -512,6 +541,22 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         // Update view radius
         const newDistance = resolvedPos.distanceTo(intersection.location);
         this.view.radius = newDistance;
+      } else {
+        // Fallback: zoom along camera direction when no point cloud intersection
+        const zoomFactor = 0.2 * this.wheelDelta;
+
+        let cameraDirection = new THREE.Vector3();
+        camera.getWorldDirection(cameraDirection);
+
+        // Calculate movement vector along camera direction
+        const moveVector = cameraDirection.clone().multiplyScalar(zoomFactor * this.view.radius);
+
+        // Update camera position
+        this.view.position.add(moveVector);
+
+        // Update distance to pivot
+        const distanceToTarget = this.view.position.distanceTo(this.view.getPivot());
+        this.view.radius = distanceToTarget;
       }
     }
 
@@ -552,18 +597,49 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   /**
    * Get current mouse position
    *
-   * This is a helper method to get the mouse position.
-   * For now, it returns the center of the screen as a fallback.
+   * This now properly tracks the mouse position during mousemove events.
    *
    * @returns Mouse position
    */
   private getMousePosition(): { x: number; y: number } {
-    // TODO: Track mouse position in a mousemove handler
-    // For now, return center of screen
+    // Use tracked mouse position, or fall back to center
+    if (this.currentMousePosition) {
+      return this.currentMousePosition;
+    }
     return {
       x: this.domElement.clientWidth / 2,
       y: this.domElement.clientHeight / 2,
     };
+  }
+
+  /**
+   * Get render center vector (fallback pivot when no point cloud intersection)
+   *
+   * Based on potree-core's getRenderCenterVector implementation.
+   * Returns a point in world space calculated from the center of the screen.
+   *
+   * @returns World space vector at screen center
+   */
+  private getRenderCenterVector(): THREE.Vector3 {
+    const domElement = this.domElement;
+    const mouse = {
+      x: domElement.clientWidth / 2,
+      y: domElement.clientHeight / 2,
+    };
+    const camera = this.camera;
+
+    // Convert to normalized device coordinates
+    const normalizedMouse = {
+      x: (mouse.x / domElement.clientWidth) * 2 - 1,
+      y: -(mouse.y / domElement.clientHeight) * 2 + 1,
+    };
+
+    // Create screen center point with depth
+    const screenCenter = new THREE.Vector3(normalizedMouse.x, normalizedMouse.y, 0.78);
+
+    // Unproject to world space
+    const worldCenter = screenCenter.unproject(camera);
+    return worldCenter;
   }
 
   /**
