@@ -24,8 +24,14 @@ export class View {
   /** Horizontal rotation angle in radians */
   yaw: number;
 
-  /** Vertical rotation angle in radians */
-  pitch: number;
+  /** Private pitch value for clamping */
+  private _pitch: number;
+
+  /** Maximum pitch angle (looking up) */
+  maxPitch = Math.PI / 2;
+
+  /** Minimum pitch angle (looking down) */
+  minPitch = -Math.PI / 2;
 
   /**
    * Create a new View
@@ -44,8 +50,24 @@ export class View {
     this.position = position.clone();
     this.direction = new THREE.Vector3(0, 0, -1);
     this.yaw = yaw;
-    this.pitch = pitch;
+    this._pitch = pitch;
     this.radius = radius;
+    this.updateDirection();
+  }
+
+  /**
+   * Get pitch angle
+   */
+  get pitch(): number {
+    return this._pitch;
+  }
+
+  /**
+   * Set pitch angle with automatic clamping to min/max range
+   * Based on potree-core implementation
+   */
+  set pitch(angle: number) {
+    this._pitch = Math.max(Math.min(angle, this.maxPitch), this.minPitch);
     this.updateDirection();
   }
 
@@ -54,9 +76,9 @@ export class View {
    */
   private updateDirection(): void {
     // Convert yaw-pitch to direction vector
-    this.direction.x = Math.cos(this.pitch) * Math.sin(this.yaw);
-    this.direction.y = Math.cos(this.pitch) * Math.cos(this.yaw);
-    this.direction.z = Math.sin(this.pitch);
+    this.direction.x = Math.cos(this._pitch) * Math.sin(this.yaw);
+    this.direction.y = Math.cos(this._pitch) * Math.cos(this.yaw);
+    this.direction.z = Math.sin(this._pitch);
     this.direction.normalize();
   }
 
@@ -142,7 +164,7 @@ export class View {
    * @returns New View instance with same values
    */
   clone(): View {
-    return new View(this.position.clone(), this.yaw, this.pitch, this.radius);
+    return new View(this.position.clone(), this.yaw, this._pitch, this.radius);
   }
 
   /**
@@ -154,7 +176,44 @@ export class View {
     this.position.copy(source.position);
     this.direction.copy(source.direction);
     this.yaw = source.yaw;
-    this.pitch = source.pitch;
+    this._pitch = source._pitch;
     this.radius = source.radius;
+  }
+
+  /**
+   * Pan the camera in screen space
+   *
+   * Based on Potree's View.pan() implementation:
+   * - x: pan distance along the side (right) vector
+   * - y: pan distance along the up vector
+   *
+   * This is used for RIGHT-click drag panning in EarthControls.
+   *
+   * @param x - Horizontal pan distance (positive = right)
+   * @param y - Vertical pan distance (positive = up)
+   *
+   * @example
+   * ```ts
+   * // Pan 10 units right, 5 units up
+   * view.pan(10, 5);
+   * ```
+   */
+  pan(x: number, y: number): void {
+    // Get direction vector with yaw and pitch applied
+    let dir = new THREE.Vector3(0, 1, 0);
+    dir.applyAxisAngle(new THREE.Vector3(1, 0, 0), this._pitch);
+    dir.applyAxisAngle(new THREE.Vector3(0, 0, 1), this.yaw);
+
+    // Get side (right) vector
+    const side = this.getSide();
+
+    // Calculate up vector as cross product of side and direction
+    const up = side.clone().cross(dir);
+
+    // Calculate pan vector: combine side and up movements
+    const panVector = side.multiplyScalar(x).add(up.multiplyScalar(y));
+
+    // Apply pan to position
+    this.position.add(panVector);
   }
 }
