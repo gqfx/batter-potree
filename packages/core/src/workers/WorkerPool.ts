@@ -113,8 +113,6 @@ export class WorkerPool<T = unknown, R = unknown> {
    * @param transferables - 可转移对象
    */
   private submitTask(task: WorkerTask<T, R>, transferables?: Transferable[]): void {
-    console.log('[WorkerPool] Submitting task:', task.id);
-
     if (this.disposed) {
       task.onError(new Error('WorkerPool has been disposed'));
       return;
@@ -123,12 +121,10 @@ export class WorkerPool<T = unknown, R = unknown> {
     this.activeTasks.set(task.id, task);
 
     const worker = this.getAvailableWorker();
-    console.log('[WorkerPool] Available worker:', worker ? 'found' : 'not found', 'Total workers:', this.workers.length, 'Queue size:', this.taskQueue.length);
 
     if (worker) {
       this.assignTask(worker, task, transferables);
     } else {
-      console.log('[WorkerPool] No available worker, queueing task');
       this.taskQueue.push(task);
     }
   }
@@ -156,11 +152,8 @@ export class WorkerPool<T = unknown, R = unknown> {
    * 创建 Worker
    */
   private createWorker(): WorkerInstance {
-    console.log('[WorkerPool] Creating worker with URL:', this.workerUrl, 'options:', this.workerOptions);
-
     try {
       const worker = new Worker(this.workerUrl, this.workerOptions);
-      console.log('[WorkerPool] Worker created successfully:', worker);
 
       const instance: WorkerInstance = {
         worker,
@@ -168,7 +161,6 @@ export class WorkerPool<T = unknown, R = unknown> {
       };
 
       worker.addEventListener('message', (event: MessageEvent<WorkerResponse<R>>) => {
-        console.log('[WorkerPool] Worker message received:', event.data);
         this.handleWorkerMessage(instance, event.data);
       });
 
@@ -178,7 +170,6 @@ export class WorkerPool<T = unknown, R = unknown> {
       });
 
       this.workers.push(instance);
-      console.log('[WorkerPool] Total workers:', this.workers.length);
       return instance;
     } catch (error) {
       console.error('[WorkerPool] Failed to create worker:', error);
@@ -194,8 +185,6 @@ export class WorkerPool<T = unknown, R = unknown> {
     task: WorkerTask<T, R>,
     transferables?: Transferable[],
   ): void {
-    console.log('[WorkerPool] Assigning task', task.id, 'to worker');
-
     worker.busy = true;
     worker.currentTaskId = task.id;
 
@@ -205,10 +194,8 @@ export class WorkerPool<T = unknown, R = unknown> {
     };
 
     if (transferables && transferables.length > 0) {
-      console.log('[WorkerPool] Posting message with', transferables.length, 'transferables');
       worker.worker.postMessage(message, transferables);
     } else {
-      console.log('[WorkerPool] Posting message without transferables');
       worker.worker.postMessage(message);
     }
   }

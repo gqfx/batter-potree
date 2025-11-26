@@ -6,6 +6,9 @@
 
 Better Potree 是基于 [Potree](https://github.com/potree/potree) 的现代化 WebGL 点云查看器重写版本。
 
+## 规则
+1. devtool mcp中读取日志是，限制只读前10条，避免过多日志导致上下文被填满
+
 ### 核心特性
 - **现代架构**: 模块化设计，清晰的关注点分离
 - **TypeScript 优先**: 启用严格模式的完整类型安全

@@ -163,18 +163,13 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
           try {
             workerUrl = new URL('./loaders/workers/BinaryDecoderWorker.js', import.meta.url).href;
           } catch {
-            console.warn('[Viewer] Could not resolve Worker URL from import.meta.url');
+            // Failed to resolve Worker URL from import.meta.url
           }
         }
 
         if (workerUrl) {
           const maxWorkers = config.maxWorkers ?? Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
-
-          console.log('[Viewer] Creating Worker Pool with URL:', workerUrl, 'maxWorkers:', maxWorkers);
-
           this.workerPool = createDecoderWorkerPool(workerUrl, maxWorkers);
-        } else {
-          console.warn('[Viewer] No Worker URL available, Worker decoding disabled');
         }
       } catch (error) {
         console.error('[Viewer] Failed to create Worker Pool:', error);
@@ -298,28 +293,20 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     this.streamingSystem.setOnLoadComplete((event) => {
       const { octree, node, data } = event;
 
-      console.log('[ViewerAPI] onLoadComplete callback triggered', { nodeName: node.name, numPoints: data.numPoints });
-
       // Find the point cloud scene for this octree
       const cloudName = this.getPointCloudNameByOctree(octree);
-      console.log('[ViewerAPI] cloudName:', cloudName);
       if (!cloudName) {
-        console.warn('[ViewerAPI] No cloudName found for octree');
         return;
       }
 
       const scene = this.pointCloudScenes.get(cloudName);
-      console.log('[ViewerAPI] pointCloudScene:', scene);
       if (!scene) {
-        console.warn('[ViewerAPI] No PointCloudScene found for cloudName:', cloudName);
         return;
       }
 
       try {
         // Create geometry from decoded data
-        console.log('[ViewerAPI] Creating geometry from decoded data...');
         const geometry = this.createGeometry(data);
-        console.log('[ViewerAPI] Geometry created:', geometry);
 
         // Calculate pcIndex (index in point clouds map)
         // For single point cloud, pcIndex is 0
@@ -334,10 +321,8 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
           numPoints: data.numPoints,
         };
 
-        console.log('[ViewerAPI] Adding node to PointCloudScene...', { nodeName: node.name, metadata });
         // Add node to PointCloudScene
         scene.addNode(node.name, geometry, metadata);
-        console.log('[ViewerAPI] Node added successfully. Scene children:', scene.children.length);
 
         // Update node state
         node.loaded = true;
@@ -460,17 +445,12 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     const geometry = new THREE.BufferGeometry();
     const attributeBuffers = data.attributeBuffers;
 
-    console.log('[createGeometry] Processing attributes:', Object.keys(attributeBuffers));
-    console.log('[createGeometry] data.numPoints:', data.numPoints);
-
     // Process each attribute buffer
     for (const attributeName in attributeBuffers) {
       const attrData = attributeBuffers[attributeName];
       if (!attrData) continue;
 
       const { buffer, attribute } = attrData;
-
-      console.log(`[createGeometry] Processing attribute: ${attributeName}, buffer.byteLength: ${buffer.byteLength}, detached: ${buffer.byteLength === 0}`);
 
       // Check if buffer is detached
       if (buffer.byteLength === 0) {
@@ -619,8 +599,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
    * ```
    */
   async load(url: string, name?: string): Promise<IPointCloudOctree> {
-    console.log('[Viewer.load] Starting load process...', { url, name });
-
     // Validate URL
     if (!url || typeof url !== 'string') {
       throw new Error('Invalid URL: URL must be a non-empty string');
@@ -628,7 +606,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
     // Determine point cloud name
     const cloudName = name || this.extractNameFromUrl(url);
-    console.log('[Viewer.load] Cloud name:', cloudName);
 
     // Check if point cloud with this name already exists
     if (this.pointClouds.has(cloudName)) {
@@ -640,32 +617,15 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       // TODO: Consider injecting loader in constructor for better testability
       const { PotreeLoader } = await import('./loaders/PotreeLoader.js');
       const loader = new PotreeLoader();
-      console.log('[Viewer.load] Loader created');
 
       // 2. Load metadata and create octree structure
-      console.log('[Viewer.load] Loading metadata from:', url);
       const octree = await loader.load(url);
-      console.log('[Viewer.load] Octree loaded:', {
-        version: octree.version,
-        hasRoot: !!octree.root,
-        rootLoaded: octree.root?.loaded,
-        rootNumPoints: octree.root?.numPoints,
-        spacing: octree.spacing,
-        boundingBox: octree.boundingBox,
-      });
 
       // 3. Store in point clouds map
       this.pointClouds.set(cloudName, octree);
-      console.log('[Viewer.load] Octree stored in pointClouds map');
 
       // 4. Create PointCloudScene with material
       const material = this.createMaterial();
-      console.log('[Viewer.load] Material created:', {
-        size: material.size,
-        colorMode: material.colorMode,
-        sizeType: material.sizeType,
-        shape: material.shape,
-      });
 
       const pointCloudScene = new PointCloudScene({
         materialConfig: {
@@ -677,49 +637,30 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         },
         octreeSpacing: octree.spacing,
       });
-      console.log('[Viewer.load] PointCloudScene created:', {
-        children: pointCloudScene.children.length,
-        visible: pointCloudScene.visible,
-        material: pointCloudScene.material,
-      });
 
       // 5. Add to Three.js scene
       const threeScene = this.scene.getThreeScene?.();
       if (threeScene) {
         threeScene.add(pointCloudScene);
-        console.log('[Viewer.load] PointCloudScene added to Three.js scene. Scene children:', threeScene.children.length);
-      } else {
-        console.warn('[Viewer.load] No Three.js scene available!');
       }
 
       // 6. Store in point cloud scenes map
       this.pointCloudScenes.set(cloudName, pointCloudScene);
-      console.log('[Viewer.load] PointCloudScene stored in map. Total scenes:', this.pointCloudScenes.size);
 
       // 7. Add to TraversalSystem for LOD traversal
       this.traversalSystem.addPointCloud(cloudName, octree);
-      console.log('[Viewer.load] Octree added to TraversalSystem');
 
       // 8. Emit loaded event
       this.emit('pointcloud-loaded', {
         pointCloud: octree,
         name: cloudName,
       });
-      console.log('[Viewer.load] Emitted pointcloud-loaded event');
 
       // 9. Request loading root node immediately
       if (octree.root && !octree.root.loaded && !octree.root.loading) {
-        console.log('[Viewer.load] Requesting root node load...');
         this.streamingSystem.requestLoad(octree, octree.root, 1.0);
-      } else {
-        console.log('[Viewer.load] Root node state:', {
-          hasRoot: !!octree.root,
-          loaded: octree.root?.loaded,
-          loading: octree.root?.loading,
-        });
       }
 
-      console.log('[Viewer.load] Load process completed successfully');
       return octree;
     } catch (error) {
       console.error('[Viewer.load] Load process failed:', error);
