@@ -1,21 +1,79 @@
 # @better-potree/viewer
 
-高级查看器 API，是 better-potree 库的核心组件，提供了简单易用的接口来加载、渲染和交互点云数据。
+> 开箱即用的点云查看器 API，提供完整的点云可视化解决方案
 
-## 功能特性
+## 概述
 
-- **点云管理** - 加载、移除和管理多个点云实例
-- **渲染控制** - 点预算、点大小、EDL（Eye-Dome Lighting）等渲染参数配置
-- **相机操作** - 相机移动、视野控制、自动适配场景
-- **事件系统** - 基于类型安全的事件系统，监听点云加载、渲染更新等事件
-- **动画循环** - 内置请求动画帧循环，自动更新和渲染
-- **响应式** - 自动处理窗口大小调整
-- **截屏功能** - 支持自定义分辨率和格式的截屏导出
-- **依赖注入** - 通过接口注入渲染器和场景，支持不同实现
+`@better-potree/viewer` 是 Better Potree 项目的**高级查看器 API 包**，提供开箱即用的点云可视化解决方案。它将底层的 core 和 rendering-three 能力封装成简单易用的 API，开发者无需理解复杂的 LOD 遍历和流式加载机制即可实现专业的点云应用。
+
+### 核心定位
+
+- **高级封装层**：将底层能力封装成简单易用的 API
+- **完整解决方案**：集成点云加载、LOD 遍历、流式加载、渲染等完整流程
+- **开发者友好**：提供事件驱动、类型安全的 API 接口
+- **可扩展架构**：通过依赖注入支持不同的渲染器和场景实现
+
+### 核心价值
+
+1. **简化开发**：开发者无需理解复杂的 LOD 遍历和流式加载机制
+2. **完整集成**：将 TraversalSystem、StreamingSystem、PotreeLoader 无缝集成
+3. **即插即用**：提供 ViewerAPI 高级 API，包含相机控制、工具等高级功能
+4. **生产就绪**：包含完整的事件系统、错误处理、资源清理
+
+## 核心特性
+
+### Potree 格式完整支持
+
+- ✅ Potree 1.x 格式（cloud.js）
+- ✅ Potree 2.0 格式（metadata.json）
+- ✅ Proxy 节点支持（三种节点类型：normal/leaf/proxy）
+- ✅ HTTP Range 请求支持（按需加载节点数据）
+- ✅ Hierarchy.bin 层级加载
+
+### 高性能加载和渲染
+
+- ✅ Worker Pool 并行解码（默认使用 CPU 核心数 - 1）
+- ✅ 优先级队列驱动的 LOD 遍历
+- ✅ 流式加载系统（最多支持 8 个并发加载）
+- ✅ 自动内存管理（LRU 缓存策略）
+- ✅ 点预算管理（每帧最大渲染点数控制）
+
+### 交错布局正确处理
+
+关键修复：正确处理 Potree 的交错属性布局
+
+```
+Point 0: [position(12) + intensity(2) + RGB(6) + ...]
+Point 1: [position(12) + intensity(2) + RGB(6) + ...]
+```
+
+**核心公式**：读取点 j 的属性 A 的位置
+```typescript
+const offset = attrOffset + j * pointAttributes.byteSize
+```
+
+### 相机控制系统
+
+- **EarthControls**：Potree 风格的相机控制
+  - 动态旋转轴心（基于点云表面）
+  - 左键平移、右键旋转、滚轮缩放
+  - 双击动画缩放
+  - 轴心指示器可视化
+  - 支持 View 系统（Potree 平移和 pitch 限制）
+
+### 事件驱动架构
+
+类型安全的事件系统：
+- `pointcloud-loaded` - 点云加载完成
+- `node-loaded` - 节点加载完成
+- `camera-changed` - 相机变化
+- `render` - 每帧渲染后
 
 ## 安装
 
 ```bash
+npm install @better-potree/viewer
+# 或
 pnpm add @better-potree/viewer
 ```
 
@@ -24,850 +82,431 @@ pnpm add @better-potree/viewer
 ### 基础示例
 
 ```typescript
-import { ViewerAPI } from '@better-potree/viewer';
-import { ThreeRenderer } from '@better-potree/rendering-three';
-import { ThreeScene } from '@better-potree/rendering-three';
+import { Viewer } from '@better-potree/viewer';
+import { ThreeJsRenderer, PointCloudScene } from '@better-potree/rendering-three';
+import { PotreeLoader } from '@better-potree/viewer';
 
-// 创建查看器
-const viewer = new ViewerAPI({
-  container: document.getElementById('viewer-container')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
+// 1. 创建渲染器和场景
+const renderer = new ThreeJsRenderer();
+const scene = new PointCloudScene();
+
+// 2. 创建查看器
+const viewer = new Viewer({
+  renderer,
+  scene,
   pointBudget: 1_000_000,
-  pointSize: 1.5,
-  edlEnabled: true,
-  backgroundColor: 0x000000,
+  enableWorkerDecoding: true  // 启用 Worker 解码
 });
 
-// 监听事件
+// 3. 创建加载器
+const loader = new PotreeLoader({
+  workerPool: viewer.getWorkerPool()
+});
+
+// 4. 加载点云
+const octree = await loader.load('path/to/cloud.json');
+viewer.addPointCloud(octree, 'my-cloud');
+
+// 5. 监听事件
 viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {
-  console.log(`点云已加载: ${name}`);
-  viewer.fitToScreen(pointCloud);
+  console.log(`点云 ${name} 加载完成`);
 });
 
-// 加载点云（需要 loader 支持）
-// const pointCloud = await viewer.load('path/to/cloud.json');
-
-// 启动动画循环
+// 6. 启动渲染循环
 viewer.startAnimation();
-
-// 清理
-// viewer.destroy();
 ```
 
-### 配置选项
+### 使用 ViewerAPI（推荐）
 
 ```typescript
 import { ViewerAPI } from '@better-potree/viewer';
-import type { ViewerConfig } from '@better-potree/viewer';
+import { ThreeJsRenderer, PointCloudScene } from '@better-potree/rendering-three';
 
-const config: ViewerConfig = {
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
+const viewer = new ViewerAPI({
+  renderer: new ThreeJsRenderer(),
+  scene: new PointCloudScene(),
+  pointBudget: 1_500_000,
+  edlEnabled: true
+});
 
-  // 可选配置
-  camera: customCamera,           // 自定义相机
-  pointBudget: 2_000_000,        // 每帧最大点数
-  pointSize: 2.0,                // 点大小
-  fov: 60,                       // 视野角度
+// 监听加载完成
+viewer.on('pointcloud-loaded', ({ pointCloud }) => {
+  viewer.fitToScreen(pointCloud);  // 自动适配视图
+});
 
-  // EDL 配置
-  edlEnabled: true,              // 启用 EDL
-  edlRadius: 1.4,                // EDL 半径
-  edlStrength: 0.4,              // EDL 强度
+// 加载点云
+await viewer.load('cloud.json', 'main-cloud');
 
-  backgroundColor: 0x202020,     // 背景色
-  showStats: false,              // 显示统计信息
+// 启动渲染
+viewer.startAnimation();
+```
+
+## 核心模块
+
+### 1. Viewer 类（核心）
+
+```typescript
+import { Viewer } from '@better-potree/viewer';
+
+const viewer = new Viewer({
+  renderer,
+  scene,
+  camera,                      // 可选，自定义相机
+  pointBudget: 1_000_000,     // 点预算
+  enableWorkerDecoding: true,  // 启用 Worker 解码
+  maxConcurrentLoads: 8       // 最大并发加载数
+});
+
+// 添加点云
+viewer.addPointCloud(octree, 'cloud1');
+
+// 移除点云
+viewer.remove('cloud1');
+
+// 获取点云
+const cloud = viewer.getPointCloud('cloud1');
+const allClouds = viewer.getPointClouds();
+
+// 渲染循环
+viewer.startAnimation();
+viewer.stopAnimation();
+viewer.render();  // 手动渲染
+
+// 清理
+viewer.destroy();
+```
+
+**系统整合**：
+```typescript
+// Viewer 内部整合了完整的系统栈
+this.scheduler.addSystem(this.streamingSystem);
+this.scheduler.addSystem(this.traversalSystem);
+
+// 连接系统：Traversal → Streaming
+private updateVisibleNodes(): void {
+  const result = this.traversalSystem.getLastResult();
+
+  for (const visibleNode of result.visibleNodes) {
+    if (!node.loaded && !node.loading) {
+      this.streamingSystem.requestLoad(octree, node, priority);
+    }
+  }
+}
+```
+
+### 2. PotreeLoader 类
+
+```typescript
+import { PotreeLoader } from '@better-potree/viewer';
+
+const loader = new PotreeLoader({
+  workerPool,                 // Worker Pool
+  customFileLoader            // 可选，自定义文件加载器（用于本地文件系统）
+});
+
+// 加载 Potree 点云
+const octree = await loader.load('cloud.json');
+
+// 支持的格式
+// - Potree 1.x: cloud.js
+// - Potree 2.0: metadata.json
+```
+
+**版本兼容**：
+```typescript
+// 自动检测版本
+const version = new Version(metadata.version);
+
+if (version.upTo('1.7')) {
+  // Potree 1.x 处理
+} else {
+  // Potree 2.0+ 处理
+}
+```
+
+**Proxy 节点支持**：
+```typescript
+// Potree 2.0 三种节点类型
+interface IPointCloudOctreeNode {
+  nodeType?: number;  // 0: normal, 1: leaf, 2: proxy
+  hierarchyByteOffset?: number | bigint;
+  hierarchyByteSize?: number | bigint;
+}
+```
+
+### 3. BinaryDecoderWorker
+
+在 Web Worker 中解码 Potree 二进制数据。
+
+**关键修复**（参考 CLAUDE.md）：
+
+1. **交错布局处理**：
+```typescript
+// ✅ 正确的属性偏移计算
+const getAttributeOffset = (attrName: string): number => {
+  let offset = 0;
+  for (const attr of pointAttributes.attributes) {
+    if (attr.name === attrName) return offset;
+    offset += attr.byteSize;
+  }
+  return 0;
 };
 
-const viewer = new ViewerAPI(config);
+// 读取属性
+const attrOffset = getAttributeOffset('RGB');
+for (let j = 0; j < numPoints; j++) {
+  const offset = attrOffset + j * pointAttributes.byteSize;
+  // 读取数据...
+}
+```
+
+2. **点数计算修复**：
+```typescript
+// ✅ 防止越界的点数计算
+const actualNumPoints = Math.floor(buffer.byteLength / bytesPerPoint);
+const numPoints = metadataNumPoints !== undefined
+  ? Math.min(metadataNumPoints, actualNumPoints)
+  : actualNumPoints;
+
+// 添加不匹配警告
+if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
+  console.warn(`Point count mismatch: metadata=${metadataNumPoints}, actual=${actualNumPoints}`);
+}
+```
+
+### 4. EarthControls（相机控制）
+
+```typescript
+import { EarthControls } from '@better-potree/viewer';
+
+const controls = new EarthControls(viewer, camera, domElement);
+
+// 启用/禁用控制
+controls.enabled = true;
+
+// 设置轴心
+controls.pivot.copy(new THREE.Vector3(0, 0, 0));
+
+// 显示/隐藏轴心指示器
+controls.showPivotIndicator = true;
+
+// 清理
+controls.dispose();
+```
+
+**特性**：
+- ✅ 动态旋转轴心（基于射线检测点云表面）
+- ✅ 左键平移、右键旋转、滚轮缩放
+- ✅ 双击动画缩放
+- ✅ 触摸支持
+- ✅ 集成 View 系统（Potree 平移和 pitch 限制）
+
+### 5. WorkerPool 管理
+
+```typescript
+import { WorkerPool } from '@better-potree/viewer';
+
+const workerPool = new WorkerPool({
+  workerCount: navigator.hardwareConcurrency - 1,
+  workerScript: '/workers/BinaryDecoderWorker.js'
+});
+
+// 执行任务
+const result = await workerPool.execute({
+  buffer: arrayBuffer,
+  pointAttributes: attributes,
+  numPoints: 10000
+});
+
+// 清理
+workerPool.dispose();
+```
+
+**特性**：
+- ✅ 任务队列管理
+- ✅ Worker 繁忙状态跟踪
+- ✅ 自动任务分配
+- ✅ 错误处理和重试
+
+## 事件系统
+
+### 主要事件
+
+```typescript
+// 点云加载完成
+viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {
+  console.log(`加载完成: ${name}`);
+});
+
+// 节点加载完成
+viewer.on('node-loaded', ({ pointCloud, node, data }) => {
+  console.log(`节点 ${node.name} 加载完成`);
+});
+
+// 相机变化
+viewer.on('camera-changed', ({ camera, position, target }) => {
+  console.log('相机位置:', position);
+});
+
+// 渲染帧
+viewer.on('render', ({ deltaTime, timestamp }) => {
+  // 每帧回调
+});
+```
+
+## 关键技术实现
+
+### 1. Potree 格式兼容
+
+**HTTP Range 请求支持**：
+```typescript
+fetch(url, {
+  headers: {
+    'Range': `bytes=${start}-${end}`
+  }
+})
+```
+
+**Proxy 节点加载**：
+```typescript
+// type 0: 普通节点（octree.bin 中有数据）
+// type 1: 叶子节点（octree.bin 中有数据，无子节点）
+// type 2: proxy 节点（需要从 hierarchy.bin 加载）
+if (node.nodeType === 2) {
+  await loadHierarchyChunk(node.hierarchyByteOffset, node.hierarchyByteSize);
+}
+```
+
+### 2. Worker Pool 并行解码
+
+**并发策略**：
+- 默认 Worker 数量：`navigator.hardwareConcurrency - 1`
+- 任务队列缓冲
+- 自动任务分配
+
+**移除 Transferables**（关键修复）：
+```typescript
+// ❌ 错误：使用 transferables 导致 buffer detached
+self.postMessage({ buffer: arrayBuffer }, [arrayBuffer]);
+
+// ✅ 正确：不使用 transferables
+self.postMessage({ buffer: arrayBuffer });
+```
+
+### 3. LOD 加载策略
+
+**防止过度加载**：
+```typescript
+const MAX_LOADS_PER_FRAME_PER_CLOUD = 5;
+
+// 收集未加载节点并按优先级排序
+const unloadedNodes = visibleNodes
+  .filter(vn => !vn.node.loaded && !vn.node.loading)
+  .map(vn => ({ node: vn.node, priority: vn.priority }))
+  .sort((a, b) => b.priority - a.priority);
+
+// 只请求前 N 个节点
+const nodesToLoad = unloadedNodes.slice(0, MAX_LOADS_PER_FRAME_PER_CLOUD);
 ```
 
 ## API 参考
 
-### 类
-
-#### `Viewer`
-
-核心查看器类，管理点云的加载、渲染和交互。
-
-**构造函数:**
+### Viewer
 
 ```typescript
-constructor(config: ViewerConfig)
-```
+class Viewer {
+  constructor(config: ViewerConfig);
 
-**参数:**
-- `config` - 查看器配置对象，详见 `ViewerConfig` 接口
+  // 点云管理
+  addPointCloud(octree: IPointCloudOctree, name: string): void;
+  remove(pointCloud: IPointCloudOctree | string): void;
+  getPointCloud(name: string): IPointCloudOctree | undefined;
+  getPointClouds(): IPointCloudOctree[];
 
-**示例:**
+  // 渲染循环
+  startAnimation(): void;
+  stopAnimation(): void;
+  render(): void;
 
-```typescript
-const viewer = new Viewer({
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
-});
-```
+  // 访问器
+  getCamera(): THREE.Camera;
+  getScene(): IScene;
+  getRenderer(): IRenderer;
+  getWorkerPool(): WorkerPool;
 
-#### `ViewerAPI`
-
-扩展的查看器类，提供更多高级 API 方法。继承自 `Viewer`。
-
-**构造函数:**
-
-```typescript
-constructor(config: ViewerConfig)
-```
-
-**示例:**
-
-```typescript
-const viewer = new ViewerAPI({
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
-});
-```
-
-### 主要方法
-
-#### 点云管理
-
-##### `load(url: string, name?: string): Promise<IPointCloudOctree>`
-
-加载点云数据。
-
-**参数:**
-- `url` - 点云元数据 URL
-- `name` - 可选的点云名称
-
-**返回值:**
-- `Promise<IPointCloudOctree>` - 加载的点云对象
-
-**注意:** 此功能需要 loader 系统支持（Phase 3 实现）。
-
-**示例:**
-
-```typescript
-try {
-  const pointCloud = await viewer.load('cloud.json', 'my-cloud');
-  console.log('点云已加载');
-} catch (error) {
-  console.error('加载失败:', error);
+  // 生命周期
+  destroy(): void;
 }
 ```
 
-##### `remove(pointCloud: IPointCloudOctree | string): void`
-
-移除点云。
-
-**参数:**
-- `pointCloud` - 点云对象或名称
-
-**示例:**
+### PotreeLoader
 
 ```typescript
-viewer.remove('my-cloud');
-// 或
-viewer.remove(pointCloudObject);
-```
-
-##### `getPointClouds(): IPointCloudOctree[]`
-
-获取所有已加载的点云。
-
-**返回值:**
-- `IPointCloudOctree[]` - 点云数组
-
-**示例:**
-
-```typescript
-const clouds = viewer.getPointClouds();
-console.log(`已加载 ${clouds.length} 个点云`);
-```
-
-##### `getPointCloud(name: string): IPointCloudOctree | undefined`
-
-根据名称获取点云。
-
-**参数:**
-- `name` - 点云名称
-
-**返回值:**
-- `IPointCloudOctree | undefined` - 点云对象或 undefined
-
-**示例:**
-
-```typescript
-const cloud = viewer.getPointCloud('my-cloud');
-if (cloud) {
-  console.log('找到点云');
-}
-```
-
-#### 渲染控制
-
-##### `setPointBudget(budget: number): void`
-
-设置点预算（每帧渲染的最大点数）。
-
-**参数:**
-- `budget` - 点预算值（最小 100,000）
-
-**示例:**
-
-```typescript
-viewer.setPointBudget(2_000_000);
-```
-
-##### `getPointBudget(): number`
-
-获取当前点预算。
-
-**返回值:**
-- `number` - 点预算值
-
-##### `setPointSize(size: number): void`
-
-设置点大小。
-
-**参数:**
-- `size` - 点大小（最小 0.1）
-
-**示例:**
-
-```typescript
-viewer.setPointSize(2.5);
-```
-
-##### `getPointSize(): number`
-
-获取当前点大小。
-
-**返回值:**
-- `number` - 点大小值
-
-##### `setBackground(color: THREE.ColorRepresentation): void`
-
-设置背景颜色。
-
-**参数:**
-- `color` - Three.js 颜色表示（数字、字符串或 Color 对象）
-
-**示例:**
-
-```typescript
-viewer.setBackground(0xff0000);      // 红色
-viewer.setBackground('#00ff00');     // 绿色
-viewer.setBackground('blue');        // 蓝色
-```
-
-##### `getBackground(): THREE.Color`
-
-获取当前背景颜色。
-
-**返回值:**
-- `THREE.Color` - 背景颜色对象
-
-#### EDL（Eye-Dome Lighting）
-
-##### `setEDLEnabled(enabled: boolean): void`
-
-启用或禁用 EDL。
-
-**参数:**
-- `enabled` - 是否启用 EDL
-
-**示例:**
-
-```typescript
-viewer.setEDLEnabled(true);
-```
-
-##### `setEDLConfig(config: Partial<EDLConfig>): void`
-
-设置 EDL 配置。
-
-**参数:**
-- `config` - EDL 配置对象（可部分配置）
-
-**示例:**
-
-```typescript
-viewer.setEDLConfig({
-  enabled: true,
-  radius: 2.0,
-  strength: 0.6,
-});
-```
-
-##### `getEDLConfig(): EDLConfig`
-
-获取当前 EDL 配置。
-
-**返回值:**
-- `EDLConfig` - EDL 配置对象
-
-#### 相机操作 (ViewerAPI)
-
-##### `moveCameraTo(position: THREE.Vector3, target?: THREE.Vector3, duration?: number): void`
-
-移动相机到指定位置。
-
-**参数:**
-- `position` - 目标位置
-- `target` - 可选的观察目标
-- `duration` - 动画时长（毫秒），0 表示立即移动
-
-**示例:**
-
-```typescript
-const position = new THREE.Vector3(10, 10, 10);
-const target = new THREE.Vector3(0, 0, 0);
-
-// 立即移动
-viewer.moveCameraTo(position, target, 0);
-
-// 动画移动（暂未实现）
-// viewer.moveCameraTo(position, target, 1000);
-```
-
-##### `setFOV(fov: number): void`
-
-设置透视相机的视野角度。
-
-**参数:**
-- `fov` - 视野角度（度）
-
-**示例:**
-
-```typescript
-viewer.setFOV(75);
-```
-
-##### `getFOV(): number | undefined`
-
-获取透视相机的视野角度。
-
-**返回值:**
-- `number | undefined` - 视野角度或 undefined（非透视相机）
-
-##### `fitToScreen(pointCloud?: any, options?: FitToScreenOptions): void`
-
-将相机调整到适合查看所有（或指定）点云的位置。
-
-**参数:**
-- `pointCloud` - 可选的特定点云
-- `options` - 适配选项
-
-**示例:**
-
-```typescript
-// 适配所有点云
-viewer.fitToScreen();
-
-// 适配特定点云，自定义边距
-viewer.fitToScreen(pointCloud, {
-  padding: 1.5,
-  duration: 1000,
-});
-```
-
-##### `setNavigation(mode: NavigationMode, options?: NavigationOptions): void`
-
-设置导航模式。
-
-**参数:**
-- `mode` - 导航模式 ('orbit' | 'fly' | 'earth' | 'fps')
-- `options` - 导航选项
-
-**示例:**
-
-```typescript
-viewer.setNavigation('orbit', {
-  speed: 1.5,
-  enableRotation: true,
-  enablePanning: true,
-  enableZooming: true,
-});
-```
-
-#### 截屏功能 (ViewerAPI)
-
-##### `screenshot(options?: ScreenshotOptions): string`
-
-生成截屏并返回 data URL。
-
-**参数:**
-- `options` - 截屏选项
-
-**返回值:**
-- `string` - 图片的 data URL
-
-**示例:**
-
-```typescript
-// 默认配置（PNG，当前分辨率）
-const dataUrl = viewer.screenshot();
-
-// 自定义分辨率和格式
-const dataUrl = viewer.screenshot({
-  width: 1920,
-  height: 1080,
-  format: 'image/jpeg',
-  quality: 0.9,
-});
-```
-
-##### `downloadScreenshot(filename?: string, options?: ScreenshotOptions): void`
-
-下载截屏到本地。
-
-**参数:**
-- `filename` - 文件名（默认 'screenshot.png'）
-- `options` - 截屏选项
-
-**示例:**
-
-```typescript
-viewer.downloadScreenshot('my-scene.png', {
-  width: 2560,
-  height: 1440,
-  format: 'image/png',
-});
-```
-
-#### 渲染循环
-
-##### `render(): void`
-
-渲染单帧。
-
-**示例:**
-
-```typescript
-viewer.render();
-```
-
-##### `startAnimation(): void`
-
-启动动画循环。
-
-**示例:**
-
-```typescript
-viewer.startAnimation();
-```
-
-##### `stopAnimation(): void`
-
-停止动画循环。
-
-**示例:**
-
-```typescript
-viewer.stopAnimation();
-```
-
-#### 访问器方法
-
-##### `getCamera(): THREE.Camera`
-
-获取相机对象。
-
-**返回值:**
-- `THREE.Camera` - 相机对象
-
-##### `getScene(): IScene`
-
-获取场景对象。
-
-**返回值:**
-- `IScene` - 场景对象
-
-##### `getRenderer(): IRenderer`
-
-获取渲染器对象。
-
-**返回值:**
-- `IRenderer` - 渲染器对象
-
-#### 生命周期
-
-##### `destroy(): void`
-
-销毁查看器并清理所有资源。
-
-**示例:**
-
-```typescript
-viewer.destroy();
-```
-
-### 接口和类型
-
-#### `ViewerConfig`
-
-查看器配置接口。
-
-```typescript
-interface ViewerConfig {
-  container: HTMLElement;           // 容器元素
-  renderer: IRenderer;              // 渲染器实现
-  scene: IScene;                    // 场景实现
-  camera?: THREE.Camera;            // 可选的自定义相机
-  pointBudget?: number;             // 点预算（默认 1,000,000）
-  pointSize?: number;               // 点大小（默认 1.0）
-  fov?: number;                     // 视野角度（默认 60）
-  edlEnabled?: boolean;             // EDL 启用（默认 true）
-  edlRadius?: number;               // EDL 半径（默认 1.4）
-  edlStrength?: number;             // EDL 强度（默认 0.4）
-  backgroundColor?: THREE.ColorRepresentation;  // 背景色（默认 0x000000）
-  showStats?: boolean;              // 显示统计信息（默认 false）
-}
-```
-
-#### `NavigationOptions`
-
-导航选项接口。
-
-```typescript
-interface NavigationOptions {
-  speed?: number;                   // 速度倍数
-  enableRotation?: boolean;         // 启用旋转
-  enablePanning?: boolean;          // 启用平移
-  enableZooming?: boolean;          // 启用缩放
-}
-```
-
-#### `FitToScreenOptions`
-
-适配屏幕选项接口。
-
-```typescript
-interface FitToScreenOptions {
-  padding?: number;                 // 边距系数（0-1）
-  duration?: number;                // 动画时长（毫秒）
-}
-```
-
-#### `ScreenshotOptions`
-
-截屏选项接口。
-
-```typescript
-interface ScreenshotOptions {
-  width?: number;                   // 宽度（像素）
-  height?: number;                  // 高度（像素）
-  format?: 'image/png' | 'image/jpeg' | 'image/webp';  // 图片格式
-  quality?: number;                 // JPEG 质量（0-1）
-}
-```
-
-### 事件
-
-查看器使用类型安全的事件系统。所有事件都可以通过 `on` 方法订阅。
-
-#### `pointcloud-loaded`
-
-点云加载完成时触发。
-
-```typescript
-viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {
-  console.log(`已加载点云: ${name}`);
-});
-```
-
-#### `pointcloud-removed`
-
-点云移除时触发。
-
-```typescript
-viewer.on('pointcloud-removed', ({ pointCloud, name }) => {
-  console.log(`已移除点云: ${name}`);
-});
-```
-
-#### `camera-changed`
-
-相机变化时触发。
-
-```typescript
-viewer.on('camera-changed', ({ camera, position, target }) => {
-  console.log('相机位置:', position);
-});
-```
-
-#### `navigation-changed`
-
-导航模式变化时触发。
-
-```typescript
-viewer.on('navigation-changed', ({ mode }) => {
-  console.log('导航模式:', mode);
-});
-```
-
-#### `point-budget-changed`
-
-点预算变化时触发。
-
-```typescript
-viewer.on('point-budget-changed', ({ budget }) => {
-  console.log('点预算:', budget);
-});
-```
-
-#### `point-size-changed`
-
-点大小变化时触发。
-
-```typescript
-viewer.on('point-size-changed', ({ size }) => {
-  console.log('点大小:', size);
-});
-```
-
-#### `background-changed`
-
-背景颜色变化时触发。
-
-```typescript
-viewer.on('background-changed', ({ color }) => {
-  console.log('背景色:', color.getHexString());
-});
-```
-
-#### `edl-changed`
-
-EDL 配置变化时触发。
-
-```typescript
-viewer.on('edl-changed', ({ enabled, radius, strength }) => {
-  console.log('EDL 配置已更新');
-});
-```
-
-#### `update`
-
-每帧更新前触发（在渲染之前）。
-
-```typescript
-viewer.on('update', ({ deltaTime, timestamp }) => {
-  // 更新逻辑
-});
-```
-
-#### `render`
-
-每帧渲染后触发。
-
-```typescript
-viewer.on('render', ({ deltaTime, timestamp }) => {
-  // 渲染后逻辑
-});
-```
-
-#### `destroy`
-
-查看器销毁时触发。
-
-```typescript
-viewer.on('destroy', () => {
-  console.log('查看器已销毁');
-});
-```
-
-## 使用示例
-
-### 完整示例
-
-```typescript
-import { ViewerAPI } from '@better-potree/viewer';
-import { ThreeRenderer, ThreeScene } from '@better-potree/rendering-three';
-import * as THREE from 'three';
-
-// 创建查看器
-const viewer = new ViewerAPI({
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
-  pointBudget: 1_500_000,
-  pointSize: 1.5,
-  fov: 75,
-  edlEnabled: true,
-  edlRadius: 1.4,
-  edlStrength: 0.4,
-  backgroundColor: 0x303030,
-});
-
-// 配置事件监听
-viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {
-  console.log(`点云 ${name} 加载完成`);
-
-  // 自动适配视图
-  viewer.fitToScreen(pointCloud, { padding: 1.2 });
-});
-
-viewer.on('update', ({ deltaTime }) => {
-  // 自定义更新逻辑
-});
-
-viewer.on('render', ({ deltaTime }) => {
-  // 渲染后处理
-});
-
-// 加载点云
-async function loadPointCloud() {
-  try {
-    const cloud = await viewer.load('data/cloud.json', 'main-cloud');
-    console.log('加载成功');
-  } catch (error) {
-    console.error('加载失败:', error);
-  }
-}
-
-// 启动渲染循环
-viewer.startAnimation();
-
-// UI 控制
-document.getElementById('btn-screenshot')?.addEventListener('click', () => {
-  viewer.downloadScreenshot('scene.png', {
-    width: 1920,
-    height: 1080,
+class PotreeLoader {
+  constructor(config?: {
+    workerPool?: WorkerPool;
+    customFileLoader?: (url: string) => Promise<ArrayBuffer | string>;
   });
-});
 
-document.getElementById('slider-point-size')?.addEventListener('input', (e) => {
-  const size = parseFloat((e.target as HTMLInputElement).value);
-  viewer.setPointSize(size);
-});
-
-document.getElementById('slider-point-budget')?.addEventListener('input', (e) => {
-  const budget = parseInt((e.target as HTMLInputElement).value);
-  viewer.setPointBudget(budget);
-});
-
-// 清理
-window.addEventListener('beforeunload', () => {
-  viewer.destroy();
-});
-```
-
-### 自定义相机控制
-
-```typescript
-import { ViewerAPI } from '@better-potree/viewer';
-import * as THREE from 'three';
-
-const viewer = new ViewerAPI({
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
-});
-
-// 设置导航模式
-viewer.setNavigation('orbit', {
-  speed: 1.0,
-  enableRotation: true,
-  enablePanning: true,
-  enableZooming: true,
-});
-
-// 移动到预设位置
-const positions = {
-  front: new THREE.Vector3(0, 0, 100),
-  top: new THREE.Vector3(0, 100, 0),
-  side: new THREE.Vector3(100, 0, 0),
-};
-
-const target = new THREE.Vector3(0, 0, 0);
-
-// 切换视角
-function setView(view: 'front' | 'top' | 'side') {
-  viewer.moveCameraTo(positions[view], target, 0);
+  load(url: string): Promise<IPointCloudOctree>;
 }
-
-setView('front');
 ```
 
-### 动态调整渲染参数
+### EarthControls
 
 ```typescript
-import { ViewerAPI } from '@better-potree/viewer';
+class EarthControls {
+  constructor(viewer: Viewer, camera: THREE.Camera, domElement: HTMLElement);
 
-const viewer = new ViewerAPI({
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
-});
+  enabled: boolean;
+  pivot: THREE.Vector3;
+  showPivotIndicator: boolean;
 
-// 根据性能动态调整点预算
-let fps = 60;
-viewer.on('render', ({ deltaTime }) => {
-  fps = 1000 / deltaTime;
-
-  if (fps < 30) {
-    // 降低点预算以提高性能
-    const currentBudget = viewer.getPointBudget();
-    viewer.setPointBudget(Math.max(100_000, currentBudget * 0.9));
-  } else if (fps > 55) {
-    // 提高点预算以改善质量
-    const currentBudget = viewer.getPointBudget();
-    viewer.setPointBudget(Math.min(5_000_000, currentBudget * 1.1));
-  }
-});
+  dispose(): void;
+}
 ```
 
-### 响应式布局处理
+## 性能优化建议
+
+1. **Worker Pool 大小**：根据 CPU 核心数调整 Worker 数量
+2. **点预算管理**：根据硬件能力设置合理的 pointBudget
+3. **并发加载控制**：调整 maxConcurrentLoads 避免网络拥塞
+4. **内存限制**：配置 LRU 缓存的内存限制（默认 500MB）
+
+## 注意事项
+
+### 1. Potree 格式兼容性
+
+- ✅ Potree 1.x：cloud.js
+- ✅ Potree 2.0：metadata.json
+- ✅ 支持所有标准 Potree 属性
+
+### 2. Worker 相关
+
+- Worker 脚本路径必须正确
+- Worker 数量建议为 CPU 核心数 - 1
+- 不要使用 transferables（会导致 buffer detached）
+
+### 3. 内存管理
+
+- 使用 LRU 缓存自动管理内存
+- 默认内存限制：500MB
+- 不再需要的点云应调用 `remove()` 清理
+
+### 4. 资源清理
 
 ```typescript
-import { ViewerAPI } from '@better-potree/viewer';
+// 清理查看器
+viewer.destroy();
 
-const viewer = new ViewerAPI({
-  container: document.getElementById('viewer')!,
-  renderer: new ThreeRenderer(),
-  scene: new ThreeScene(),
-});
-
-// 查看器内部已处理 window resize 事件
-// 但如果需要自定义响应逻辑：
-window.addEventListener('resize', () => {
-  // 查看器会自动更新相机和渲染器尺寸
-  // 可以在这里添加额外的响应逻辑
-
-  const container = document.getElementById('viewer')!;
-  console.log(`容器尺寸: ${container.clientWidth}x${container.clientHeight}`);
-});
+// 内部会自动：
+// 1. 停止动画
+// 2. 移除所有点云（包括几何体清理）
+// 3. 销毁系统
+// 4. 清理 Worker Pool
+// 5. 清理渲染器
+// 6. 移除事件监听器
 ```
-
-## 依赖关系
-
-此包依赖以下 better-potree 包：
-
-- `@better-potree/types` - 类型定义
-- `@better-potree/utils` - 工具函数（包括事件系统）
-- `@better-potree/core` - 核心功能
-- `@better-potree/rendering-three` - Three.js 渲染实现
-- `@better-potree/loaders` - 加载器集合
-- `@better-potree/loader-potree` - Potree 格式加载器
-- `@better-potree/controls` - 相机控制
-- `@better-potree/tools` - 工具集
-
-## 对等依赖
-
-- `three` ~0.180.0
-
-## 重要说明
-
-1. **点云加载**: `load()` 方法需要完整的 loader 系统支持（Phase 3 实现）
-2. **渲染器要求**: 截屏功能需要 Three.js WebGL 渲染器
-3. **事件清理**: 使用 `destroy()` 方法可以自动清理所有事件监听器
-4. **性能优化**: 通过调整 `pointBudget` 可以平衡渲染质量和性能
-5. **EDL 效果**: Eye-Dome Lighting 可以显著提升深度感知，建议启用
-6. **响应式**: 查看器会自动处理窗口大小调整，无需手动干预
 
 ## 开发
 
@@ -882,6 +521,10 @@ pnpm test
 pnpm clean
 ```
 
-## License
+## 许可证
 
 BSD-2-Clause
+
+---
+
+**Better Potree** - 现代化的 WebGL 点云查看器

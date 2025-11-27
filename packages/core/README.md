@@ -1,15 +1,59 @@
 # @better-potree/core
 
-> 点云渲染库 better-potree 的核心功能模块，提供八叉树数据结构、LOD 选择、视锥体裁剪和点属性管理。
+> Better Potree 的核心基础包，提供框架无关的点云渲染核心能力
 
-## 功能特性
+## 概述
 
-- **八叉树数据结构** - 用于分层点云存储的完整八叉树实现
-- **点属性系统** - 支持位置、颜色、强度、法线等标准点云属性
-- **LOD (细节层次) 选择** - 基于屏幕空间投影的自动 LOD 选择
-- **视锥体裁剪** - 高效的相机视锥体裁剪
-- **点预算管理** - 控制渲染负载的点预算分配系统
-- **类型安全的事件系统** - 基于 eventemitter3 的强类型事件发射器
+`@better-potree/core` 是 Better Potree 项目的基础核心包，提供了**零渲染依赖**的纯逻辑层。它专注于点云渲染引擎的核心算法和数据结构，作为整个 monorepo 的基础，被 `@better-potree/rendering-three` 和 `@better-potree/viewer` 依赖。
+
+### 核心定位
+
+- **数据结构定义**：八叉树、点属性、LOD 节点等核心数据结构
+- **类型系统**：完整的 TypeScript 类型定义，为其他包提供类型安全保障
+- **算法实现**：LOD 选择、视锥剔除、点预算管理等核心算法
+- **状态管理**：基于 Zustand 的配置状态管理和运行时状态管理
+- **系统架构**：ECS（Entity-Component-System）架构和系统调度器
+- **资源管理**：LRU 缓存、Worker Pool、内存管理等
+
+## 核心特性
+
+### 双层状态架构
+
+采用创新的 **Config + Runtime** 双层状态架构：
+
+- **Config 层**：不可变、可序列化、低频更新（用户配置）
+- **Runtime 层**：可变、不可序列化、高频更新（每帧状态）
+- **StateCoordinator**：单向同步 Config → Runtime
+
+**优势**：
+- ✅ 零 GC 压力的运行时状态更新
+- ✅ 清晰的关注点分离
+- ✅ 支持配置持久化和快照
+
+### 系统架构
+
+基于 ECS（Entity-Component-System）架构：
+
+- **ECS World**：轻量级 ECS 实现，专为点云场景优化
+- **System Scheduler**：管理和调度所有系统的执行顺序
+- **TraversalSystem**：LOD 遍历系统（650+ 行）
+- **StreamingSystem**：数据流式加载系统（600+ 行）
+
+**系统阶段**：INPUT (0) → UPDATE (100) → RENDER (200) → CLEANUP (300)
+
+### 高性能资源管理
+
+- **LRU 缓存策略**：基于内存大小自动卸载最久未使用的节点
+- **精确内存计算**：遍历 BufferGeometry 的所有属性和索引
+- **Worker Pool**：管理多个 Web Worker 实例，支持并行数据解码
+- **点预算管理**：控制每帧渲染点数，平衡性能和质量
+
+### 完整的类型系统
+
+- **严格模式**：启用 TypeScript strict 模式
+- **接口优先**：使用接口（`I` 前缀）定义契约
+- **泛型约束**：广泛使用泛型保证类型安全
+- **类型安全的事件系统**：基于 eventemitter3 的强类型事件发射器
 
 ## 安装
 
@@ -19,7 +63,7 @@ npm install @better-potree/core
 pnpm add @better-potree/core
 ```
 
-## 使用方法
+## 快速开始
 
 ### 基础示例
 
@@ -28,17 +72,20 @@ import * as THREE from 'three';
 import {
   PointCloudOctree,
   PointAttributes,
-  PointAttribute
+  PointAttribute,
+  SystemScheduler,
+  TraversalSystem,
+  StreamingSystem,
 } from '@better-potree/core';
 
-// 创建点属性配置
+// 1. 创建点属性配置
 const pointAttributes = new PointAttributes([
-  'POSITION_CARTESIAN',
-  'RGB_PACKED',
-  'INTENSITY'
+  PointAttribute.POSITION_CARTESIAN,
+  PointAttribute.RGB_PACKED,
+  PointAttribute.INTENSITY
 ]);
 
-// 创建点云八叉树
+// 2. 创建点云八叉树
 const boundingBox = new THREE.Box3(
   new THREE.Vector3(0, 0, 0),
   new THREE.Vector3(100, 100, 100)
@@ -50,12 +97,44 @@ const octree = new PointCloudOctree(
   pointAttributes
 );
 
-// 配置渲染参数
+// 3. 配置渲染参数
 octree.pointBudget = 1_000_000;
 octree.minimumNodePixelSize = 150;
+
+// 4. 创建系统调度器
+const scheduler = new SystemScheduler();
+
+// 5. 添加系统
+const traversalSystem = new TraversalSystem({
+  pointBudget: 1_000_000,
+  minScreenSize: 1.0
+});
+
+const streamingSystem = new StreamingSystem({
+  maxConcurrentLoads: 8
+});
+
+scheduler.addSystem(traversalSystem);
+scheduler.addSystem(streamingSystem);
+
+// 6. 在渲染循环中更新
+function render() {
+  const deltaTime = 16; // ms
+  scheduler.update(deltaTime);
+
+  // 获取可见节点
+  const result = traversalSystem.getLastResult();
+  console.log(`可见节点数: ${result.visibleNodes.length}`);
+
+  requestAnimationFrame(render);
+}
+
+render();
 ```
 
-### 点属性管理
+## 核心模块
+
+### 1. 点属性系统
 
 ```typescript
 import { PointAttribute, PointAttributes, PointAttributeDataType } from '@better-potree/core';
@@ -63,9 +142,6 @@ import { PointAttribute, PointAttributes, PointAttributeDataType } from '@better
 // 使用标准预定义属性
 const positionAttr = PointAttribute.POSITION_CARTESIAN;
 console.log(positionAttr.byteSize); // 12 (3 个 float，每个 4 字节)
-
-const intensityAttr = PointAttribute.INTENSITY;
-console.log(intensityAttr.byteSize); // 2 (1 个 uint16，2 字节)
 
 // 创建自定义属性
 const customAttr = new PointAttribute(
@@ -80,16 +156,27 @@ attributes.add(PointAttribute.POSITION_CARTESIAN);
 attributes.add(PointAttribute.RGB_PACKED);
 attributes.add(PointAttribute.INTENSITY);
 
-console.log(attributes.byteSize);  // 总字节大小: 12 + 3 + 2 = 17
-console.log(attributes.hasNormals());  // false
-console.log(attributes.getAttributeOffset('INTENSITY'));  // 15 (位置 + RGB 之后的偏移)
+console.log(attributes.byteSize);  // 总字节大小
+console.log(attributes.getAttributeOffset('INTENSITY'));  // 属性偏移
 ```
 
-### 八叉树节点操作
+**重要**：Potree 使用**交错布局**存储点数据，每个点包含所有属性：
+
+```
+Point 0: [position(12) + intensity(2) + RGB(6) + ...]
+Point 1: [position(12) + intensity(2) + RGB(6) + ...]
+```
+
+读取点 j 的属性 A 的位置公式：
 
 ```typescript
-import * as THREE from 'three';
-import { OctreeNode } from '@better-potree/core';
+const offset = attrOffset + j * pointAttributes.byteSize
+```
+
+### 2. 八叉树系统
+
+```typescript
+import { OctreeNode, PointCloudOctree } from '@better-potree/core';
 
 // 创建根节点
 const rootBox = new THREE.Box3(
@@ -102,21 +189,27 @@ const rootNode = new OctreeNode('r', rootBox, 1.0, 0);
 const child0 = rootNode.createChild(0);  // 名称: 'r0'
 const child1 = rootNode.createChild(1);  // 名称: 'r1'
 
-// 访问子节点
-console.log(rootNode.getChild(0));  // child0
-console.log(rootNode.getChildren());  // [child0, child1]
-console.log(rootNode.isLeaf());  // false
-
 // 计算子节点边界框
 const childBox = OctreeNode.computeChildBoundingBox(rootBox, 0);
-// 子节点 0 占据父边界框的 (-X, -Y, -Z) 八分之一
+
+// 遍历八叉树
+octree.traverse((node) => {
+  console.log(`节点 ${node.name}: ${node.numPoints} 个点`);
+});
 ```
 
-### LOD 选择
+**八分位索引模式**：
+```
+0: -X, -Y, -Z    4: -X, -Y, +Z
+1: +X, -Y, -Z    5: +X, -Y, +Z
+2: -X, +Y, -Z    6: -X, +Y, +Z
+3: +X, +Y, -Z    7: +X, +Y, +Z
+```
+
+### 3. LOD 选择和遍历
 
 ```typescript
-import { LODSelector } from '@better-potree/core';
-import * as THREE from 'three';
+import { LODSelector, TraversalSystem } from '@better-potree/core';
 
 const params = {
   cameraPosition: new THREE.Vector3(50, 50, 50),
@@ -136,49 +229,140 @@ const shouldRender = LODSelector.shouldRender(node, params);
 const priority = LODSelector.calculatePriority(node, params);
 ```
 
-### 视锥体裁剪
+**TraversalSystem** 使用 **BinaryHeap 优先级队列** 实现最优遍历：
+1. 计算节点的屏幕空间投影大小作为优先级
+2. 从根节点开始，将子节点加入优先队列
+3. 每次弹出优先级最高的节点
+4. 当点预算用尽时停止遍历
+
+### 4. 资源管理
 
 ```typescript
-import { FrustumCuller } from '@better-potree/core';
+import { NodeResourceManager } from '@better-potree/core';
 
-const culler = new FrustumCuller();
+const resourceManager = new NodeResourceManager({
+  memoryLimit: 500 * 1024 * 1024,  // 500MB
+  cleanupThreshold: 0.9             // 90%
+});
 
-// 从相机更新视锥体
-culler.updateFrustum(camera);
+// 注册节点资源
+resourceManager.register('node-id', geometry);
 
-// 测试节点是否与视锥体相交
-if (culler.intersects(node)) {
-  // 节点可见，执行渲染
-}
+// 标记节点为已使用（更新 LRU）
+resourceManager.touch('node-id');
 
-// 也可以测试球体或包围盒
-culler.intersectsSphere(sphere);
-culler.intersectsBox(box);
+// 获取缓存统计
+const stats = resourceManager.getStats();
+console.log(`命中率: ${stats.hitRate}`);
+console.log(`内存使用: ${stats.memoryUsage} bytes`);
+
+// 手动释放内存
+resourceManager.freeMemory(400 * 1024 * 1024); // 释放至 400MB
 ```
 
-### 点预算管理
+**LRU 缓存特性**：
+- ✅ 双向链表 + HashMap 实现 O(1) 访问和更新
+- ✅ 精确计算 BufferGeometry 的内存大小
+- ✅ 自动调用 Three.js 的 `geometry.dispose()` 释放 GPU 资源
+
+### 5. 状态管理
 
 ```typescript
-import { PointBudget } from '@better-potree/core';
+import { ConfigStore, Runtime, StateCoordinator } from '@better-potree/core';
 
-const budget = new PointBudget(1_000_000);
+// Config 层（不可变状态）
+const configStore = ConfigStore.create();
 
-// 检查容量
-if (budget.hasCapacity(50000)) {
-  budget.allocate(50000);
-}
+// 添加数据源
+configStore.getState().addSource({
+  id: 'cloud1',
+  url: 'cloud.json',
+  visible: true
+});
 
-// 获取预算信息
-console.log(budget.budget);      // 1000000
-console.log(budget.used);        // 50000
-console.log(budget.remaining);   // 950000
-console.log(budget.getUsageRatio());  // 0.05
+// Runtime 层（可变状态）
+const runtime = new Runtime();
+runtime.camera = camera;
+runtime.visibleNodes = new Set(['r', 'r0', 'r1']);
 
-// 重置使用量 (通常在每帧开始时)
-budget.reset();
+// StateCoordinator（状态协调器）
+const coordinator = new StateCoordinator({
+  configStore,
+  runtime,
+  ecsWorld,
+  octreeManager
+});
+
+coordinator.start(); // 开始监听 Config 变更并同步到 Runtime
 ```
 
-### 类型安全的事件系统
+### 6. 系统调度器
+
+```typescript
+import { SystemScheduler, SystemStage } from '@better-potree/core';
+
+const scheduler = new SystemScheduler({
+  errorHandler: (error, systemName) => {
+    console.error(`系统 ${systemName} 错误:`, error);
+  }
+});
+
+// 添加系统（按阶段分组）
+scheduler.addSystem(traversalSystem, {
+  stage: SystemStage.UPDATE,
+  priority: 100
+});
+
+scheduler.addSystem(streamingSystem, {
+  stage: SystemStage.UPDATE,
+  priority: 50
+});
+
+// 启动调度器
+scheduler.start();
+
+// 在渲染循环中更新
+function render() {
+  scheduler.update(16); // deltaTime in ms
+  requestAnimationFrame(render);
+}
+
+// 停止并清理
+scheduler.stop();
+scheduler.dispose();
+```
+
+**系统阶段执行顺序**：
+1. **INPUT** (0)：输入处理
+2. **UPDATE** (100)：逻辑更新（LOD 遍历、流式加载）
+3. **RENDER** (200)：渲染
+4. **CLEANUP** (300)：清理
+
+### 7. Worker Pool
+
+```typescript
+import { WorkerPool, createDecoderWorkerPool } from '@better-potree/core';
+
+// 创建 Worker Pool
+const workerPool = createDecoderWorkerPool({
+  workerCount: navigator.hardwareConcurrency - 1,
+  workerScript: '/workers/BinaryDecoderWorker.js'
+});
+
+// 执行任务
+const result = await workerPool.execute({
+  buffer: arrayBuffer,
+  pointAttributes: attributes,
+  numPoints: 10000
+});
+
+console.log(`解码完成: ${result.numPoints} 个点`);
+
+// 清理
+workerPool.dispose();
+```
+
+### 8. 类型安全的事件系统
 
 ```typescript
 import { TypedEventEmitter } from '@better-potree/core';
@@ -202,42 +386,51 @@ emitter.emit('node-loaded', {
   node: someNode,
   pointCloud: someOctree
 });
-
-// 移除监听器
-emitter.off('node-loaded', listener);
-emitter.removeAllListeners('node-loaded');
 ```
 
-### 八叉树遍历和查询
+## 架构亮点
 
-```typescript
-// 通过名称查找节点
-const node = octree.findNode('r01234');
+### 1. 双层状态架构的优势
 
-// 获取特定层级的所有节点
-const level2Nodes = octree.getNodesAtLevel(2);
+传统单一状态管理在高频更新场景下存在性能问题：
+- ❌ 不可变更新导致大量对象创建
+- ❌ 序列化/反序列化开销
+- ❌ 状态订阅通知开销
 
-// 遍历所有节点
-octree.traverse((node) => {
-  console.log(`节点 ${node.name}: ${node.numPoints} 个点`);
-});
+Better Potree 的双层架构解决方案：
+- ✅ Config 层：不可变、可序列化、低频更新
+- ✅ Runtime 层：可变、不可序列化、高频更新
+- ✅ 零 GC 压力的运行时状态更新
 
-// 获取总点数
-const totalPoints = octree.getTotalPoints();
+### 2. 优先级队列驱动的 LOD 遍历
 
-// 资源清理
-octree.dispose();
-```
+使用 BinaryHeap 实现最优优先遍历：
+- ✅ 确保最重要的节点优先加载
+- ✅ 避免深度优先遍历的盲目性
+- ✅ 提高渲染质量
+
+### 3. 系统调度器的错误隔离
+
+每个系统的 `update()` 方法被 try-catch 包裹：
+- ✅ 单个系统崩溃不影响其他系统
+- ✅ 提高系统健壮性
+- ✅ 便于调试和错误追踪
+
+### 4. LRU 缓存的精确内存计算
+
+遍历 `BufferGeometry` 的所有属性和索引，累加字节数：
+- ✅ 精确的内存预算管理
+- ✅ 避免内存泄漏
+- ✅ 支持动态内存调整
 
 ## API 参考
 
-### 类
+### 核心类
 
 #### `PointCloudOctree`
 
 基于八叉树的分层 LOD 点云。
 
-**构造函数：**
 ```typescript
 constructor(
   boundingBox: THREE.Box3,
@@ -247,49 +440,25 @@ constructor(
 )
 ```
 
-**属性：**
+**属性**：
 - `root: OctreeNode` - 八叉树的根节点
 - `boundingBox: THREE.Box3` - 整个点云的边界框
-- `pointBudget: number` - 最大渲染点数 (默认: 1,000,000)
-- `minimumNodePixelSize: number` - LOD 选择的最小节点像素大小 (默认: 150)
-- `visibleNodes: OctreeNode[]` - 可见节点 (裁剪时更新)
+- `pointBudget: number` - 最大渲染点数
+- `minimumNodePixelSize: number` - LOD 选择的最小节点像素大小
+- `visibleNodes: OctreeNode[]` - 可见节点列表
 - `numVisiblePoints: number` - 可见点数量
 
-**方法：**
-
-##### `findNode(name: string): OctreeNode | null`
-
-通过名称查找节点。
-
-**参数：**
-- `name` - 节点名称 (例如: "r", "r0", "r01")
-
-**返回：**
-- 找到的节点或 `null`
-
-##### `getNodesAtLevel(level: number): OctreeNode[]`
-
-获取特定层级的所有节点。
-
-##### `traverse(callback: (node: OctreeNode) => void): void`
-
-遍历八叉树中的所有节点。
-
-##### `getTotalPoints(): number`
-
-获取八叉树中的总点数。
-
-##### `dispose(): void`
-
-释放八叉树资源。
-
----
+**方法**：
+- `findNode(name: string): OctreeNode | null` - 通过名称查找节点
+- `getNodesAtLevel(level: number): OctreeNode[]` - 获取特定层级的所有节点
+- `traverse(callback: (node: OctreeNode) => void): void` - 遍历八叉树
+- `getTotalPoints(): number` - 获取总点数
+- `dispose(): void` - 释放资源
 
 #### `OctreeNode`
 
 八叉树层级结构中的节点。
 
-**构造函数：**
 ```typescript
 constructor(
   name: string,
@@ -299,398 +468,139 @@ constructor(
 )
 ```
 
-**属性：**
+**属性**：
 - `name: string` - 节点名称 (例如: "r", "r0", "r01")
-- `children: (OctreeNode | null)[]` - 子节点 (最多 8 个)
+- `children: (OctreeNode | null)[]` - 子节点数组（最多 8 个）
 - `boundingBox: THREE.Box3` - 局部空间中的边界框
 - `boundingSphere: THREE.Sphere` - 边界球
-- `level: number` - 八叉树层级 (0 = 根节点)
+- `level: number` - 八叉树层级
 - `numPoints: number` - 此节点中的点数
 - `spacing: number` - 此层级的点间距
 - `geometry: THREE.BufferGeometry | null` - 几何数据
 - `loaded: boolean` - 几何数据是否已加载
 
-**方法：**
-
-##### `getChild(index: number): OctreeNode | null`
-
-通过索引 (0-7) 获取子节点。
-
-##### `setChild(index: number, child: OctreeNode): void`
-
-设置子节点。
-
-##### `createChild(index: number): OctreeNode`
-
-为给定的八分位创建子节点。
-
-##### `getChildren(): OctreeNode[]`
-
-获取所有非空子节点。
-
-##### `isLeaf(): boolean`
-
-检查节点是否为叶节点 (无子节点)。
-
-##### `static computeChildBoundingBox(parentBox: THREE.Box3, index: number): THREE.Box3`
-
-计算给定八分位索引的子边界框。
-
-**八分位索引模式：**
-```
-0: -X, -Y, -Z    4: -X, -Y, +Z
-1: +X, -Y, -Z    5: +X, -Y, +Z
-2: -X, +Y, -Z    6: -X, +Y, +Z
-3: +X, +Y, -Z    7: +X, +Y, +Z
-```
-
----
+**方法**：
+- `getChild(index: number): OctreeNode | null` - 获取子节点
+- `setChild(index: number, child: OctreeNode): void` - 设置子节点
+- `createChild(index: number): OctreeNode` - 创建子节点
+- `getChildren(): OctreeNode[]` - 获取所有非空子节点
+- `isLeaf(): boolean` - 检查是否为叶节点
+- `static computeChildBoundingBox(parentBox: THREE.Box3, index: number): THREE.Box3` - 计算子边界框
 
 #### `PointAttributes`
 
 管理点云的点属性集合。
 
-**构造函数：**
 ```typescript
 constructor(pointAttributeNames?: string[])
 ```
 
-**属性：**
+**属性**：
 - `attributes: PointAttribute[]` - 属性数组
 - `byteSize: number` - 每个点的总字节大小
 - `size: number` - 属性数量
 
-**方法：**
+**方法**：
+- `add(pointAttribute: PointAttribute): void` - 添加属性
+- `hasNormals(): boolean` - 检查是否包含法线
+- `hasAttribute(name: string): boolean` - 检查是否包含特定属性
+- `getAttribute(name: string): PointAttribute | undefined` - 获取属性
+- `getAttributeOffset(name: string): number` - 获取属性的字节偏移量
 
-##### `add(pointAttribute: PointAttribute): void`
+#### `SystemScheduler`
 
-向集合添加点属性。
+系统调度器，管理所有系统的执行顺序。
 
-##### `hasNormals(): boolean`
-
-检查集合是否包含法线属性。
-
-##### `hasAttribute(name: string): boolean`
-
-检查集合是否包含特定属性。
-
-##### `getAttribute(name: string): PointAttribute | undefined`
-
-通过名称获取属性。
-
-##### `getAttributeOffset(name: string): number`
-
-获取属性的字节偏移量。如果未找到属性，返回 -1。
-
----
-
-#### `PointAttribute`
-
-表示单个点属性 (例如: 位置、颜色、强度)。
-
-**构造函数：**
 ```typescript
-constructor(
-  name: string,
-  dataType: PointAttributeDataType,
-  numElements: number
-)
+constructor(config?: {
+  errorHandler?: (error: Error, systemName: string) => void;
+})
 ```
 
-**属性：**
-- `name: string` - 属性名称
-- `type: PointAttributeType` - 数据类型元数据
-- `numElements: number` - 元素数量 (例如: XYZ 位置为 3)
-- `byteSize: number` - 总字节大小
-- `description: string` - 人类可读的描述
-- `range: [number, number]` - 值范围 [最小值, 最大值]
+**方法**：
+- `addSystem(system: ISystem, config?: { stage?: SystemStage; priority?: number }): void` - 添加系统
+- `removeSystem(system: ISystem): void` - 移除系统
+- `start(): void` - 启动调度器
+- `stop(): void` - 停止调度器
+- `update(deltaTime: number): void` - 更新所有系统
+- `dispose(): void` - 清理资源
 
-**标准属性 (静态常量)：**
+#### `NodeResourceManager`
+
+节点资源管理器，使用 LRU 缓存策略。
 
 ```typescript
-PointAttribute.POSITION_CARTESIAN  // 3 个 float (12 字节)
-PointAttribute.RGBA_PACKED         // 4 个 int8 (4 字节)
-PointAttribute.RGB_PACKED          // 3 个 int8 (3 字节)
-PointAttribute.NORMAL_FLOATS       // 3 个 float (12 字节)
-PointAttribute.NORMAL_SPHEREMAPPED // 2 个 uint8 (2 字节)
-PointAttribute.NORMAL_OCT16        // 2 个 uint8 (2 字节)
-PointAttribute.NORMAL              // 3 个 float (12 字节)
-PointAttribute.INTENSITY           // 1 个 uint16 (2 字节)
-PointAttribute.CLASSIFICATION      // 1 个 uint8 (1 字节)
-PointAttribute.RETURN_NUMBER       // 1 个 uint8 (1 字节)
-PointAttribute.NUMBER_OF_RETURNS   // 1 个 uint8 (1 字节)
-PointAttribute.SOURCE_ID           // 1 个 uint16 (2 字节)
-PointAttribute.GPS_TIME            // 1 个 double (8 字节)
-PointAttribute.INDICES             // 1 个 uint32 (4 字节)
-PointAttribute.SPACING             // 1 个 float (4 字节)
+constructor(config?: {
+  memoryLimit?: number;
+  cleanupThreshold?: number;
+})
 ```
 
----
+**方法**：
+- `register(id: string, geometry: THREE.BufferGeometry): void` - 注册节点资源
+- `touch(id: string): void` - 标记节点为已使用
+- `freeMemory(targetMemory: number): void` - 释放内存至目标限制
+- `getStats(): CacheStats` - 获取缓存统计
 
-#### `LODSelector`
+## 依赖关系
 
-基于屏幕空间标准选择适当的 LOD 层级。
+### 外部依赖
 
-**静态方法：**
-
-##### `calculateScreenPixelRadius(node: OctreeNode, params: LODSelectionParams): number`
-
-计算节点边界球的屏幕空间半径。
-
-##### `shouldRender(node: OctreeNode, params: LODSelectionParams): boolean`
-
-根据屏幕大小判断节点是否应该可见。
-
-##### `calculatePriority(node: OctreeNode, params: LODSelectionParams): number`
-
-计算节点加载优先级 (返回值越大表示优先级越高)。
-
----
-
-#### `FrustumCuller`
-
-对八叉树节点执行视锥体裁剪。
-
-**方法：**
-
-##### `updateFrustum(camera: { matrixWorldInverse: THREE.Matrix4; projectionMatrix: THREE.Matrix4 }): void`
-
-从相机更新视锥体。
-
-##### `intersects(node: OctreeNode): boolean`
-
-测试节点是否与视锥体相交。
-
-##### `intersectsSphere(sphere: THREE.Sphere): boolean`
-
-测试球体是否与视锥体相交。
-
-##### `intersectsBox(box: THREE.Box3): boolean`
-
-测试包围盒是否与视锥体相交。
-
----
-
-#### `PointBudget`
-
-管理多个点云的点预算分配。
-
-**构造函数：**
-```typescript
-constructor(budget?: number)  // 默认: 1,000,000
-```
-
-**属性：**
-- `budget: number` - 总点预算 (getter/setter)
-- `used: number` - 当前使用的点数 (只读)
-- `remaining: number` - 剩余预算 (只读)
-
-**方法：**
-
-##### `hasCapacity(points: number): boolean`
-
-检查预算是否有给定点数的容量。
-
-##### `allocate(points: number): boolean`
-
-从预算中分配点。如果容量不足，返回 `false`。
-
-##### `reset(): void`
-
-重置已使用的点数 (通常在每帧开始时调用)。
-
-##### `getUsageRatio(): number`
-
-获取预算使用率 (0-1)。
-
----
-
-#### `TypedEventEmitter<TEventMap>`
-
-基于 eventemitter3 的类型安全事件发射器。
-
-**方法：**
-
-##### `on<K>(event: K, listener: (data: TEventMap[K]) => void): this`
-
-添加事件监听器。
-
-##### `once<K>(event: K, listener: (data: TEventMap[K]) => void): this`
-
-添加一次性事件监听器。
-
-##### `off<K>(event: K, listener: (data: TEventMap[K]) => void): this`
-
-移除事件监听器。
-
-##### `emit<K>(event: K, data: TEventMap[K]): boolean`
-
-发射事件。
-
-##### `removeAllListeners<K>(event?: K): this`
-
-移除事件的所有监听器或所有事件的监听器。
-
-##### `listenerCount<K>(event: K): number`
-
-获取事件的监听器数量。
-
-### 类型和接口
-
-#### `PointAttributeDataType`
-
-点属性数据类型枚举：
-
-```typescript
-enum PointAttributeDataType {
-  DOUBLE = 'double',   // 8 字节
-  FLOAT = 'float',     // 4 字节
-  INT8 = 'int8',       // 1 字节
-  UINT8 = 'uint8',     // 1 字节
-  INT16 = 'int16',     // 2 字节
-  UINT16 = 'uint16',   // 2 字节
-  INT32 = 'int32',     // 4 字节
-  UINT32 = 'uint32',   // 4 字节
-  INT64 = 'int64',     // 8 字节
-  UINT64 = 'uint64',   // 8 字节
+```json
+{
+  "dependencies": {
+    "eventemitter3": "^5.0.1",  // 事件系统
+    "zustand": "^5.0.8"         // 状态管理
+  },
+  "peerDependencies": {
+    "three": "~0.180.0"         // Three.js（类型依赖）
+  }
 }
 ```
 
-#### `PointAttributeName`
+**依赖说明**：
+- **eventemitter3**：提供高性能的事件发射器基础
+- **zustand**：提供简洁的 store 模式，支持订阅和不可变更新
+- **three**：仅作为类型依赖，保持 Core 包的框架无关性
 
-标准点属性名称枚举。
-
-#### `LODSelectionParams`
-
-LOD 选择参数：
-
-```typescript
-interface LODSelectionParams {
-  cameraPosition: THREE.Vector3;
-  screenWidth: number;
-  screenHeight: number;
-  fov: number;
-  minimumNodePixelSize: number;
-}
-```
-
-#### `PointCloudEvents`
-
-点云相关事件：
-
-```typescript
-interface PointCloudEvents {
-  'visibility-changed': { visible: boolean; pointCloud: PointCloudOctree };
-  'name-changed': { name: string; pointCloud: PointCloudOctree };
-  'transformation-changed': { pointCloud: PointCloudOctree };
-  'node-loaded': { node: OctreeNode; pointCloud: PointCloudOctree };
-  'node-disposed': { node: OctreeNode; pointCloud: PointCloudOctree };
-}
-```
-
-#### `LoaderEvents`, `MeasurementEvents`, `CameraEvents`
-
-其他事件类型定义可用于扩展类型安全的事件系统。
-
-## 示例
-
-### 完整的点云设置
-
-```typescript
-import * as THREE from 'three';
-import {
-  PointCloudOctree,
-  PointAttributes,
-  PointBudget,
-  FrustumCuller,
-  LODSelector
-} from '@better-potree/core';
-
-// 创建点属性
-const attributes = new PointAttributes([
-  'POSITION_CARTESIAN',
-  'RGB_PACKED',
-  'INTENSITY',
-  'CLASSIFICATION'
-]);
-
-// 创建八叉树
-const boundingBox = new THREE.Box3(
-  new THREE.Vector3(-50, -50, -50),
-  new THREE.Vector3(50, 50, 50)
-);
-
-const octree = new PointCloudOctree(boundingBox, 1.0, attributes);
-octree.setName('my-point-cloud');
-
-// 设置渲染参数
-const pointBudget = new PointBudget(2_000_000);
-octree.pointBudget = pointBudget.budget;
-octree.minimumNodePixelSize = 120;
-
-// 设置视锥体裁剪
-const culler = new FrustumCuller();
-
-// 渲染循环
-function render(camera: THREE.Camera) {
-  // 更新视锥体
-  culler.updateFrustum(camera);
-
-  // 重置点预算
-  pointBudget.reset();
-
-  // LOD 选择参数
-  const lodParams = {
-    cameraPosition: camera.position,
-    screenWidth: window.innerWidth,
-    screenHeight: window.innerHeight,
-    fov: (camera as THREE.PerspectiveCamera).fov,
-    minimumNodePixelSize: octree.minimumNodePixelSize
-  };
-
-  // 遍历并选择可见节点
-  octree.visibleNodes = [];
-  octree.traverse((node) => {
-    if (culler.intersects(node) && LODSelector.shouldRender(node, lodParams)) {
-      if (pointBudget.hasCapacity(node.numPoints)) {
-        pointBudget.allocate(node.numPoints);
-        octree.visibleNodes.push(node);
-      }
-    }
-  });
-
-  octree.numVisiblePoints = pointBudget.used;
-}
-```
-
-## 开发
-
-### 运行测试
+## 测试
 
 ```bash
+# 运行测试
 pnpm test
+
+# 观察模式
+pnpm test -- --watch
+
+# 覆盖率报告
+pnpm test -- --coverage
 ```
 
-### 构建
+**测试覆盖**：
+- ✅ ECS 系统测试
+- ✅ 状态协调器测试
+- ✅ 配置 Store 测试
+- ✅ Worker Pool 测试
+- ✅ 资源管理器测试
+- ✅ 系统调度器测试
+
+## 构建
 
 ```bash
+# 构建所有包
 pnpm build
+
+# 仅构建 core
+pnpm --filter @better-potree/core build
 ```
-
-## 依赖
-
-- **@better-potree/types** - 类型定义
-- **@better-potree/utils** - 实用工具函数
-- **eventemitter3** - 事件发射器库
-- **three** (peer dependency) - Three.js ~0.180.0
 
 ## 注意事项
 
-- 此包需要 Three.js ~0.180.0 作为 peer dependency
-- 八叉树节点名称遵循 Potree 命名约定 ("r", "r0", "r01", 等)
-- 八分位索引使用位标志: bit 0 = X, bit 1 = Y, bit 2 = Z
-- 点预算应该在每个渲染帧开始时使用 `reset()` 重置
-- 在不再需要时记得调用 `dispose()` 清理八叉树资源
+1. **Potree 格式兼容**：完全支持 Potree 1.x 和 2.0 格式
+2. **交错布局**：正确处理 Potree 的交错属性布局
+3. **内存管理**：使用 LRU 缓存自动管理内存
+4. **点预算**：应该在每个渲染帧开始时使用 `reset()` 重置
+5. **资源清理**：在不再需要时记得调用 `dispose()` 清理资源
 
 ## 许可证
 
@@ -698,4 +608,4 @@ BSD-2-Clause
 
 ---
 
-better-potree monorepo 的一部分
+**Better Potree** - 现代化的 WebGL 点云查看器
