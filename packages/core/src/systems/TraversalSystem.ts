@@ -316,6 +316,23 @@ export class TraversalSystem implements ISystem {
   }
 
   /**
+   * 使缓存失效，强制下一帧重新遍历
+   *
+   * 应该在以下情况调用：
+   * - 新节点加载完成时
+   * - 层级数据加载完成时
+   *
+   * @example
+   * ```ts
+   * // 当节点加载完成时
+   * traversalSystem.invalidateCache();
+   * ```
+   */
+  invalidateCache(): void {
+    this.transformCacheValid = false;
+  }
+
+  /**
    * 获取最后的遍历结果
    *
    * @returns 遍历结果
@@ -398,6 +415,13 @@ export class TraversalSystem implements ISystem {
         frustumCullRate,
       },
     };
+
+    console.log('[TraversalSystem] update result:', {
+      visibleNodes: budgetedNodes.length,
+      totalPoints: this.lastResult.totalPoints,
+      traversedNodes,
+      traversalTime: this.lastResult.traversalTime,
+    });
 
     // 更新变换缓存
     this.updateTransformCache();
@@ -596,13 +620,37 @@ export class TraversalSystem implements ISystem {
       };
     }
 
-    const cameraPosition = this.camera.position;
+    // **关键修复**: 在对象空间计算视锥体和相机位置
+    // 参考 potree-core: UpdateVisibility.ts:80-101
+    const objectSpaceFrustum = new THREE.Frustum();
+    let camObjPos: THREE.Vector3;
+
+    if (octree.matrixWorld) {
+      // 计算对象空间的视锥体
+      // fm = proj * viewInverse * world
+      const fm = new THREE.Matrix4()
+        .multiply(this.camera.projectionMatrix)
+        .multiply(this.camera.matrixWorldInverse)
+        .multiply(octree.matrixWorld);
+      objectSpaceFrustum.setFromProjectionMatrix(fm);
+
+      // 计算对象空间的相机位置
+      const worldInverse = octree.matrixWorld.clone().invert();
+      const camMatrixObject = new THREE.Matrix4()
+        .multiply(worldInverse)
+        .multiply(this.camera.matrixWorld);
+      camObjPos = new THREE.Vector3().setFromMatrixPosition(camMatrixObject);
+    } else {
+      // 没有 matrixWorld，使用世界空间视锥体
+      objectSpaceFrustum.copy(this.frustum);
+      camObjPos = this.camera.position.clone();
+    }
 
     // 使用优先级队列（最小堆），权重越小优先级越高
     const priorityQueue = new BinaryHeap<PriorityQueueElement>((element) => 1 / element.weight);
 
     // 初始化：将根节点加入队列
-    const rootWeight = this.computeWeight(octree.root, cameraPosition);
+    const rootWeight = this.computeWeightInObjectSpace(octree.root, camObjPos);
     priorityQueue.push({
       node: octree.root,
       octree,
@@ -618,12 +666,14 @@ export class TraversalSystem implements ISystem {
       const node = element.node;
       traversedCount++;
 
-      // 视锥剔除（使用 GPU 加速的 FrustumCuller 或降级到原生实现）
+      // 视锥剔除（在对象空间进行）
       let passedFrustumTest = false;
       if (this.frustumCuller && this.config.enableGPUCulling) {
+        // GPU 剔除仍使用世界空间（需要传入变换矩阵）
         passedFrustumTest = this.frustumCuller.testBox(node.boundingBox);
       } else {
-        passedFrustumTest = this.frustum.intersectsBox(node.boundingBox);
+        // 使用对象空间视锥体进行测试
+        passedFrustumTest = objectSpaceFrustum.intersectsBox(node.boundingBox);
       }
 
       if (!passedFrustumTest) {
@@ -654,9 +704,9 @@ export class TraversalSystem implements ISystem {
         break;
       }
 
-      // 计算到相机的距离
+      // 计算到相机的距离（使用对象空间相机位置）
       const center = node.boundingBox.getCenter(new THREE.Vector3());
-      const distance = center.distanceTo(cameraPosition);
+      const distance = center.distanceTo(camObjPos);
 
       // 计算屏幕大小
       const screenSize = this.calculateScreenSize(node, distance);
@@ -689,7 +739,7 @@ export class TraversalSystem implements ISystem {
         // 只有在节点已加载时才能安全地访问子节点
         for (const child of node.children) {
           if (child) {
-            const childWeight = this.computeWeight(child, cameraPosition);
+            const childWeight = this.computeWeightInObjectSpace(child, camObjPos);
             priorityQueue.push({
               node: child,
               octree,
@@ -782,20 +832,20 @@ export class TraversalSystem implements ISystem {
   }
 
   /**
-   * 计算节点权重（用于优先级队列排序）
+   * 计算节点权重（用于优先级队列排序）- 对象空间版本
    *
    * 权重越大，优先级越高（越早处理）
    * 计算方式：
    * - 透视相机：基于屏幕像素半径
    * - 正交相机：基于节点对角线长度
    *
-   * 参考 Potree 原版实现（Potree_update_visibility.js:352-390）
+   * 参考 Potree 原版实现（UpdateVisibility.ts:378-424）
    *
    * @param node - 八叉树节点
-   * @param cameraPosition - 相机位置
+   * @param camObjPos - 对象空间中的相机位置
    * @returns 节点权重
    */
-  private computeWeight(node: IPointCloudOctreeNode, cameraPosition: THREE.Vector3): number {
+  private computeWeightInObjectSpace(node: IPointCloudOctreeNode, camObjPos: THREE.Vector3): number {
     if (!this.camera) {
       return 0;
     }
@@ -804,10 +854,10 @@ export class TraversalSystem implements ISystem {
     const center = boundingSphere.center;
     const radius = boundingSphere.radius;
 
-    // 计算到相机的距离
-    const dx = cameraPosition.x - center.x;
-    const dy = cameraPosition.y - center.y;
-    const dz = cameraPosition.z - center.z;
+    // 计算到相机的距离（在对象空间中）
+    const dx = camObjPos.x - center.x;
+    const dy = camObjPos.y - center.y;
+    const dz = camObjPos.z - center.z;
     const distanceSquared = dx * dx + dy * dy + dz * dz;
     const distance = Math.sqrt(distanceSquared);
 

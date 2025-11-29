@@ -33,7 +33,8 @@
     "@better-potree/core": "workspace:*",
     "@better-potree/rendering": "workspace:*",
     "@better-potree/rendering-three": "workspace:*",
-    "@tweenjs/tween.js": "^25.0.0"
+    "@tweenjs/tween.js": "^25.0.0",
+    "brotli-wasm": "^3.0.1"
   },
   "peerDependencies": {
     "three": "~0.180.0"

@@ -38,10 +38,11 @@ const viewer = new ViewerAPI({
   scene,
   camera,
   pointBudget: 1_000_000,
-  pointSize: 5.0,
+  pointSize: 1.0,
   edlEnabled: false,
   backgroundColor: 0x000000,
   workerUrl: '/BinaryDecoderWorker.js',
+  brotliWorkerUrl: '/BrotliDecoderWorker.js',
 });
 
 // 将对象暴露到全局,方便调试
@@ -60,7 +61,7 @@ controls.setScene(scene.getThreeScene());
 (window as any).earthControls = controls;
 
 // 创建加载器
-const loader = new PotreeLoader();
+const _loader = new PotreeLoader();
 
 // 添加 Viewer 事件监听
 viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {

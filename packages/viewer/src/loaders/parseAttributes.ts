@@ -1,17 +1,14 @@
 /**
- * Parse Potree point attributes from metadata
+ * Parse Potree 2.0 point attributes from metadata
  */
 
 import type { IPotreeAttributeMetadata, IPotreeMetadata } from '@better-potree/core';
 import { PointAttribute, PointAttributeDataType, PointAttributes } from '@better-potree/core';
-import { Version } from './Version.js';
 
 /**
- * Parse point attributes from Potree metadata
+ * Parse point attributes from Potree 2.0 metadata
  */
-export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
-  const version = new Version(cloudjs.version);
-
+export function parseAttributes(metadata: IPotreeMetadata): PointAttributes {
   const replacements: Record<string, string> = {
     COLOR_PACKED: 'rgba',
     RGBA: 'rgba',
@@ -33,52 +30,15 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
     return replacements[old] || old;
   };
 
+  // Potree 2.0: attributes are in metadata.attributes or metadata.pointAttributes
+  const attributeSource = metadata.attributes || metadata.pointAttributes;
   const pointAttributes: IPotreeAttributeMetadata[] = [];
 
-  if (version.upTo('1.7')) {
-    // Potree 1.x format
-    // pointAttributes can be a string (space-separated) or array
-    let attributeNames: string[];
-    if (typeof cloudjs.pointAttributes === 'string') {
-      // Handle space-separated string format
-      attributeNames = cloudjs.pointAttributes.trim().split(/\s+/);
-    } else if (Array.isArray(cloudjs.pointAttributes)) {
-      // For Potree 1.x, should be string array
-      attributeNames = cloudjs.pointAttributes.filter(
-        (attr): attr is string => typeof attr === 'string',
-      );
-    } else {
-      attributeNames = [];
-    }
-
-    for (const attributeName of attributeNames) {
-      const oldAttribute = (PointAttribute as any)[attributeName];
-
-      if (oldAttribute) {
-        const attribute: IPotreeAttributeMetadata = {
-          name: oldAttribute.name,
-          size: oldAttribute.byteSize,
-          elements: oldAttribute.numElements,
-          elementSize: oldAttribute.byteSize / oldAttribute.numElements,
-          type: oldAttribute.type.name,
-          description: '',
-        };
-
-        pointAttributes.push(attribute);
-      }
-    }
-  } else {
-
-    const attributeSource = (cloudjs as any).attributes || cloudjs.pointAttributes;
-
-    if (Array.isArray(attributeSource)) {
-      // For Potree 2.0+, should be IPotreeAttributeMetadata[]
-      const attrs = attributeSource.filter(
-        (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr,
-      );
-      pointAttributes.push(...attrs);
-    } else {
-    }
+  if (Array.isArray(attributeSource)) {
+    const attrs = attributeSource.filter(
+      (attr): attr is IPotreeAttributeMetadata => typeof attr === 'object' && 'name' in attr,
+    );
+    pointAttributes.push(...attrs);
   }
 
   const attributes = new PointAttributes();
@@ -99,8 +59,8 @@ export function parseAttributes(cloudjs: IPotreeMetadata): PointAttributes {
   for (const jsAttribute of pointAttributes) {
     const name = replaceOldNames(jsAttribute.name);
     const type = typeConversion[jsAttribute.type];
-    // metadata.json uses 'numElements', but some formats use 'elements'
-    const numElements = jsAttribute.numElements ?? jsAttribute.elements;
+    // Potree 2.0 uses 'numElements'
+    const numElements = jsAttribute.numElements;
 
     if (!type) {
       continue;

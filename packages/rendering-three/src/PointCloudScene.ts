@@ -28,6 +28,8 @@ interface NodeMetadata {
   numPoints: number;
   /** Whether the node is currently visible */
   isVisible: boolean;
+  /** Node position (boundingBox.min) for correct spatial placement */
+  position?: THREE.Vector3;
 }
 
 /**
@@ -133,6 +135,9 @@ export class PointCloudScene extends THREE.Group {
     this._visiblePointCount = 0;
     this.disposeHandlers = [];
 
+    // Update material with octree spacing
+    this.material.updateOctreeSpacing(this._octreeSpacing);
+
     // Set object name for debugging
     this.name = 'PointCloudScene';
   }
@@ -203,6 +208,13 @@ export class PointCloudScene extends THREE.Group {
     // Set frustum culling to false for now (octree handles culling)
     points.frustumCulled = false;
 
+    // **关键修复**: 设置节点位置为 boundingBox.min
+    // 参考 potree-core: sceneNode.position.copy(geometryNode.boundingBox.min)
+    // 这确保每个节点渲染在正确的空间位置
+    if (metadata.position) {
+      points.position.copy(metadata.position);
+    }
+
     // Store metadata
     const nodeMetadata: NodeMetadata = {
       level: metadata.level ?? this.extractLevelFromId(nodeId),
@@ -211,6 +223,10 @@ export class PointCloudScene extends THREE.Group {
       numPoints: metadata.numPoints ?? this.getPointCount(geometry),
       isVisible: metadata.isVisible ?? true,
     };
+    // 只有当 position 存在时才添加到 metadata
+    if (metadata.position) {
+      nodeMetadata.position = metadata.position;
+    }
     this.metadataMap.set(nodeId, nodeMetadata);
 
     // Setup onBeforeRender hook for automatic uniform updates
@@ -224,19 +240,19 @@ export class PointCloudScene extends THREE.Group {
     ) => {
       // Update node-level uniforms if material has uniforms
       if (material instanceof THREE.ShaderMaterial && material.uniforms) {
-        // Level uniform for LOD-based coloring
-        if (material.uniforms.level) {
-          material.uniforms.level.value = nodeMetadata.level;
+        // Level uniform for LOD-based sizing (uLevel in shader)
+        if (material.uniforms.uLevel) {
+          material.uniforms.uLevel.value = nodeMetadata.level;
         }
 
-        // Visibility node start for LOD
-        if (material.uniforms.vnStart) {
-          material.uniforms.vnStart.value = nodeMetadata.vnStart;
+        // Visibility node start for LOD (uVNStart in shader)
+        if (material.uniforms.uVNStart) {
+          material.uniforms.uVNStart.value = nodeMetadata.vnStart;
         }
 
-        // Point cloud index for multi-cloud rendering
-        if (material.uniforms.pcIndex) {
-          material.uniforms.pcIndex.value = nodeMetadata.pcIndex;
+        // Point cloud index for multi-cloud rendering (uPCIndex in shader)
+        if (material.uniforms.uPCIndex) {
+          material.uniforms.uPCIndex.value = nodeMetadata.pcIndex;
         }
       }
     };

@@ -15,7 +15,6 @@ import type {
   ILoader,
   IPointCloudOctree,
   IPointCloudOctreeNode,
-  IPotree1xBoundingBox,
   IPotree2xBoundingBox,
   IPotree2xHierarchy,
   IPotreeMetadata,
@@ -24,40 +23,21 @@ import * as THREE from 'three';
 import { parseAttributes } from './parseAttributes.js';
 
 /**
- * Check if bounding box is in Potree 2.0 format (array-based)
+ * Parse bounding box from Potree 2.0 format
  */
-function isPotree2xBoundingBox(
-  box: IPotree1xBoundingBox | IPotree2xBoundingBox,
-): box is IPotree2xBoundingBox {
-  return 'min' in box && Array.isArray(box.min);
+function parseBoundingBox(box: IPotree2xBoundingBox): THREE.Box3 {
+  return new THREE.Box3(
+    new THREE.Vector3(box.min[0], box.min[1], box.min[2]),
+    new THREE.Vector3(box.max[0], box.max[1], box.max[2]),
+  );
 }
 
 /**
- * Parse bounding box from either Potree 1.x or 2.0 format
+ * Parse scale from Potree 2.0 format
+ * Uses the first value for uniform scaling
  */
-function parseBoundingBox(box: IPotree1xBoundingBox | IPotree2xBoundingBox): THREE.Box3 {
-  if (isPotree2xBoundingBox(box)) {
-    return new THREE.Box3(
-      new THREE.Vector3(box.min[0], box.min[1], box.min[2]),
-      new THREE.Vector3(box.max[0], box.max[1], box.max[2]),
-    );
-  } else {
-    return new THREE.Box3(
-      new THREE.Vector3(box.lx, box.ly, box.lz),
-      new THREE.Vector3(box.ux, box.uy, box.uz),
-    );
-  }
-}
-
-/**
- * Parse scale from either Potree 1.x (number) or 2.0 (array) format
- * For Potree 2.0, we assume uniform scale and use the first value
- */
-function parseScale(scale: number | [number, number, number]): number {
-  if (Array.isArray(scale)) {
-    return scale[0]; // Use first scale value for uniform scaling
-  }
-  return scale;
+function parseScale(scale: [number, number, number]): number {
+  return scale[0];
 }
 
 /**
@@ -118,10 +98,10 @@ interface HierarchyNode {
 
 /**
  * Potree loader class
- * Implements the ILoader interface for Potree format
+ * Implements the ILoader interface for Potree 2.0 format
  *
  * @remarks
- * Supports both Potree 1.x (cloud.js) and Potree 2.0 (metadata.json) formats.
+ * Supports Potree 2.0 (metadata.json) format.
  * The loader parses metadata, constructs the octree structure, and optionally
  * loads the hierarchy information.
  */
@@ -288,6 +268,8 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       projection: metadata.projection || null,
       version: metadata.version,
       scale,
+      // Potree 2.0: encoding type for point data
+      encoding: (metadata.encoding as 'DEFAULT' | 'BROTLI') || 'DEFAULT',
     };
 
     // Attach custom file loader if present
@@ -334,7 +316,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
   ): Promise<void> {
     // Potree 2.0: hierarchy.bin is in root directory
     let hierarchyUrl = baseUrl;
-    if (hierarchyUrl.endsWith('cloud.js') || hierarchyUrl.endsWith('metadata.json')) {
+    if (hierarchyUrl.endsWith('metadata.json')) {
       hierarchyUrl = hierarchyUrl.substring(0, hierarchyUrl.lastIndexOf('/'));
     }
     if (!hierarchyUrl.endsWith('/')) {

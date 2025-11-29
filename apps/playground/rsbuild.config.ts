@@ -3,12 +3,14 @@ import { pluginTypeCheck } from '@rsbuild/plugin-type-check';
 import path from 'node:path';
 import fs from 'node:fs';
 
-// Copy Worker file to public directory
+// Copy Worker files to public directory
 const workerSourcePath = path.resolve(__dirname, '../../packages/viewer/dist/loaders/workers/BinaryDecoderWorker.js');
+const brotliWorkerSourcePath = path.resolve(__dirname, '../../packages/viewer/dist/loaders/workers/BrotliDecoderWorker.js');
 const publicDir = path.resolve(__dirname, 'public');
 const workerDestPath = path.resolve(publicDir, 'BinaryDecoderWorker.js');
+const brotliWorkerDestPath = path.resolve(publicDir, 'BrotliDecoderWorker.js');
 
-// Ensure public directory exists and copy worker file
+// Ensure public directory exists and copy worker files
 if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
@@ -17,6 +19,12 @@ if (fs.existsSync(workerSourcePath)) {
   console.log('[rsbuild config] Copied BinaryDecoderWorker.js to public directory');
 } else {
   console.warn('[rsbuild config] Worker source file not found:', workerSourcePath);
+}
+if (fs.existsSync(brotliWorkerSourcePath)) {
+  fs.copyFileSync(brotliWorkerSourcePath, brotliWorkerDestPath);
+  console.log('[rsbuild config] Copied BrotliDecoderWorker.js to public directory');
+} else {
+  console.warn('[rsbuild config] Brotli Worker source file not found:', brotliWorkerSourcePath);
 }
 
 export default defineConfig({
@@ -42,6 +50,18 @@ export default defineConfig({
 
         // 在所有中间件之前添加
         middlewares.unshift((req: any, res: any, next: any) => {
+          // 处理 Worker JS 文件，确保正确的 MIME 类型
+          if (req.url?.endsWith('Worker.js')) {
+            const workerPath = pathModule.join(__dirname, 'public', pathModule.basename(req.url));
+            if (fs.existsSync(workerPath)) {
+              const content = fs.readFileSync(workerPath, 'utf8');
+              res.setHeader('Content-Type', 'application/javascript');
+              res.setHeader('Access-Control-Allow-Origin', '*');
+              res.end(content);
+              return;
+            }
+          }
+
           if (req.url?.startsWith('/pointcloud/')) {
             const filePath = req.url.replace('/pointcloud', 'D:/3d_models/pointcloud');
 

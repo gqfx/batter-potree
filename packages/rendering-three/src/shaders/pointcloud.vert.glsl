@@ -262,6 +262,14 @@ float getPointSize() {
   float slope = tan(fov / 2.0);
   float projFactor = -0.5 * uScreenHeight / (slope * vViewPosition.z);
 
+  // Calculate scale factor to account for model matrix scaling
+  // This matches potree-core's approach
+  float scale = length(
+    modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0) -
+    modelViewMatrix * vec4(uOctreeSpacing, 0.0, 0.0, 1.0)
+  ) / uOctreeSpacing;
+  projFactor = projFactor * scale;
+
   float r = uOctreeSpacing * 1.7;
   vRadius = r;
 
@@ -286,11 +294,14 @@ float getPointSize() {
       }
     } else {
       // Fallback to simple adaptive sizing without GPU LOD
+      // Use LOD-based attenuation like potree-core does
+      // worldSpaceSize = size * r / pow(2.0, level)
+      float attenuation = pow(2.0, uLevel);
       if (uUseOrthographicCamera) {
-        float worldSpaceSize = size * r;
+        float worldSpaceSize = size * r / attenuation;
         pointSize = (worldSpaceSize / uOrthoWidth) * uScreenWidth;
       } else {
-        float worldSpaceSize = size * r;
+        float worldSpaceSize = size * r / attenuation;
         pointSize = worldSpaceSize * projFactor;
       }
     }

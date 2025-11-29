@@ -53,6 +53,7 @@ export default defineConfig([
   {
     entry: {
       'loaders/workers/BinaryDecoderWorker': 'src/loaders/workers/BinaryDecoderWorker.ts',
+      'loaders/workers/BrotliDecoderWorker': 'src/loaders/workers/BrotliDecoderWorker.ts',
     },
 
     // 只生成 ESM 格式（Worker 需要 module 类型）
@@ -80,10 +81,11 @@ export default defineConfig([
     // 输出目录
     outDir: 'dist',
 
-    // 确保 @better-potree/core 和 three 都被打包进去
+    // 确保 @better-potree/core、three 和 brotli-wasm 都被打包进去
     noExternal: [
       '@better-potree/core',
       'three',
+      'brotli-wasm',
     ],
   },
 ]);

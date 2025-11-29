@@ -53,6 +53,16 @@ interface WorkerInstance {
 }
 
 /**
+ * 队列中的任务（包含 transferables）
+ */
+interface QueuedTask<T, R> {
+  /** 任务对象 */
+  task: WorkerTask<T, R>;
+  /** 可转移对象（需要保存，否则从队列取出时会丢失） */
+  transferables: Transferable[] | undefined;
+}
+
+/**
  * Web Worker 对象池
  *
  * 特性：
@@ -66,7 +76,7 @@ export class WorkerPool<T = unknown, R = unknown> {
   private readonly maxWorkers: number;
   private readonly workerOptions: WorkerOptions;
   private readonly workers: WorkerInstance[] = [];
-  private readonly taskQueue: Array<WorkerTask<T, R>> = [];
+  private readonly taskQueue: Array<QueuedTask<T, R>> = [];
   private readonly activeTasks = new Map<string, WorkerTask<T, R>>();
   private disposed = false;
 
@@ -125,7 +135,8 @@ export class WorkerPool<T = unknown, R = unknown> {
     if (worker) {
       this.assignTask(worker, task, transferables);
     } else {
-      this.taskQueue.push(task);
+      // 保存 transferables 到队列，否则从队列取出时会丢失
+      this.taskQueue.push({ task, transferables });
     }
   }
 
@@ -262,9 +273,10 @@ export class WorkerPool<T = unknown, R = unknown> {
    */
   private processNextTask(worker: WorkerInstance): void {
     if (this.taskQueue.length > 0 && !worker.busy) {
-      const nextTask = this.taskQueue.shift();
-      if (nextTask) {
-        this.assignTask(worker, nextTask);
+      const queuedTask = this.taskQueue.shift();
+      if (queuedTask) {
+        // 使用保存的 transferables
+        this.assignTask(worker, queuedTask.task, queuedTask.transferables);
       }
     }
   }
@@ -295,6 +307,11 @@ export class WorkerPool<T = unknown, R = unknown> {
     }
 
     this.workers.length = 0;
+
+    // 拒绝队列中的任务
+    for (const queuedTask of this.taskQueue) {
+      queuedTask.task.onError(new Error('WorkerPool disposed'));
+    }
     this.taskQueue.length = 0;
 
     // 拒绝所有待处理任务

@@ -705,6 +705,13 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
       // 9. Request loading root node immediately
       if (octree.root && !octree.root.loaded && !octree.root.loading) {
+        console.log('[Viewer] Requesting root node load:', {
+          name: octree.root.name,
+          byteOffset: octree.root.byteOffset,
+          byteSize: octree.root.byteSize,
+          numPoints: octree.root.numPoints,
+          hasChildren: octree.root.children.filter(c => c !== null).length,
+        });
         this.streamingSystem.requestLoad(octree, octree.root, 1.0);
       }
 
@@ -1448,7 +1455,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
       // 只请求前 MAX_LOADS_PER_FRAME_PER_CLOUD 个节点
       const nodesToLoad = unloadedNodes.slice(0, MAX_LOADS_PER_FRAME_PER_CLOUD);
+      console.log('[Viewer] updateVisibleNodes: unloadedNodes=', unloadedNodes.length, 'nodesToLoad=', nodesToLoad.length);
       for (const { node, priority } of nodesToLoad) {
+        console.log('[Viewer] Requesting load for node:', node.name, 'priority:', priority);
         this.streamingSystem.requestLoad(octree, node, priority);
       }
 

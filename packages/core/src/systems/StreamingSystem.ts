@@ -307,6 +307,11 @@ export class StreamingSystem implements ISystem {
    */
   update(_deltaTime: number): void {
     // 处理待处理请求
+    const pendingCount = this.pendingRequests.size;
+    const activeCount = this.activeLoads.size;
+    if (pendingCount > 0 || activeCount > 0) {
+      console.log('[StreamingSystem] update: pending=', pendingCount, 'active=', activeCount);
+    }
     this.processQueue();
   }
 
@@ -338,6 +343,7 @@ export class StreamingSystem implements ISystem {
     if (this.config.downloadBudgetMB > 0) {
       const budgetBytes = this.config.downloadBudgetMB * 1024 * 1024;
       if (this.downloadedBytesThisSecond >= budgetBytes) {
+        console.log('[StreamingSystem] processQueue: download budget exceeded');
         // 超出预算，暂停本秒内的加载
         return;
       }
@@ -345,7 +351,14 @@ export class StreamingSystem implements ISystem {
 
     // 检查是否有空闲槽位
     const availableSlots = this.config.maxConcurrentLoads - this.activeLoads.size;
+    console.log('[StreamingSystem] processQueue: availableSlots=', availableSlots, 'pendingRequests=', this.pendingRequests.size);
     if (availableSlots <= 0 || this.pendingRequests.size === 0) {
+      if (availableSlots <= 0) {
+        console.log('[StreamingSystem] processQueue: no available slots');
+      }
+      if (this.pendingRequests.size === 0) {
+        console.log('[StreamingSystem] processQueue: no pending requests');
+      }
       return;
     }
 
@@ -378,6 +391,13 @@ export class StreamingSystem implements ISystem {
    * @param request - 加载请求
    */
   private startLoad(key: string, request: LoadRequest): void {
+    console.log('[StreamingSystem] startLoad:', {
+      key,
+      nodeName: request.node.name,
+      byteOffset: request.node.byteOffset,
+      byteSize: request.node.byteSize,
+    });
+
     // 标记节点为加载中
     (request.node as { loading: boolean }).loading = true;
     this.activeLoads.set(key, request);
@@ -488,6 +508,9 @@ export class StreamingSystem implements ISystem {
     buffer: ArrayBuffer,
     startTime: number,
   ): Promise<void> {
+    // 调试日志：记录发送给 Worker 的 buffer 大小
+    console.log(`[StreamingSystem] decodeWithWorker: node=${request.node.name}, buffer.byteLength=${buffer.byteLength}, node.byteSize=${request.node.byteSize}, node.numPoints=${request.node.numPoints}`);
+
     // 根据 encoding 选择正确的 Worker Pool
     const encoding = request.octree.encoding || 'DEFAULT';
     const workerPool = encoding === 'BROTLI'
