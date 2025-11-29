@@ -36,8 +36,14 @@ export interface StreamingSystemConfig {
   readonly maxConcurrentLoads?: number;
   /** 最大重试次数 */
   readonly maxRetries?: number;
-  /** Worker 池（可选） */
+  /** Worker 池（用于 DEFAULT 编码，可选） */
   readonly workerPool?: WorkerPool;
+  /**
+   * Brotli Worker 池（用于 BROTLI 编码，可选）
+   *
+   * Potree 2.0 使用 Brotli 压缩点云数据，需要使用专门的 Brotli 解码 Worker
+   */
+  readonly brotliWorkerPool?: WorkerPool;
   /** 每帧最大处理请求数 */
   readonly maxRequestsPerFrame?: number;
   /** 每秒最大下载量 (MB)，0 表示不限制 */
@@ -110,8 +116,9 @@ export class StreamingSystem implements ISystem {
   readonly stage: SystemStage = 100; // UPDATE stage
   readonly priority = 10; // 在遍历系统之后执行
 
-  private config: Required<Omit<StreamingSystemConfig, 'workerPool'>> & {
+  private config: Required<Omit<StreamingSystemConfig, 'workerPool' | 'brotliWorkerPool'>> & {
     workerPool?: WorkerPool;
+    brotliWorkerPool?: WorkerPool;
   };
 
   // 请求队列
@@ -152,10 +159,15 @@ export class StreamingSystem implements ISystem {
       downloadBudgetMB: config.downloadBudgetMB ?? 0, // 0 = 不限制
     };
 
+    // Build config with optional worker pools
+    this.config = { ...baseConfig };
+
     if (config.workerPool !== undefined) {
-      this.config = { ...baseConfig, workerPool: config.workerPool };
-    } else {
-      this.config = baseConfig;
+      this.config.workerPool = config.workerPool;
+    }
+
+    if (config.brotliWorkerPool !== undefined) {
+      this.config.brotliWorkerPool = config.brotliWorkerPool;
     }
   }
 
@@ -382,11 +394,19 @@ export class StreamingSystem implements ISystem {
           return;
         }
 
-        // 解码数据（如果有 Worker 池）
-        if (this.config.workerPool) {
+        // 解码数据（根据 encoding 选择合适的 Worker 池）
+        const encoding = request.octree.encoding || 'DEFAULT';
+        const hasWorkerPool = encoding === 'BROTLI'
+          ? !!this.config.brotliWorkerPool
+          : !!this.config.workerPool;
+
+        if (hasWorkerPool) {
           return this.decodeWithWorker(request, arrayBuffer, startTime);
         } else {
-          // 直接处理（简化版）
+          // 直接处理（简化版，仅支持 DEFAULT 编码）
+          if (encoding === 'BROTLI') {
+            throw new Error('Brotli Worker Pool not configured, cannot decode BROTLI data');
+          }
           return this.processLoadComplete(request, arrayBuffer, startTime);
         }
       })
@@ -437,6 +457,7 @@ export class StreamingSystem implements ISystem {
 
     // 否则使用标准 fetch
     // For Potree 2.0, use HTTP Range request
+    // Potree 2.0: use Range request
     if (node.byteOffset !== undefined && node.byteSize !== undefined) {
       const headers = new Headers();
       headers.set('Range', `bytes=${node.byteOffset}-${node.byteOffset + node.byteSize - 1}`);
@@ -448,16 +469,15 @@ export class StreamingSystem implements ISystem {
       return response.arrayBuffer();
     }
 
-    // Potree 1.x: fetch entire file
-    const response = await fetch(url, { signal });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch node data: ${response.statusText}`);
-    }
-    return response.arrayBuffer();
+    throw new Error(`Node ${node.name} has no byteOffset/byteSize - Potree 2.0 format required`);
   }
 
   /**
    * 使用 Worker 解码数据
+   *
+   * 根据点云的 encoding 类型选择正确的 Worker Pool:
+   * - 'BROTLI': 使用 brotliWorkerPool (Potree 2.0 压缩格式)
+   * - 'DEFAULT': 使用 workerPool (未压缩格式)
    *
    * @param request - 加载请求
    * @param buffer - 原始数据
@@ -468,18 +488,33 @@ export class StreamingSystem implements ISystem {
     buffer: ArrayBuffer,
     startTime: number,
   ): Promise<void> {
-    if (!this.config.workerPool) {
-      // Fallback to synchronous decode if no worker pool
+    // 根据 encoding 选择正确的 Worker Pool
+    const encoding = request.octree.encoding || 'DEFAULT';
+    const workerPool = encoding === 'BROTLI'
+      ? this.config.brotliWorkerPool
+      : this.config.workerPool;
+
+    if (!workerPool) {
+      // 没有对应的 Worker Pool，回退到同步解码（仅支持 DEFAULT）
+      if (encoding === 'BROTLI') {
+        console.warn('[StreamingSystem] Brotli Worker Pool not configured, cannot decode BROTLI data');
+        const key = this.getNodeKey(request.octree, request.node);
+        this.handleLoadError(key, request, new Error('Brotli Worker Pool not configured'));
+        return;
+      }
       return this.processLoadComplete(request, buffer, startTime);
     }
 
     try {
       // 准备 Worker 解码请求
+      // ✅ 修复: Potree 2.0 的点坐标是相对于 boundingBox.min 的偏移量
+      // 需要传递 boundingBox.min 作为 offset，使解码后的点坐标成为绝对坐标
+      const boundingBoxMin = request.octree.boundingBox.min;
       const decodeRequest: IWorkerDecodeRequest = {
         buffer,
         pointAttributes: request.octree.pointAttributes,
         version: request.octree.version,
-        offset: [0, 0, 0], // Potree 2.0 不需要 offset
+        offset: [boundingBoxMin.x, boundingBoxMin.y, boundingBoxMin.z],
         scale: request.octree.scale,
         spacing: request.octree.spacing,
         hasChildren: request.node.children.some((c) => c !== null) ? 1 : 0,
@@ -490,7 +525,7 @@ export class StreamingSystem implements ISystem {
       // 使用 WorkerPool 执行解码
       // 注意：buffer 会被转移到 Worker，之后不能再使用
       const transferables: Transferable[] = [buffer];
-      const decodedData = (await this.config.workerPool.execute(
+      const decodedData = (await workerPool.execute(
         decodeRequest,
         transferables,
       )) as IWorkerDecodeResponse;
@@ -644,15 +679,18 @@ export class StreamingSystem implements ISystem {
     // Process each attribute
     for (const pointAttribute of pointAttributes.attributes) {
       if (pointAttribute.name === 'POSITION_CARTESIAN') {
-        // Decode position data
-        // Potree 2.0 uses int32, Potree 1.x uses uint32
+        // Decode position data (Potree 2.0 uses int32)
         const positions = new Float32Array(numPoints * 3);
+        // ✅ 修复: 加上 boundingBox.min 得到绝对坐标
+        const offsetX = octree.boundingBox.min.x;
+        const offsetY = octree.boundingBox.min.y;
+        const offsetZ = octree.boundingBox.min.z;
 
         for (let j = 0; j < numPoints; j++) {
           // Read as int32 for Potree 2.0 compatibility
-          const x = view.getInt32(inOffset + j * pointAttributes.byteSize + 0, true) * octree.scale;
-          const y = view.getInt32(inOffset + j * pointAttributes.byteSize + 4, true) * octree.scale;
-          const z = view.getInt32(inOffset + j * pointAttributes.byteSize + 8, true) * octree.scale;
+          const x = view.getInt32(inOffset + j * pointAttributes.byteSize + 0, true) * octree.scale + offsetX;
+          const y = view.getInt32(inOffset + j * pointAttributes.byteSize + 4, true) * octree.scale + offsetY;
+          const z = view.getInt32(inOffset + j * pointAttributes.byteSize + 8, true) * octree.scale + offsetZ;
 
           positions[3 * j + 0] = x;
           positions[3 * j + 1] = y;
@@ -773,19 +811,10 @@ export class StreamingSystem implements ISystem {
    */
   private buildNodeUrl(octree: IPointCloudOctree, node: IPointCloudOctreeNode): string {
     // Potree 2.0 格式：所有数据在 octree.bin 文件中，使用 byte offset
-    // Potree 1.x 格式：octree.url + node.name + .bin
-
-    // Check if this is Potree 2.0 (node has byteOffset)
-    if (node.byteOffset !== undefined) {
-      // Potree 2.0: return path to octree.bin
-      // octree.url 对于 Potree 2.0 是空字符串或 '/'
-      // 需要从基础 URL 构建 octree.bin 路径
-      const url = `${octree.url}octree.bin`;
-      return url;
+    if (node.byteOffset === undefined) {
+      throw new Error(`Node ${node.name} has no byteOffset - Potree 2.0 format required`);
     }
-
-    // Potree 1.x format
-    const url = `${octree.url}${node.name}.bin`;
+    const url = `${octree.url}octree.bin`;
     return url;
   }
 

@@ -221,9 +221,10 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 
         if (version.newerThan('1.3')) {
           // ✅ 修复: Potree 2.0 使用 Int32 (有符号整数) 并分别应用 scale
-          x = view.getInt32(posOffset + 0, true) * scaleArray[0];
-          y = view.getInt32(posOffset + 4, true) * scaleArray[1];
-          z = view.getInt32(posOffset + 8, true) * scaleArray[2];
+          // 然后加上 offset (boundingBox.min) 得到绝对坐标
+          x = view.getInt32(posOffset + 0, true) * scaleArray[0] + nodeOffset[0];
+          y = view.getInt32(posOffset + 4, true) * scaleArray[1] + nodeOffset[1];
+          z = view.getInt32(posOffset + 8, true) * scaleArray[2] + nodeOffset[2];
         } else {
           x = view.getFloat32(posOffset + 0, true) + nodeOffset[0];
           y = view.getFloat32(posOffset + 4, true) + nodeOffset[1];

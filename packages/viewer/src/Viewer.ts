@@ -64,10 +64,17 @@ export interface ViewerConfig {
    */
   maxWorkers?: number;
   /**
-   * Custom Worker URL for the BinaryDecoderWorker
+   * Custom Worker URL for the BinaryDecoderWorker (DEFAULT encoding)
    * If not provided, will try to resolve from import.meta.url
    */
   workerUrl?: string;
+  /**
+   * Custom Worker URL for the BrotliDecoderWorker (BROTLI encoding)
+   * If not provided, will try to resolve from import.meta.url
+   *
+   * Required for loading Potree 2.0 point clouds with Brotli compression
+   */
+  brotliWorkerUrl?: string;
 }
 
 /**
@@ -119,6 +126,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
   // Worker Pool
   private workerPool?: WorkerPool;
+  private brotliWorkerPool?: WorkerPool;
 
   // Animation
   private animationId: number | null;
@@ -156,8 +164,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Initialize Worker Pool for decoding
     const enableWorkerDecoding = config.enableWorkerDecoding ?? true;
     if (enableWorkerDecoding) {
+      const maxWorkers = config.maxWorkers ?? Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
+
+      // Initialize DEFAULT encoding Worker Pool
       try {
-        // Get Worker URL - use config or try to resolve from import.meta.url
         let workerUrl = config.workerUrl;
         if (!workerUrl) {
           try {
@@ -168,11 +178,28 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         }
 
         if (workerUrl) {
-          const maxWorkers = config.maxWorkers ?? Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
           this.workerPool = createDecoderWorkerPool(workerUrl, maxWorkers);
         }
       } catch (error) {
-        console.error('[Viewer] Failed to create Worker Pool:', error);
+        console.error('[Viewer] Failed to create DEFAULT Worker Pool:', error);
+      }
+
+      // Initialize BROTLI encoding Worker Pool
+      try {
+        let brotliWorkerUrl = config.brotliWorkerUrl;
+        if (!brotliWorkerUrl) {
+          try {
+            brotliWorkerUrl = new URL('./loaders/workers/BrotliDecoderWorker.js', import.meta.url).href;
+          } catch {
+            // Failed to resolve Brotli Worker URL from import.meta.url
+          }
+        }
+
+        if (brotliWorkerUrl) {
+          this.brotliWorkerPool = createDecoderWorkerPool(brotliWorkerUrl, maxWorkers);
+        }
+      } catch (error) {
+        console.error('[Viewer] Failed to create BROTLI Worker Pool:', error);
       }
     }
 
@@ -189,6 +216,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       maxRetries: number;
       maxRequestsPerFrame: number;
       workerPool?: WorkerPool;
+      brotliWorkerPool?: WorkerPool;
     } = {
       maxConcurrentLoads: 8,
       maxRetries: 3,
@@ -197,6 +225,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
     if (this.workerPool) {
       streamingConfig.workerPool = this.workerPool;
+    }
+
+    if (this.brotliWorkerPool) {
+      streamingConfig.brotliWorkerPool = this.brotliWorkerPool;
     }
 
     this.streamingSystem = new StreamingSystem(streamingConfig);
@@ -273,7 +305,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       colorMode: PointCloudColorMode.RGB,
       sizeType: PointSizeType.ADAPTIVE,
       shape: PointShape.CIRCLE,
-      enableGPULOD: true,
+      // 禁用 GPU LOD，因为 visibility texture 尚未实现
+      // 使用 CPU LOD 路径，通过 onBeforeRender 设置 uLevel 来实现逐节点点大小衰减
+      enableGPULOD: false,
     });
     
     // Update screen size after creation
@@ -313,8 +347,17 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         // For multiple point clouds, use the index in the map
         const pcIndex = Array.from(this.pointClouds.keys()).indexOf(cloudName);
 
+        // ✅ 修复: 不再设置节点位置
+        // 因为点坐标已经在 BinaryDecoderWorker 中加上了 boundingBox.min
+        // 现在使用绝对坐标，不需要额外的节点偏移
+
         // Prepare node metadata for PointCloudScene
-        const metadata = {
+        const metadata: {
+          level: number;
+          vnStart: number;
+          pcIndex: number;
+          numPoints: number;
+        } = {
           level: node.level,
           vnStart: node.vnStart ?? 0, // Use vnStart from node or 0 if undefined
           pcIndex: pcIndex >= 0 ? pcIndex : 0,
@@ -329,6 +372,10 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
         node.loading = false;
         node.geometry = geometry; // Cache geometry reference on node
         node.numPoints = data.numPoints; // Update numPoints from actual data
+
+        // 关键修复：节点加载完成后，使遍历缓存失效
+        // 这样下一帧会重新遍历，能够发现新加载的节点及其子节点
+        this.traversalSystem.invalidateCache();
       } catch (error) {
         console.error('[ViewerAPI] Error in onLoadComplete:', error);
         if (error instanceof Error) {
@@ -633,7 +680,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
           colorMode: material.colorMode,
           sizeType: material.sizeType,
           shape: material.shape,
-          enableGPULOD: true,
+          enableGPULOD: false,
         },
         octreeSpacing: octree.spacing,
       });
@@ -719,7 +766,7 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
           colorMode: material.colorMode,
           sizeType: material.sizeType,
           shape: material.shape,
-          enableGPULOD: true,
+          enableGPULOD: false,
         },
         octreeSpacing: octree.spacing,
       });
@@ -1359,17 +1406,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Get traversal result from last update
     const result = this.traversalSystem.getLastResult();
 
-    // 每5秒输出一次详细信息
-    const now = performance.now();
-    if (!this._lastVisibleNodesDebugTime || now - this._lastVisibleNodesDebugTime > 5000) {
-      this._lastVisibleNodesDebugTime = now;
-      console.log('[Viewer.updateVisibleNodes] Traversal result:', {
-        visibleNodesCount: result.visibleNodes.length,
-        totalPoints: result.totalPoints,
-        pointCloudsCount: this.pointClouds.size,
-      });
-    }
-
     // Group visible nodes by point cloud
     const nodesByCloud = new Map<string, Array<typeof result.visibleNodes[number]>>();
 
@@ -1411,15 +1447,9 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       unloadedNodes.sort((a, b) => b.priority - a.priority);
 
       // 只请求前 MAX_LOADS_PER_FRAME_PER_CLOUD 个节点
-      let requestedLoads = 0;
       const nodesToLoad = unloadedNodes.slice(0, MAX_LOADS_PER_FRAME_PER_CLOUD);
       for (const { node, priority } of nodesToLoad) {
         this.streamingSystem.requestLoad(octree, node, priority);
-        requestedLoads++;
-      }
-
-      if (requestedLoads > 0 && (!this._lastVisibleNodesDebugTime || now - this._lastVisibleNodesDebugTime > 5000)) {
-        console.log(`[Viewer.updateVisibleNodes] Requested ${requestedLoads} loads for ${cloudName}`);
       }
 
       // Update PointCloudScene visibility
@@ -1430,8 +1460,6 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
       }
     }
   }
-
-  private _lastVisibleNodesDebugTime?: number;
 
   /**
    * Calculate load priority for a node
@@ -1584,6 +1612,11 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
     // Dispose Worker Pool
     if (this.workerPool) {
       this.workerPool.dispose();
+    }
+
+    // Dispose Brotli Worker Pool
+    if (this.brotliWorkerPool) {
+      this.brotliWorkerPool.dispose();
     }
 
     // Cleanup renderer
