@@ -45,24 +45,10 @@ export interface IPointAttributes {
 export interface IPotreeAttributeMetadata {
   name: string;
   size: number;
-  /** Number of elements (Potree 1.x uses 'elements', Potree 2.0 uses 'numElements') */
-  elements?: number;
   numElements?: number;
   elementSize: number;
   type: string;
   description?: string;
-}
-
-/**
- * Potree 1.x bounding box format
- */
-export interface IPotree1xBoundingBox {
-  lx: number;
-  ly: number;
-  lz: number;
-  ux: number;
-  uy: number;
-  uz: number;
 }
 
 /**
@@ -83,24 +69,19 @@ export interface IPotree2xHierarchy {
 }
 
 /**
- * Potree metadata (cloud.js / metadata.json format)
+ * Potree 2.0 metadata (metadata.json format)
  */
 export interface IPotreeMetadata {
   version: string;
   octreeDir?: string;
-  /** Potree 1.x format */
-  boundingBox: IPotree1xBoundingBox | IPotree2xBoundingBox;
-  /** Potree 1.x format */
-  tightBoundingBox?: IPotree1xBoundingBox | IPotree2xBoundingBox;
-  pointAttributes: string | string[] | IPotreeAttributeMetadata[];
+  boundingBox: IPotree2xBoundingBox;
+  tightBoundingBox?: IPotree2xBoundingBox;
+  pointAttributes: IPotreeAttributeMetadata[];
   spacing: number;
-  /** Potree 1.x: number, Potree 2.0: [number, number, number] */
-  scale: number | [number, number, number];
+  scale: [number, number, number];
   points: number;
   projection?: string;
-  /** Potree 1.x: unknown, Potree 2.0: IPotree2xHierarchy */
-  hierarchy?: unknown | IPotree2xHierarchy;
-  hierarchyStepSize?: number;
+  hierarchy?: IPotree2xHierarchy;
   /** Potree 2.0: offset for coordinates */
   offset?: [number, number, number];
   /** Potree 2.0: encoding type */
@@ -130,6 +111,12 @@ export interface IPointCloudOctree {
   matrixWorld?: THREE.Matrix4;
   /** Custom file loader for non-HTTP sources (e.g., local file system) */
   customFileLoader?: (path: string) => Promise<ArrayBuffer>;
+  /**
+   * Potree 2.0: encoding type for point data
+   * - 'DEFAULT': uncompressed data
+   * - 'BROTLI': Brotli compressed data
+   */
+  encoding?: 'DEFAULT' | 'BROTLI';
 }
 
 /**
