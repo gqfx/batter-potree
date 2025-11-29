@@ -711,9 +711,10 @@ export class StreamingSystem implements ISystem {
 
         for (let j = 0; j < numPoints; j++) {
           // Read as int32 for Potree 2.0 compatibility
-          const x = view.getInt32(inOffset + j * pointAttributes.byteSize + 0, true) * octree.scale + offsetX;
-          const y = view.getInt32(inOffset + j * pointAttributes.byteSize + 4, true) * octree.scale + offsetY;
-          const z = view.getInt32(inOffset + j * pointAttributes.byteSize + 8, true) * octree.scale + offsetZ;
+          const pointOffset = j * pointAttributes.byteSize + inOffset;
+          const x = view.getInt32(pointOffset + 0, true) * octree.scale + offsetX;
+          const y = view.getInt32(pointOffset + 4, true) * octree.scale + offsetY;
+          const z = view.getInt32(pointOffset + 8, true) * octree.scale + offsetZ;
 
           positions[3 * j + 0] = x;
           positions[3 * j + 1] = y;
@@ -741,9 +742,10 @@ export class StreamingSystem implements ISystem {
         const colors = new Uint8Array(numPoints * 4);
 
         for (let j = 0; j < numPoints; j++) {
-          colors[4 * j + 0] = view.getUint8(inOffset + j * pointAttributes.byteSize + 0);
-          colors[4 * j + 1] = view.getUint8(inOffset + j * pointAttributes.byteSize + 1);
-          colors[4 * j + 2] = view.getUint8(inOffset + j * pointAttributes.byteSize + 2);
+          const pointOffset = j * pointAttributes.byteSize + inOffset;
+          colors[4 * j + 0] = view.getUint8(pointOffset + 0);
+          colors[4 * j + 1] = view.getUint8(pointOffset + 1);
+          colors[4 * j + 2] = view.getUint8(pointOffset + 2);
           colors[4 * j + 3] = 255; // Alpha
         }
 
@@ -758,9 +760,10 @@ export class StreamingSystem implements ISystem {
 
         for (let j = 0; j < numPoints; j++) {
           // Potree 2.0 stores RGB as 3 x uint16
-          const r = view.getUint16(inOffset + j * pointAttributes.byteSize + 0, true);
-          const g = view.getUint16(inOffset + j * pointAttributes.byteSize + 2, true);
-          const b = view.getUint16(inOffset + j * pointAttributes.byteSize + 4, true);
+          const pointOffset = j * pointAttributes.byteSize + inOffset;
+          const r = view.getUint16(pointOffset + 0, true);
+          const g = view.getUint16(pointOffset + 2, true);
+          const b = view.getUint16(pointOffset + 4, true);
 
           // Convert from uint16 (0-65535) to uint8 (0-255)
           // Note: Some Potree exports use 0-255 range even in uint16
