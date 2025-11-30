@@ -6,3 +6,4 @@
 export * from './PointCloudMaterial.js';
 export * from './ClassificationScheme.js';
 export * from './EDLMaterial.js';
+export * from './PickMaterial.js';

@@ -390,11 +390,20 @@ export class StreamingSystem implements ISystem {
     if (request.node.nodeType === 2) {
       // 只警告一次
       if (!this.warnedProxyNodes.has(request.node.name)) {
-        console.warn(`[StreamingSystem] Loading hierarchy for proxy node ${request.node.name}`);
+        // console.warn(`[StreamingSystem] Loading hierarchy for proxy node ${request.node.name}`);
         this.warnedProxyNodes.add(request.node.name);
       }
       // 加载 hierarchy chunk
       await this.loadHierarchyChunk(key, request);
+      return;
+    }
+
+    // ✅ 跳过 byteSize=0 的节点（空节点，无点云数据）
+    if (request.node.byteSize === 0 || request.node.byteSize === undefined) {
+      // console.warn(`[StreamingSystem] Skipping node ${request.node.name} with byteSize=${request.node.byteSize}`);
+      this.pendingRequests.delete(key);
+      (request.node as { loaded: boolean; loading: boolean }).loaded = true;
+      (request.node as { loading: boolean }).loading = false;
       return;
     }
 
@@ -509,7 +518,7 @@ export class StreamingSystem implements ISystem {
     startTime: number,
   ): Promise<void> {
     // 调试日志：记录发送给 Worker 的 buffer 大小
-    console.log(`[StreamingSystem] decodeWithWorker: node=${request.node.name}, buffer.byteLength=${buffer.byteLength}, node.byteSize=${request.node.byteSize}, node.numPoints=${request.node.numPoints}`);
+    // console.log(`[StreamingSystem] decodeWithWorker: node=${request.node.name}, buffer.byteLength=${buffer.byteLength}, node.byteSize=${request.node.byteSize}, node.numPoints=${request.node.numPoints}`);
 
     // 根据 encoding 选择正确的 Worker Pool
     const encoding = request.octree.encoding || 'DEFAULT';
@@ -667,7 +676,7 @@ export class StreamingSystem implements ISystem {
       (node as { loaded: boolean; loading: boolean }).loaded = true;
       (node as { loading: boolean }).loading = false;
 
-      console.log(`[StreamingSystem] Loaded hierarchy for proxy node ${node.name}, children created`);
+      // console.log(`[StreamingSystem] Loaded hierarchy for proxy node ${node.name}, children created`);
     } catch (error) {
       this.handleLoadError(key, request, error);
     }

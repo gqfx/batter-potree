@@ -5,6 +5,20 @@
 
 import type { IPointCloudOctree } from '@better-potree/core';
 import * as THREE from 'three';
+import { PointCloudPicker, type PickParams, type PickResult } from '../picking/PointCloudPicker.js';
+
+// Singleton picker instance for reuse
+let globalPicker: PointCloudPicker | null = null;
+
+/**
+ * Get or create the global picker instance
+ */
+function getGlobalPicker(): PointCloudPicker {
+  if (!globalPicker) {
+    globalPicker = new PointCloudPicker();
+  }
+  return globalPicker;
+}
 
 /**
  * Convert mouse coordinates to a ray in world space
@@ -44,17 +58,21 @@ export interface PointCloudIntersection {
   normal?: THREE.Vector3;
   /** Distance from camera to intersection */
   distance: number;
+  /** Point index (if GPU picking was used) */
+  pointIndex?: number;
+  /** All point attributes (if GPU picking was used) */
+  point?: PickResult;
 }
 
 /**
- * Get intersection between mouse ray and point clouds
+ * Get intersection between mouse ray and point clouds using GPU picking
  *
- * This performs a raycasting test against all provided point clouds
- * and returns the closest intersection point.
+ * This performs GPU-accelerated raycasting against all provided point clouds
+ * and returns the closest intersection point with precise point-level accuracy.
  *
  * @param mouse - Mouse position
  * @param camera - Camera
- * @param renderer - Renderer (for viewport dimensions)
+ * @param renderer - Renderer (for viewport dimensions and GPU picking)
  * @param pointclouds - Array of point clouds to test against
  * @param options - Additional options
  * @returns Intersection result or null if no hit
@@ -67,21 +85,63 @@ export function getMousePointCloudIntersection(
   options?: {
     /** Filter by clip volumes */
     pickClipped?: boolean;
+    /** Pick window size (default: 17) */
+    pickWindowSize?: number;
+    /** Point size for picking (default: 3) */
+    pointSize?: number;
+    /** Use fallback bounding box picking instead of GPU (default: false) */
+    useFallback?: boolean;
   },
 ): PointCloudIntersection | null {
   const width = renderer.domElement.clientWidth;
   const height = renderer.domElement.clientHeight;
   const ray = mouseToRay(mouse, camera, width, height);
 
+  // Convert mouse Y to WebGL coordinate (from bottom)
+  const glY = height - mouse.y;
+
   let closestIntersection: PointCloudIntersection | null = null;
   let minDistance = Number.POSITIVE_INFINITY;
 
-  // Test against each point cloud
-  for (const pointcloud of pointclouds) {
-    const intersection = raycastPointCloud(ray, pointcloud, options);
-    if (intersection && intersection.distance < minDistance) {
-      minDistance = intersection.distance;
-      closestIntersection = intersection;
+  // Use GPU picking by default, fallback to bounding box if requested
+  const useFallback = options?.useFallback ?? false;
+
+  if (useFallback) {
+    // Fallback: bounding box intersection (fast but imprecise)
+    for (const pointcloud of pointclouds) {
+      const intersection = raycastPointCloudBoundingBox(ray, pointcloud, options);
+      if (intersection && intersection.distance < minDistance) {
+        minDistance = intersection.distance;
+        closestIntersection = intersection;
+      }
+    }
+  } else {
+    // GPU picking (precise point-level accuracy)
+    const picker = getGlobalPicker();
+
+    for (const pointcloud of pointclouds) {
+      const pickParams: PickParams = {
+        x: mouse.x,
+        y: glY,
+        pickWindowSize: options?.pickWindowSize ?? 17,
+        pointSize: options?.pointSize ?? 3,
+      };
+      if (options?.pickClipped !== undefined) {
+        pickParams.pickClipped = options.pickClipped;
+      }
+
+      const result = picker.pick(pointcloud, ray, camera, renderer, pickParams);
+
+      if (result && result.distance < minDistance) {
+        minDistance = result.distance;
+        closestIntersection = {
+          pointcloud,
+          location: result.position.clone(),
+          distance: result.distance,
+          pointIndex: result.pointIndex,
+          point: result,
+        };
+      }
     }
   }
 
@@ -100,7 +160,7 @@ export function getMousePointCloudIntersection(
  * @param _options - Additional options (currently unused)
  * @returns Intersection result or null
  */
-function raycastPointCloud(
+function raycastPointCloudBoundingBox(
   ray: THREE.Ray,
   pointcloud: IPointCloudOctree,
   _options?: {

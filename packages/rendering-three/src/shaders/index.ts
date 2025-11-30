@@ -8,6 +8,8 @@ import vertexShader from './pointcloud.vert.glsl?raw';
 import edlFragmentShader from './edl.frag.glsl?raw';
 import edlVertexShader from './edl.vert.glsl?raw';
 import hqSplatShader from './hqsplat.glsl?raw';
+import pickVertexShader from './pick.vert.glsl?raw';
+import pickFragmentShader from './pick.frag.glsl?raw';
 
 /**
  * Get the point cloud vertex shader source
@@ -62,6 +64,20 @@ export function getHQSplatShader(): string {
 }
 
 /**
+ * Get the pick vertex shader source
+ */
+export function getPickVertexShader(): string {
+  return pickVertexShader;
+}
+
+/**
+ * Get the pick fragment shader source
+ */
+export function getPickFragmentShader(): string {
+  return pickFragmentShader;
+}
+
+/**
  * Shader export for convenience
  */
 export const shaders = {
@@ -70,4 +86,6 @@ export const shaders = {
   edlVertex: edlVertexShader,
   edlFragment: edlFragmentShader,
   hqSplat: hqSplatShader,
+  pickVertex: pickVertexShader,
+  pickFragment: pickFragmentShader,
 };

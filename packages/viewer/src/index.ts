@@ -9,6 +9,7 @@ export * from './controls/index.js';
 export * from './effects/index.js';
 export * from './events.js';
 export * from './loaders/index.js';
+export * from './picking/index.js';
 export * from './PointCloudViewer.js';
 export * from './tools/index.js';
 export * from './ui/index.js';

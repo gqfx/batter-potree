@@ -27,7 +27,10 @@ const renderer = new ThreeJsRenderer({ canvas });
 const scene = new ThreeScene();
 
 // 创建相机
-const camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
+// 🔧 修复：将 near plane 从 0.1 减小到 0.01，避免靠近时点被裁剪
+// far plane 从 1000 增加到 10000，支持更大的场景
+// FOV 60 度提供更自然的视角（相比 75 度更接近人眼）
+const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.01, 10000);
 camera.position.set(10, 10, 10);
 camera.lookAt(0, 0, 0);
 
