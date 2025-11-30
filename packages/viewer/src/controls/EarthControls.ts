@@ -35,6 +35,8 @@ export interface EarthControlsEvents {
   start: undefined;
   change: undefined;
   end: undefined;
+  onSceneMoved: undefined;
+  clearEffect: undefined;
   [key: string]: any;
 }
 
@@ -100,6 +102,20 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
   rotationSpeed = 10;
   zoomSpeed = 1;
   fadeFactor = 20;
+
+  // 距离自适应缩放相关参数 (from potree-core)
+  dollyDistFactor = 1.0;
+  dollyProximityThreshold = 10.0;
+  dollyMinSpeed = 0.1;
+  dollyMaxSpeed = 20;
+  mouseWheelDollyRate = 15;
+  private secsNowLast: number | null = null;
+  private dollyDelta1 = 0;
+  private maxElapsed = 1 / 20;
+  private minElapsed = 1 / 60;
+
+  // Speed for external use
+  speed: number | undefined;
 
   // Control disable flags
   /** Disable camera rotation */
@@ -265,6 +281,9 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         this.camStart = camera.clone();
         this.pivotIndicator.visible = false;
       }
+
+      // 设置鼠标样式为手状 (like potree-core)
+      document.body.style.cursor = 'grabbing';
     }
 
     // Initialize drag state
@@ -292,6 +311,9 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
     this.pivot = null;
     this.pivotIndicator.visible = false;
     this.dragState = null;
+
+    // 恢复默认鼠标样式 (like potree-core)
+    document.body.style.cursor = 'default';
 
     // Remove global listeners
     document.removeEventListener('mousemove', this.boundHandlers.drag);
@@ -367,27 +389,40 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         this.emit('change', undefined);
       } else if (this.dragState.mouse === MouseButton.RIGHT) {
         // Pan: Move camera using View.pan() (RIGHT button)
+        // 使用基于 FOV 的平移逻辑，类似 potree-core
         if (this.disableMove) {
           return;
         }
 
         const ndrag = {
-          x: this.dragState.lastDrag.x / this.domElement.clientWidth,
-          y: this.dragState.lastDrag.y / this.domElement.clientHeight,
+          x: this.dragState.lastDrag.x,
+          y: this.dragState.lastDrag.y,
         };
 
-        const panDistance = this.view.radius * 3;
-        const px = -ndrag.x * panDistance;
-        const py = ndrag.y * panDistance;
+        // 计算相机到目标的距离
+        const panDepth = this.view.position.distanceTo(this.view.getPivot());
+
+        // 使用视场角计算屏幕空间到世界空间的比例
+        const camera = this.camera as THREE.PerspectiveCamera;
+        const fov = camera.fov || 60; // 默认 60 度视场角
+        const targetDistance = panDepth * Math.tan(((fov / 2) * Math.PI) / 180.0);
+
+        // 根据屏幕高度计算平移量
+        const px = (-ndrag.x * targetDistance) / this.domElement.clientHeight;
+        const py = (ndrag.y * targetDistance) / this.domElement.clientHeight;
 
         this.view.pan(px, py);
 
-        // Update view radius
+        // Update view radius and speed
         const distance = this.view.position.distanceTo(this.pivot);
         this.view.radius = distance;
+        this.speed = this.view.radius / 2.5;
 
         this.emit('change', undefined);
       }
+
+      // Emit onSceneMoved event (like potree-core)
+      this.emit('onSceneMoved', undefined);
     }
   }
 
@@ -412,9 +447,29 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
 
     event.preventDefault();
 
+    // 使用时间因素计算缩放增量，类似 potree-core
+    const secsNow = performance.now() / 1000.0;
+    let secsElapsed = this.secsNowLast !== null ? secsNow - this.secsNowLast : 0;
+    this.secsNowLast = secsNow;
+
+    if (secsElapsed > this.maxElapsed) {
+      secsElapsed = this.maxElapsed;
+    }
+    if (secsElapsed < this.minElapsed) {
+      secsElapsed = this.minElapsed;
+    }
+
+    // 检查是否有滚轮输入
+    if (event.deltaY === 0) {
+      return;
+    }
+
     // Normalize wheel delta
     const delta = event.deltaY > 0 ? -1 : 1;
-    this.wheelDelta += delta;
+    const normalizedDelta = delta;
+    // 修正滚动方向：向上滚动(delta>0)应该放大，向下滚动(delta<0)应该缩小
+    this.dollyDelta1 += normalizedDelta * secsElapsed * this.mouseWheelDollyRate;
+    this.wheelDelta = delta; // 保留用于触发 update 中的逻辑
   }
 
   /**
@@ -520,32 +575,54 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
     // Update TWEEN animations
     TWEEN.update();
 
-    // Compute zoom (only if viewer is available)
+    // Compute zoom - 使用距离自适应的缩放逻辑 (from potree-core)
     if (this.wheelDelta !== 0 && this.viewer && this.renderer) {
       const mouse = this.getMousePosition();
       const pointclouds = this.viewer.getPointClouds();
 
       const intersection = getMousePointCloudIntersection(mouse, camera, this.renderer, pointclouds);
 
+      let target: THREE.Vector3 | null = null;
+
+      if (intersection) {
+        target = intersection.location;
+      }
+
+      // 计算距离自适应因子
+      if (target) {
+        const dist = Math.abs(this.view.position.distanceTo(target));
+        this.dollyDistFactor = dist / this.dollyProximityThreshold;
+      } else {
+        // 如果没有交点，使用当前 radius 作为参考距离
+        this.dollyDistFactor = this.view.radius / this.dollyProximityThreshold;
+      }
+
+      // 限制缩放速度在合理范围内
+      this.dollyDistFactor = Math.max(Math.min(this.dollyDistFactor, this.dollyMaxSpeed), this.dollyMinSpeed);
+
+      // 应用距离因子到缩放增量
+      const dollyDelta = this.dollyDelta1 * this.dollyDistFactor;
+
       if (intersection) {
         // Zoom towards point cloud intersection
         const resolvedPos = new THREE.Vector3().addVectors(this.view.position, this.zoomDelta);
-        const distance = intersection.location.distanceTo(resolvedPos);
-        const jumpDistance = distance * 0.2 * this.wheelDelta;
         const targetDir = new THREE.Vector3().subVectors(intersection.location, this.view.position);
         targetDir.normalize();
 
-        resolvedPos.add(targetDir.multiplyScalar(jumpDistance));
+        // 使用基于距离因子的跳跃距离
+        resolvedPos.add(targetDir.multiplyScalar(dollyDelta));
         this.zoomDelta.subVectors(resolvedPos, this.view.position);
 
-        // Update view radius
+        // Update view radius and speed
         const newDistance = resolvedPos.distanceTo(intersection.location);
         this.view.radius = newDistance;
+        this.speed = this.view.radius / 2.5;
       } else {
         // Fallback: zoom along camera direction when no point cloud intersection
-        const zoomFactor = 0.2 * this.wheelDelta;
+        // 使用基于距离因子的缩放
+        const zoomFactor = dollyDelta / this.view.radius;
 
-        let cameraDirection = new THREE.Vector3();
+        const cameraDirection = new THREE.Vector3();
         camera.getWorldDirection(cameraDirection);
 
         // Calculate movement vector along camera direction
@@ -557,7 +634,11 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
         // Update distance to pivot
         const distanceToTarget = this.view.position.distanceTo(this.view.getPivot());
         this.view.radius = distanceToTarget;
+        this.speed = this.view.radius / 2.5;
       }
+
+      // 重置 dollyDelta1
+      this.dollyDelta1 = 0;
     }
 
     // Apply zoom
@@ -649,6 +730,16 @@ export class EarthControls extends TypedEventEmitter<EarthControlsEvents> {
    */
   getControlsScene(): THREE.Scene {
     return this.sceneControls;
+  }
+
+  /**
+   * Clear visual effects (pivot indicator, cursor style)
+   * Based on potree-core's clearEffect event handler
+   */
+  clearEffect(): void {
+    this.pivotIndicator.visible = false;
+    document.body.style.cursor = 'default';
+    this.emit('clearEffect', undefined);
   }
 
   /**
