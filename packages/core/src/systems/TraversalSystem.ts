@@ -416,12 +416,12 @@ export class TraversalSystem implements ISystem {
       },
     };
 
-    console.log('[TraversalSystem] update result:', {
-      visibleNodes: budgetedNodes.length,
-      totalPoints: this.lastResult.totalPoints,
-      traversedNodes,
-      traversalTime: this.lastResult.traversalTime,
-    });
+    // console.log('[TraversalSystem] update result:', {
+    //   visibleNodes: budgetedNodes.length,
+    //   totalPoints: this.lastResult.totalPoints,
+    //   traversedNodes,
+    //   traversalTime: this.lastResult.traversalTime,
+    // });
 
     // 更新变换缓存
     this.updateTransformCache();
@@ -666,6 +666,11 @@ export class TraversalSystem implements ISystem {
       const node = element.node;
       traversedCount++;
 
+      // ========== 对齐 potree-core 的可见性逻辑 ==========
+      // 关键：前 forceLoadDepth 层节点跳过视锥剔除，确保基础层级始终可见
+      // 参考 potree-core: visible = visible || (!!level && level <= 2)
+      const isForceLoadLevel = node.level < this.config.forceLoadDepth;
+
       // 视锥剔除（在对象空间进行）
       let passedFrustumTest = false;
       if (this.frustumCuller && this.config.enableGPUCulling) {
@@ -676,7 +681,8 @@ export class TraversalSystem implements ISystem {
         passedFrustumTest = objectSpaceFrustum.intersectsBox(node.boundingBox);
       }
 
-      if (!passedFrustumTest) {
+      // 前 forceLoadDepth 层节点跳过视锥剔除
+      if (!passedFrustumTest && !isForceLoadLevel) {
         frustumCulled++;
         continue;
       }
@@ -699,11 +705,6 @@ export class TraversalSystem implements ISystem {
         continue;
       }
 
-      // 点预算检查（提前终止）
-      if (numVisiblePoints + node.numPoints > this.config.pointBudget) {
-        break;
-      }
-
       // 计算到相机的距离（使用对象空间相机位置）
       const center = node.boundingBox.getCenter(new THREE.Vector3());
       const distance = center.distanceTo(camObjPos);
@@ -711,41 +712,60 @@ export class TraversalSystem implements ISystem {
       // 计算屏幕大小
       const screenSize = this.calculateScreenSize(node, distance);
 
-      // LOD 判断：是否应该继续细分
-      // 关键修复：只有节点已加载时才能访问其子节点
-      // 这是 Potree 的核心逻辑 - 避免遍历到未加载的深层节点
-      const hasLoadedChildren = node.loaded && node.children.some((child) => child !== null);
+      // ========== 对齐 potree-core 的遍历逻辑 ==========
+      // potree-core: 先检查可见性，然后始终添加当前节点，最后处理子节点
+      // 参考: UpdateVisibility.ts:184-425
 
-      // 对于前 forceLoadDepth 层，强制细分（如果有子节点）
-      const isForceLoadLevel = node.level < this.config.forceLoadDepth;
-      const shouldSubdivide =
-        node.level < this.config.maxLevel &&
-        hasLoadedChildren &&
-        (isForceLoadLevel || screenSize >= this.config.minScreenSize);
+      // 可见性检查（点预算在这里检查，但不终止遍历）
+      let visible = true;
 
-      if (!shouldSubdivide) {
-        // 不再细分，添加当前节点到可见列表
-        const priority = this.calculatePriority(distance, screenSize, node.level);
-        visibleNodes.push({
-          node,
-          octree,
-          distance,
-          screenSize,
-          priority,
-        });
-        numVisiblePoints += node.numPoints;
-      } else {
-        // 继续细分，将子节点加入优先级队列
-        // 只有在节点已加载时才能安全地访问子节点
+      // 点预算检查
+      visible = visible && !(numVisiblePoints + node.numPoints > this.config.pointBudget);
+
+      // 层级限制检查（maxLevel）
+      const level = node.level;
+      visible = visible && level < this.config.maxLevel;
+
+      // 关键：前 forceLoadDepth 层强制可见（参考 potree-core: visible = visible || level <= 2）
+      visible = visible || level < this.config.forceLoadDepth;
+
+      if (!visible) {
+        continue;
+      }
+
+      // ✅ 始终添加当前节点到可见列表（这是与之前逻辑的关键区别）
+      const priority = this.calculatePriority(distance, screenSize, node.level);
+      visibleNodes.push({
+        node,
+        octree,
+        distance,
+        screenSize,
+        priority,
+      });
+      numVisiblePoints += node.numPoints;
+
+      // 处理子节点：只要子节点存在就继续探索
+      // 参考 potree-core: 直接遍历 node.getChildren()，不要求父节点已加载
+      // 子节点引用来自元数据（hierarchy.bin），在节点数据加载之前就存在
+      const hasChildren = node.children.some((child) => child !== null);
+
+      if (hasChildren) {
         for (const child of node.children) {
           if (child) {
+            // 计算子节点的屏幕大小，只有足够大的子节点才加入队列
+            // 这是 potree-core 的核心逻辑：子节点入队时检查 minimumNodePixelSize
             const childWeight = this.computeWeightInObjectSpace(child, camObjPos);
-            priorityQueue.push({
-              node: child,
-              octree,
-              parent: node,
-              weight: childWeight,
-            });
+
+            // weight > 0 表示 screenPixelRadius >= minScreenSize
+            // 参考 potree-core: if (screenPixelRadius < pointcloud.minimumNodePixelSize) continue;
+            if (childWeight > 0) {
+              priorityQueue.push({
+                node: child,
+                octree,
+                parent: node,
+                weight: childWeight,
+              });
+            }
           }
         }
       }
@@ -776,7 +796,13 @@ export class TraversalSystem implements ISystem {
       // 透视相机：使用 FOV 计算屏幕投影大小
       const fov = (this.camera.fov * Math.PI) / 180;
       const slope = Math.tan(fov * 0.5);
-      const projFactor = (0.5 * this.config.screenHeight) / (slope * distance);
+
+      // 🔧 修复：设置最小距离，防止除以零或非常小的数
+      // 当相机非常靠近时，避免 screenSize 变成无穷大导致错误的 LOD 选择
+      const minDistance = radius * 2; // 至少是节点半径的2倍
+      const safeDistance = Math.max(distance, minDistance);
+
+      const projFactor = (0.5 * this.config.screenHeight) / (slope * safeDistance);
       return radius * projFactor;
     } else if (this.camera instanceof THREE.OrthographicCamera) {
       // 正交相机：直接映射
