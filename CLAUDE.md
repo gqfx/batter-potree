@@ -66,7 +66,54 @@ pnpm format
 
 ### 1. Potree 点云数据格式
 
-#### 1.1 交错布局 (Interleaved Layout)
+#### 1.1 Potree 2.0 文件结构
+
+Potree 2.0 使用两个主要文件存储点云数据：
+
+**octree.bin**:
+- 存储普通节点（type 0）和叶子节点（type 1）的实际点云数据
+- 使用 HTTP Range 请求按需加载节点数据
+
+**hierarchy.bin**:
+- 存储 proxy 节点（type 2）的层级元数据
+- 用于实现延迟加载机制
+
+**节点类型及其数据源**:
+```typescript
+// type 0: 普通节点 → octree.bin
+// type 1: 叶子节点 → octree.bin
+// type 2: proxy 节点 → hierarchy.bin
+
+// 正确处理节点数据源
+if (node.nodeType === 2) {
+  // proxy 节点：从 hierarchy.bin 加载
+  const url = `${baseUrl}/hierarchy.bin`;
+  const offset = node.hierarchyByteOffset;
+  const size = node.hierarchyByteSize;
+} else {
+  // 普通/叶子节点：从 octree.bin 加载
+  const url = `${baseUrl}/octree.bin`;
+  const offset = node.byteOffset;
+  const size = node.byteSize;
+}
+```
+
+**⚠️ 常见错误**:
+```typescript
+// ❌ 错误：所有节点都从 octree.bin 加载
+const url = `${baseUrl}/octree.bin`;
+const offset = node.byteOffset;  // proxy 节点会加载错误数据！
+
+// ✅ 正确：根据节点类型选择数据源
+const isProxyNode = node.nodeType === 2;
+const url = isProxyNode ? `${baseUrl}/hierarchy.bin` : `${baseUrl}/octree.bin`;
+const offset = isProxyNode ? node.hierarchyByteOffset : node.byteOffset;
+const size = isProxyNode ? node.hierarchyByteSize : node.byteSize;
+```
+
+---
+
+#### 1.2 交错布局 (Interleaved Layout)
 
 Potree 使用**交错布局**存储点云数据，每个点包含所有属性：
 
@@ -77,7 +124,9 @@ Point 1: [position(12) + intensity(2) + classification(1) + ... + RGB(6)]
 Point 2: [position(12) + intensity(2) + classification(1) + ... + RGB(6)]
 ```
 
-#### 1.2 属性偏移计算
+---
+
+#### 1.3 属性偏移计算
 
 **核心公式**：读取点 `j` 的属性 `A` 的位置：
 ```typescript
@@ -99,7 +148,9 @@ const rgbOffset = 31;  // 所有前置属性的总字节数
 // 读取第 2 个点的 RGB：offset = 31 + 2 * 37 = 105
 ```
 
-#### 1.3 常见错误模式 ❌
+---
+
+#### 1.4 常见错误模式 ❌
 
 ```typescript
 // ❌ 错误：使用累加的 inOffset
@@ -122,7 +173,9 @@ for (const attr of attributes) {
 }
 ```
 
-#### 1.4 参考实现
+---
+
+#### 1.5 参考实现
 
 参考 Potree 原始实现：
 - 文件：`src/loader/POCLoader.js`
@@ -198,13 +251,66 @@ fetch(url, {
 
 ## 最近的关键修复
 
-### 修复 1: Potree 2.0 proxy 节点支持和点数计算修复 (2025-11-25)
+### 修复 1: Potree 2.0 proxy 节点字节偏移处理 (2025-11-30)
+
+**问题**：
+- proxy 节点（type=2）的 byteOffset/byteSize 指向 hierarchy.bin，而不是 octree.bin
+- 之前的代码将所有节点的 byteOffset/byteSize 都视为指向 octree.bin，导致 HTTP Range 请求加载错误数据
+- 触发 DataView bounds 错误，点云无法正常显示
+
+**根本原因**：
+
+Potree 2.0 的节点数据存储在两个文件中：
+- **octree.bin**: 存储普通节点和叶子节点的点云数据
+- **hierarchy.bin**: 存储 proxy 节点的层级元数据（用于延迟加载）
+
+不同节点类型的 byteOffset/byteSize 含义不同：
+- **type 0/1** (普通/叶子节点): byteOffset/byteSize → octree.bin
+- **type 2** (proxy 节点): byteOffset/byteSize → hierarchy.bin
+
+**修复内容** (`ae8e244`):
+
+1. **PotreeLoader.ts**: 正确解析并区分节点类型
+   ```typescript
+   // proxy 节点：设置 hierarchyByteOffset/hierarchyByteSize
+   if (type === 2) {
+     node.hierarchyByteOffset = byteOffset;
+     node.hierarchyByteSize = byteSize;
+   }
+   // 普通节点：设置 byteOffset/byteSize
+   else {
+     node.byteOffset = byteOffset;
+     node.byteSize = byteSize;
+   }
+   ```
+
+2. **StreamingSystem.ts**: 检测并暂时跳过 proxy 节点
+   ```typescript
+   // 检测 proxy 节点
+   if (node.nodeType === 2) {
+     console.log(`[StreamingSystem] Skipping proxy node ${node.name} (hierarchy chunk loading not yet implemented)`);
+     continue;
+   }
+   ```
+
+**影响**：
+- ✅ 修复了 buffer 大小不匹配导致的 DataView bounds 错误
+- ✅ 点云可以正常加载和显示（跳过 proxy 节点）
+- ✅ 为后续实现 proxy 节点的 hierarchy chunk 加载奠定基础
+
+**相关文件**：
+- `packages/viewer/src/loaders/PotreeLoader.ts`
+- `packages/core/src/systems/StreamingSystem.ts`
+
+---
+
+### 修复 2: Potree 2.0 proxy 节点类型定义 (2025-11-25)
 
 **问题**：
 - Potree 2.0 点云加载时出现 404 错误
 - DataView bounds 错误：元数据中的 `numPoints` 可能与实际 buffer 大小不匹配
 
-**修复 1 - 添加 Potree 2.0 proxy 节点支持** (`f4c737a`):
+**修复 1 - 添加 Potree 2.0 节点类型定义** (`f4c737a`):
 
 Potree 2.0 使用三种节点类型进行分层加载：
 - **type 0**: 普通节点（octree.bin 中有数据）
@@ -262,9 +368,9 @@ if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
 ```
 
 **影响**：
-- ✅ 解决了 Potree 2.0 点云的 404 错误
-- ✅ 彻底修复了 DataView bounds 错误
-- ✅ 支持 Potree 2.0 的分层加载机制
+- ✅ 定义了 Potree 2.0 节点类型系统
+- ✅ 为 proxy 节点处理提供了基础接口
+- ✅ 修复了点数计算越界问题
 
 **相关文件**：
 - `packages/core/src/types/potree.ts`
@@ -272,7 +378,7 @@ if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
 
 ---
 
-### 修复 2: BinaryDecoderWorker 属性偏移计算错误 (2025-11-20)
+### 修复 3: BinaryDecoderWorker 属性偏移计算错误 (2025-11-20)
 
 **问题**：
 - DataView bounds 错误持续出现
@@ -298,7 +404,7 @@ if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
 
 ---
 
-### 修复 3: ThreeJsRenderer 接口对齐 (2025-11-19)
+### 修复 4: ThreeJsRenderer 接口对齐 (2025-11-19)
 
 **问题**：
 - `Viewer.ts` 调用 `renderer.render(scene, camera)` 时类型不匹配
@@ -312,7 +418,7 @@ if (metadataNumPoints !== undefined && metadataNumPoints !== actualNumPoints) {
 
 ---
 
-### 修复 4: Shader 编译错误 (早期)
+### 修复 5: Shader 编译错误 (早期)
 
 **问题**：
 - GLSL 着色器编译失败
@@ -507,4 +613,4 @@ chore: 更新构建配置
 
 ---
 
-*最后更新: 2025-11-25*
+*最后更新: 2025-11-30*
