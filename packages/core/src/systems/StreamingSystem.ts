@@ -19,6 +19,7 @@
  * ```
  */
 
+import * as THREE from 'three';
 import type {
   IPointCloudOctree,
   IPointCloudOctreeNode,
@@ -307,11 +308,7 @@ export class StreamingSystem implements ISystem {
    */
   update(_deltaTime: number): void {
     // 处理待处理请求
-    const pendingCount = this.pendingRequests.size;
-    const activeCount = this.activeLoads.size;
-    if (pendingCount > 0 || activeCount > 0) {
-      console.log('[StreamingSystem] update: pending=', pendingCount, 'active=', activeCount);
-    }
+    // 移除每帧日志输出以避免日志爆炸
     this.processQueue();
   }
 
@@ -351,14 +348,7 @@ export class StreamingSystem implements ISystem {
 
     // 检查是否有空闲槽位
     const availableSlots = this.config.maxConcurrentLoads - this.activeLoads.size;
-    console.log('[StreamingSystem] processQueue: availableSlots=', availableSlots, 'pendingRequests=', this.pendingRequests.size);
     if (availableSlots <= 0 || this.pendingRequests.size === 0) {
-      if (availableSlots <= 0) {
-        console.log('[StreamingSystem] processQueue: no available slots');
-      }
-      if (this.pendingRequests.size === 0) {
-        console.log('[StreamingSystem] processQueue: no pending requests');
-      }
       return;
     }
 
@@ -390,26 +380,21 @@ export class StreamingSystem implements ISystem {
    * @param key - 节点键
    * @param request - 加载请求
    */
-  private startLoad(key: string, request: LoadRequest): void {
-    console.log('[StreamingSystem] startLoad:', {
-      key,
-      nodeName: request.node.name,
-      nodeType: request.node.nodeType,
-      byteOffset: request.node.byteOffset,
-      byteSize: request.node.byteSize,
-      hierarchyByteOffset: request.node.hierarchyByteOffset,
-      hierarchyByteSize: request.node.hierarchyByteSize,
-    });
+  // 跟踪已警告过的 proxy 节点，避免重复警告
+  private warnedProxyNodes = new Set<string>();
+
+  private async startLoad(key: string, request: LoadRequest): Promise<void> {
 
     // ✅ 检测 proxy 节点 (type = 2)
-    // Proxy 节点需要先加载 hierarchy chunk，暂时跳过
+    // Proxy 节点需要先加载 hierarchy chunk
     if (request.node.nodeType === 2) {
-      console.warn(`[StreamingSystem] Skipping proxy node ${request.node.name} - hierarchy loading not yet implemented`);
-      // 从待加载队列中移除
-      this.pendingRequests.delete(key);
-      this.activeLoads.delete(key);
-      // 标记节点为未加载
-      (request.node as { loading: boolean }).loading = false;
+      // 只警告一次
+      if (!this.warnedProxyNodes.has(request.node.name)) {
+        console.warn(`[StreamingSystem] Loading hierarchy for proxy node ${request.node.name}`);
+        this.warnedProxyNodes.add(request.node.name);
+      }
+      // 加载 hierarchy chunk
+      await this.loadHierarchyChunk(key, request);
       return;
     }
 
@@ -628,6 +613,213 @@ export class StreamingSystem implements ISystem {
         data: decodedData,
         loadTime,
       });
+    }
+  }
+
+  /**
+   * 加载 proxy 节点的 hierarchy chunk
+   *
+   * @param key - 节点键
+   * @param request - 加载请求
+   */
+  private async loadHierarchyChunk(key: string, request: LoadRequest): Promise<void> {
+    const node = request.node;
+    const octree = request.octree;
+
+    // 标记为加载中
+    (node as { loading: boolean }).loading = true;
+    this.activeLoads.set(key, request);
+
+    try {
+      // 构建 hierarchy.bin URL
+      const baseUrl = octree.url.replace(/\/metadata\.json$/, '');
+      const hierarchyUrl = `${baseUrl}/hierarchy.bin`;
+
+      // 使用 HTTP Range 请求加载 hierarchy chunk
+      if (node.hierarchyByteOffset === undefined || node.hierarchyByteSize === undefined) {
+        throw new Error(`Proxy node ${node.name} missing hierarchyByteOffset/Size`);
+      }
+
+      const start = Number(node.hierarchyByteOffset);
+      const end = start + Number(node.hierarchyByteSize) - 1;
+
+      const response = await fetch(hierarchyUrl, {
+        signal: request.abortController.signal,
+        headers: {
+          'Range': `bytes=${start}-${end}`
+        }
+      });
+
+      if (!response.ok && response.status !== 206) {
+        throw new Error(`Failed to load hierarchy chunk: ${response.statusText}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+
+      // 解析 hierarchy chunk
+      await this.parseHierarchyChunk(node, octree, buffer);
+
+      // 从活动加载中移除
+      this.activeLoads.delete(key);
+      this.pendingRequests.delete(key);
+
+      // 标记节点为已加载（hierarchy 已加载，但点云数据还未加载）
+      (node as { loaded: boolean; loading: boolean }).loaded = true;
+      (node as { loading: boolean }).loading = false;
+
+      console.log(`[StreamingSystem] Loaded hierarchy for proxy node ${node.name}, children created`);
+    } catch (error) {
+      this.handleLoadError(key, request, error);
+    }
+  }
+
+  /**
+   * 解析 hierarchy chunk 并创建子节点
+   *
+   * @param proxyNode - Proxy 节点
+   * @param octree - 点云八叉树
+   * @param buffer - Hierarchy 数据
+   */
+  private async parseHierarchyChunk(
+    proxyNode: IPointCloudOctreeNode,
+    octree: IPointCloudOctree,
+    buffer: ArrayBuffer
+  ): Promise<void> {
+    const view = new DataView(buffer);
+    const bytesPerNode = 22;
+    const numNodes = buffer.byteLength / bytesPerNode;
+
+    // 第一个节点是 proxy 节点自己，更新它的信息
+    const type = view.getUint8(0);
+    const childMask = view.getUint8(1);
+    const numPoints = view.getUint32(2, true);
+    const byteOffsetLow = view.getUint32(6, true);
+    const byteOffsetHigh = view.getUint32(10, true);
+    const byteOffset = byteOffsetLow + byteOffsetHigh * 0x100000000;
+    const byteSizeLow = view.getUint32(14, true);
+    const byteSizeHigh = view.getUint32(18, true);
+    const byteSize = byteSizeLow + byteSizeHigh * 0x100000000;
+
+    // 将 proxy 节点转换为普通节点
+    (proxyNode as any).nodeType = type;
+    (proxyNode as any).numPoints = numPoints;
+    if (type !== 2) {
+      // 如果不再是 proxy，设置 octree.bin 的偏移
+      (proxyNode as any).byteOffset = byteOffset;
+      (proxyNode as any).byteSize = byteSize;
+      // 清除 hierarchy 偏移
+      delete (proxyNode as any).hierarchyByteOffset;
+      delete (proxyNode as any).hierarchyByteSize;
+    }
+
+    // 处理第一个节点的子节点
+    if (type !== 2) {
+      this.createChildrenFromMask(proxyNode, octree, childMask, view, 0);
+    }
+
+    // 处理剩余的节点（子节点的子节点等）
+    const nodeStack: IPointCloudOctreeNode[] = [];
+    for (let i = 0; i < 8; i++) {
+      if (proxyNode.children[i]) {
+        nodeStack.push(proxyNode.children[i]!);
+      }
+    }
+
+    let nodeIndex = 1;
+    while (nodeStack.length > 0 && nodeIndex < numNodes) {
+      const currentNode = nodeStack.shift()!;
+
+      const offset = nodeIndex * bytesPerNode;
+      const childType = view.getUint8(offset);
+      const childChildMask = view.getUint8(offset + 1);
+      const childNumPoints = view.getUint32(offset + 2, true);
+      const childByteOffsetLow = view.getUint32(offset + 6, true);
+      const childByteOffsetHigh = view.getUint32(offset + 10, true);
+      const childByteOffset = childByteOffsetLow + childByteOffsetHigh * 0x100000000;
+      const childByteSizeLow = view.getUint32(offset + 14, true);
+      const childByteSizeHigh = view.getUint32(offset + 18, true);
+      const childByteSize = childByteSizeLow + childByteSizeHigh * 0x100000000;
+
+      // 更新子节点信息
+      (currentNode as any).nodeType = childType;
+      (currentNode as any).numPoints = childNumPoints;
+
+      if (childType === 2) {
+        // 子节点是 proxy
+        (currentNode as any).hierarchyByteOffset = childByteOffset;
+        (currentNode as any).hierarchyByteSize = childByteSize;
+      } else {
+        // 子节点是普通节点
+        (currentNode as any).byteOffset = childByteOffset;
+        (currentNode as any).byteSize = childByteSize;
+      }
+
+      // 创建子节点的子节点
+      if (childType !== 2) {
+        this.createChildrenFromMask(currentNode, octree, childChildMask, view, nodeIndex);
+        // 将新创建的子节点加入栈
+        for (let i = 0; i < 8; i++) {
+          if (currentNode.children[i]) {
+            nodeStack.push(currentNode.children[i]!);
+          }
+        }
+      }
+
+      nodeIndex++;
+    }
+  }
+
+  /**
+   * 根据 childMask 创建子节点
+   */
+  private createChildrenFromMask(
+    parent: IPointCloudOctreeNode,
+    _octree: IPointCloudOctree,
+    childMask: number,
+    _view: DataView,
+    _nodeIndex: number
+  ): void {
+    const min = parent.boundingBox.min.clone();
+    const max = parent.boundingBox.max.clone();
+    const center = parent.boundingBox.getCenter(new THREE.Vector3());
+
+    for (let childIndex = 0; childIndex < 8; childIndex++) {
+      const childExists = ((1 << childIndex) & childMask) !== 0;
+      if (!childExists) {
+        continue;
+      }
+
+      // 计算子节点的 bounding box
+      const childMin = min.clone();
+      const childMax = max.clone();
+
+      if ((childIndex & 1) === 0) {
+        childMax.x = center.x;
+      } else {
+        childMin.x = center.x;
+      }
+      if ((childIndex & 2) === 0) {
+        childMax.y = center.y;
+      } else {
+        childMin.y = center.y;
+      }
+      if ((childIndex & 4) === 0) {
+        childMax.z = center.z;
+      } else {
+        childMin.z = center.z;
+      }
+
+      const childNode: IPointCloudOctreeNode = {
+        name: parent.name + childIndex,
+        level: parent.level + 1,
+        boundingBox: new THREE.Box3(childMin, childMax),
+        numPoints: 0, // 将在 parseHierarchyChunk 中设置
+        children: new Array(8).fill(null),
+        loaded: false,
+        loading: false,
+      };
+
+      parent.children[childIndex] = childNode;
     }
   }
 

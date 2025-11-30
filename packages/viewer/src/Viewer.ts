@@ -1455,9 +1455,8 @@ export class Viewer extends TypedEventEmitter<ViewerEvents> {
 
       // 只请求前 MAX_LOADS_PER_FRAME_PER_CLOUD 个节点
       const nodesToLoad = unloadedNodes.slice(0, MAX_LOADS_PER_FRAME_PER_CLOUD);
-      console.log('[Viewer] updateVisibleNodes: unloadedNodes=', unloadedNodes.length, 'nodesToLoad=', nodesToLoad.length);
+      // 移除每帧日志输出
       for (const { node, priority } of nodesToLoad) {
-        console.log('[Viewer] Requesting load for node:', node.name, 'priority:', priority);
         this.streamingSystem.requestLoad(octree, node, priority);
       }
 
