@@ -86,13 +86,15 @@ export interface PotreeLoaderConfig {
 interface HierarchyNode {
   /** Node name (e.g., "r", "r0", "r01") */
   readonly name: string;
-  /** Number of points in this node */
+  /** Node type (0=internal, 1=leaf, 2=proxy) */
+  readonly type: number;
+  /** Number of points in this node (or total for proxy nodes) */
   readonly numPoints: number;
   /** Child mask (8 bits for 8 children) */
   readonly childMask: number;
-  /** Byte offset in octree.bin (Potree 2.0) */
+  /** Byte offset (octree.bin for normal, hierarchy.bin for proxy) */
   readonly byteOffset?: number;
-  /** Byte size in octree.bin (Potree 2.0) */
+  /** Byte size (octree.bin for normal, hierarchy.bin for proxy) */
   readonly byteSize?: number;
 }
 
@@ -391,7 +393,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       const byteSize = byteSizeLow + byteSizeHigh * 0x100000000;
 
       const name = stack.shift()!;
-      nodes.push({ name, numPoints, childMask, byteOffset, byteSize });
+      nodes.push({ name, type, numPoints, childMask, byteOffset, byteSize });
 
       // Add children to stack based on child mask
       // type 0 = internal node, type 1 = leaf node, type 2 = proxy (needs separate load)
@@ -442,6 +444,7 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
         const childNode = this.createChildNode(
           parent,
           childIndex,
+          hierarchyNode.type,
           hierarchyNode.numPoints,
           hierarchyNode.byteOffset,
           hierarchyNode.byteSize,
@@ -457,14 +460,16 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
    *
    * @param parent - Parent node
    * @param childIndex - Child index (0-7)
-   * @param numPoints - Number of points in child
-   * @param byteOffset - Byte offset in octree.bin (Potree 2.0)
-   * @param byteSize - Byte size in octree.bin (Potree 2.0)
+   * @param type - Node type (0=internal, 1=leaf, 2=proxy)
+   * @param numPoints - Number of points in child (or total for proxy nodes)
+   * @param byteOffset - Byte offset (octree.bin for normal nodes, hierarchy.bin for proxy)
+   * @param byteSize - Byte size (octree.bin for normal nodes, hierarchy.bin for proxy)
    * @returns New child node
    */
   private createChildNode(
     parent: IPointCloudOctreeNode,
     childIndex: number,
+    type: number,
     numPoints: number,
     byteOffset?: number,
     byteSize?: number,
@@ -500,14 +505,28 @@ export class PotreeLoader implements ILoader<IPointCloudOctree> {
       children: new Array(8).fill(null),
       loaded: false,
       loading: false,
+      nodeType: type, // 设置节点类型
     };
 
-    // Only set byte offset/size if they are defined
-    if (byteOffset !== undefined) {
-      node.byteOffset = byteOffset;
-    }
-    if (byteSize !== undefined) {
-      node.byteSize = byteSize;
+    // 根据节点类型设置不同的字段
+    // type = 2 (proxy): byteOffset/byteSize 指向 hierarchy.bin
+    // type = 0/1 (normal/leaf): byteOffset/byteSize 指向 octree.bin
+    if (type === 2) {
+      // Proxy node: set hierarchyByteOffset/Size
+      if (byteOffset !== undefined) {
+        node.hierarchyByteOffset = byteOffset;
+      }
+      if (byteSize !== undefined) {
+        node.hierarchyByteSize = byteSize;
+      }
+    } else {
+      // Normal/leaf node: set byteOffset/Size for octree.bin
+      if (byteOffset !== undefined) {
+        node.byteOffset = byteOffset;
+      }
+      if (byteSize !== undefined) {
+        node.byteSize = byteSize;
+      }
     }
 
     return node;

@@ -394,9 +394,24 @@ export class StreamingSystem implements ISystem {
     console.log('[StreamingSystem] startLoad:', {
       key,
       nodeName: request.node.name,
+      nodeType: request.node.nodeType,
       byteOffset: request.node.byteOffset,
       byteSize: request.node.byteSize,
+      hierarchyByteOffset: request.node.hierarchyByteOffset,
+      hierarchyByteSize: request.node.hierarchyByteSize,
     });
+
+    // ✅ 检测 proxy 节点 (type = 2)
+    // Proxy 节点需要先加载 hierarchy chunk，暂时跳过
+    if (request.node.nodeType === 2) {
+      console.warn(`[StreamingSystem] Skipping proxy node ${request.node.name} - hierarchy loading not yet implemented`);
+      // 从待加载队列中移除
+      this.pendingRequests.delete(key);
+      this.activeLoads.delete(key);
+      // 标记节点为未加载
+      (request.node as { loading: boolean }).loading = false;
+      return;
+    }
 
     // 标记节点为加载中
     (request.node as { loading: boolean }).loading = true;
