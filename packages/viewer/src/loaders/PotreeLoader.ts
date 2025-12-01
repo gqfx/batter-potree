@@ -23,13 +23,32 @@ import * as THREE from 'three';
 import { parseAttributes } from './parseAttributes.js';
 
 /**
- * Parse bounding box from Potree 2.0 format
+ * Parse bounding box from Potree format
+ * Supports both Potree 2.0 (min/max arrays) and legacy Potree 1.x (lx/ly/lz/ux/uy/uz) formats
  */
 function parseBoundingBox(box: IPotree2xBoundingBox): THREE.Box3 {
-  return new THREE.Box3(
-    new THREE.Vector3(box.min[0], box.min[1], box.min[2]),
-    new THREE.Vector3(box.max[0], box.max[1], box.max[2]),
-  );
+  // Potree 2.0 format: min/max arrays
+  if (box.min && box.max) {
+    return new THREE.Box3(
+      new THREE.Vector3(box.min[0], box.min[1], box.min[2]),
+      new THREE.Vector3(box.max[0], box.max[1], box.max[2]),
+    );
+  }
+  // Legacy Potree 1.x format: lx/ly/lz/ux/uy/uz
+  if (
+    box.lx !== undefined &&
+    box.ly !== undefined &&
+    box.lz !== undefined &&
+    box.ux !== undefined &&
+    box.uy !== undefined &&
+    box.uz !== undefined
+  ) {
+    return new THREE.Box3(
+      new THREE.Vector3(box.lx, box.ly, box.lz),
+      new THREE.Vector3(box.ux, box.uy, box.uz),
+    );
+  }
+  throw new Error('Invalid bounding box format: must provide either (min/max) or (lx/ly/lz/ux/uy/uz)');
 }
 
 /**

@@ -1116,9 +1116,9 @@ async function decodePointCloudData(event) {
       byteOffset = result.byteOffset;
       const positions = result.positions;
       for (let j = 0; j < numPoints; j++) {
-        const x = positions[3 * j + 0];
-        const y = positions[3 * j + 1];
-        const z = positions[3 * j + 2];
+        const x = positions[3 * j + 0] ?? 0;
+        const y = positions[3 * j + 1] ?? 0;
+        const z = positions[3 * j + 2] ?? 0;
         mean[0] += x / numPoints;
         mean[1] += y / numPoints;
         mean[2] += z / numPoints;

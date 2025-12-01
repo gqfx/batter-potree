@@ -7,7 +7,7 @@
 
 import { PointCloudColorMode } from '@better-potree/core';
 import * as THREE from 'three';
-import { PointCloudScene } from './PointCloudScene';
+import { PointCloudScene } from '../PointCloudScene';
 
 /**
  * Example 1: Basic usage
@@ -177,7 +177,9 @@ function dynamicNodeManagement() {
     pcIndex: 2,
   });
 
-  const _metadata = scene.getNodeMetadata('r');
+  // Get node metadata to verify update
+  const metadata = scene.getNodeMetadata('r');
+  console.log('Node metadata:', metadata);
 
   return scene;
 }

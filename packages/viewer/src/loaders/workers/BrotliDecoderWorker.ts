@@ -231,7 +231,8 @@ async function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): 
     try {
       const compressed = new Uint8Array(compressedBuffer);
       const decompressed = brotliDecompress(compressed);
-      decompressedBuffer = decompressed.buffer;
+      // Type assertion: brotli-wasm returns Uint8Array.buffer which is ArrayBuffer
+      decompressedBuffer = decompressed.buffer as ArrayBuffer;
     } catch (error) {
       console.error('[BrotliDecoder] Decompression failed:', error);
       // Return empty buffer on error
@@ -280,9 +281,9 @@ async function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): 
 
       // Calculate tight bounding box and mean
       for (let j = 0; j < numPoints; j++) {
-        const x = positions[3 * j + 0];
-        const y = positions[3 * j + 1];
-        const z = positions[3 * j + 2];
+        const x = positions[3 * j + 0] ?? 0;
+        const y = positions[3 * j + 1] ?? 0;
+        const z = positions[3 * j + 2] ?? 0;
 
         mean[0] += x / numPoints;
         mean[1] += y / numPoints;

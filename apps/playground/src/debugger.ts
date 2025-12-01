@@ -232,7 +232,10 @@ class DebugSystem {
 
     // 如果是错误，捕获堆栈
     if (level === LogLevel.ERROR) {
-      entry.stack = new Error().stack;
+      const stack = new Error().stack;
+      if (stack !== undefined) {
+        entry.stack = stack;
+      }
     }
 
     this.logs.push(entry);

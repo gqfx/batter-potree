@@ -46,6 +46,8 @@ export interface IPotreeAttributeMetadata {
   name: string;
   size: number;
   numElements?: number;
+  /** Alias for numElements, used in some Potree 2.0 metadata files */
+  elements?: number;
   elementSize: number;
   type: string;
   description?: string;
@@ -53,10 +55,23 @@ export interface IPotreeAttributeMetadata {
 
 /**
  * Potree 2.0 bounding box format
+ * Supports both array format (min/max) and legacy Potree 1.x format (lx/ly/lz/ux/uy/uz)
  */
 export interface IPotree2xBoundingBox {
-  min: [number, number, number];
-  max: [number, number, number];
+  min?: [number, number, number];
+  max?: [number, number, number];
+  /** Legacy Potree 1.x: lower x coordinate */
+  lx?: number;
+  /** Legacy Potree 1.x: lower y coordinate */
+  ly?: number;
+  /** Legacy Potree 1.x: lower z coordinate */
+  lz?: number;
+  /** Legacy Potree 1.x: upper x coordinate */
+  ux?: number;
+  /** Legacy Potree 1.x: upper y coordinate */
+  uy?: number;
+  /** Legacy Potree 1.x: upper z coordinate */
+  uz?: number;
 }
 
 /**

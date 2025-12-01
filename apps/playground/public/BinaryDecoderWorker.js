@@ -664,8 +664,8 @@ function decodePointCloudData(event) {
   }
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
-  const nodeOffset = event.data.offset;
-  const scaleArray = Array.isArray(event.data.scale) ? event.data.scale : [event.data.scale, event.data.scale, event.data.scale];
+  const nodeOffset = event.data.offset ?? [0, 0, 0];
+  const scaleArray = event.data.scale ? Array.isArray(event.data.scale) ? event.data.scale : [event.data.scale, event.data.scale, event.data.scale] : [1, 1, 1];
   const tightBoxMin = [
     Number.POSITIVE_INFINITY,
     Number.POSITIVE_INFINITY,

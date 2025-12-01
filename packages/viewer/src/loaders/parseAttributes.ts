@@ -59,14 +59,16 @@ export function parseAttributes(metadata: IPotreeMetadata): PointAttributes {
   for (const jsAttribute of pointAttributes) {
     const name = replaceOldNames(jsAttribute.name);
     const type = typeConversion[jsAttribute.type];
-    // Potree 2.0 uses 'numElements'
-    const numElements = jsAttribute.numElements;
+    // Potree 2.0 uses 'numElements' or 'elements' (both are supported)
+    const numElements = jsAttribute.numElements ?? jsAttribute.elements;
 
     if (!type) {
+      console.warn(`Unknown attribute type: ${jsAttribute.type}`);
       continue;
     }
 
     if (numElements === undefined) {
+      console.warn(`Missing numElements/elements for attribute: ${jsAttribute.name}`);
       continue;
     }
 
