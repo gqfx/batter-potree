@@ -176,7 +176,8 @@ describe('ECSWorld', () => {
       world.addComponent(entity3, VelocityComponent, new VelocityComponent());
       // entity3 没有 Position
 
-      const entities = world.query(PositionComponent, VelocityComponent);
+      // biome-ignore lint/suspicious/noExplicitAny: Testing multi-component query with different types
+      const entities = world.query(PositionComponent, VelocityComponent as any);
 
       expect(entities).toHaveLength(1);
       expect(entities).toContain(entity1);

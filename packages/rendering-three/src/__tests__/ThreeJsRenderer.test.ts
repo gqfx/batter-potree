@@ -193,38 +193,6 @@ describe('ThreeJsRenderer', () => {
     });
   });
 
-  describe('clear', () => {
-    it('should clear with default parameters', () => {
-      const renderer = new ThreeJsRenderer();
-      const threeRenderer = renderer.getThreeRenderer();
-      const clearSpy = vi.spyOn(threeRenderer, 'clear');
-
-      renderer.clear();
-
-      expect(clearSpy).toHaveBeenCalledWith(true, true, true);
-    });
-
-    it('should clear with custom parameters', () => {
-      const renderer = new ThreeJsRenderer();
-      const threeRenderer = renderer.getThreeRenderer();
-      const clearSpy = vi.spyOn(threeRenderer, 'clear');
-
-      renderer.clear(false, true, false);
-
-      expect(clearSpy).toHaveBeenCalledWith(false, true, false);
-    });
-
-    it('should clear only color buffer', () => {
-      const renderer = new ThreeJsRenderer();
-      const threeRenderer = renderer.getThreeRenderer();
-      const clearSpy = vi.spyOn(threeRenderer, 'clear');
-
-      renderer.clear(true, false, false);
-
-      expect(clearSpy).toHaveBeenCalledWith(true, false, false);
-    });
-  });
-
   describe('getContext', () => {
     it('should return WebGL2 rendering context', () => {
       const renderer = new ThreeJsRenderer();

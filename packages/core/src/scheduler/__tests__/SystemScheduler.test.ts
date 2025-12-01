@@ -382,7 +382,7 @@ describe('SystemScheduler', () => {
           SystemStage.UPDATE,
           SystemStage.RENDER,
           SystemStage.CLEANUP,
-        ][i % 4];
+        ][i % 4]!;
         const system = createTestSystem(`system-${i}`, stage, i);
         scheduler.addSystem(system);
       }
@@ -413,7 +413,7 @@ describe('SystemScheduler', () => {
           SystemStage.UPDATE,
           SystemStage.RENDER,
           SystemStage.CLEANUP,
-        ][i % 4];
+        ][i % 4]!;
         const system = createTestSystem(`system-${i}`, stage, i);
         scheduler.addSystem(system);
       }

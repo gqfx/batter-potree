@@ -2,12 +2,12 @@
  * Tests for Octree hierarchy and node management
  */
 
-import type { IPointCloudOctree, IPointCloudOctreeNode } from '@better-potree/core';
+import type { IPointCloudOctreeNode } from '@better-potree/core';
 import * as THREE from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 describe('Octree Hierarchy', () => {
-  let _mockOctree: IPointCloudOctree;
+  // MockOctree not needed for these tests
   let rootNode: IPointCloudOctreeNode;
 
   beforeEach(() => {
@@ -25,17 +25,7 @@ describe('Octree Hierarchy', () => {
       loading: false,
     };
 
-    _mockOctree = {
-      url: 'test://pointcloud',
-      spacing: 0.1,
-      boundingBox: rootNode.boundingBox.clone(),
-      tightBoundingBox: rootNode.boundingBox.clone(),
-      root: rootNode,
-      pointAttributes: {} as any,
-      projection: null,
-      version: '2.0',
-      scale: 0.001,
-    };
+    // Note: mockOctree not needed for these tests
   });
 
   describe('Node creation', () => {

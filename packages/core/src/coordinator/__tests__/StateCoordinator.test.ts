@@ -11,6 +11,15 @@ import type { ConfigStore, SourceConfig } from '../../config/types.js';
 import { Runtime } from '../../runtime/Runtime.js';
 import { StateCoordinator } from '../StateCoordinator.js';
 
+// 简单的 ECS World 接口（仅用于测试）
+interface IECSWorld {
+  createEntity(): number;
+  addComponent<T>(entity: number, ComponentClass: new (...args: any[]) => T, instance: T): void;
+  query<T>(ComponentClass: new (...args: any[]) => T): number[];
+  getComponent<T>(entity: number, ComponentClass: new (...args: any[]) => T): T | undefined;
+  removeEntity(entity: number): void;
+}
+
 /**
  * Mock OctreeManager
  */
@@ -67,12 +76,10 @@ class MockECSWorld implements IECSWorld {
     return result;
   });
 
-  public getComponent = vi.fn(
-    <T>(entity: number, ComponentClass: new (...args: unknown[]) => T): T | undefined => {
-      const components = this.entities.get(entity);
-      return components?.get(ComponentClass) as T | undefined;
-    },
-  );
+  public getComponent<T>(entity: number, ComponentClass: new (...args: any[]) => T): T | undefined {
+    const components = this.entities.get(entity);
+    return components?.get(ComponentClass) as T | undefined;
+  }
 
   public removeEntity = vi.fn((entity: number) => {
     this.entities.delete(entity);
@@ -96,7 +103,7 @@ describe('StateCoordinator', () => {
     ecs = new MockECSWorld();
 
     // 创建 StateCoordinator
-    coordinator = new StateCoordinator(configStore, runtime, octreeManager, resourceManager, ecs);
+    coordinator = new StateCoordinator(configStore, runtime, octreeManager as any, resourceManager as any, ecs as IECSWorld);
   });
 
   describe('初始化', () => {

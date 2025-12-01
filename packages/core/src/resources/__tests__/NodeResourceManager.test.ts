@@ -224,7 +224,7 @@ describe('NodeResourceManager', () => {
 
       // r0 should be evicted first
       if (evictionCallback.mock.calls.length > 0) {
-        expect(evictionCallback.mock.calls[0][0]).toBe('cloud:r0');
+        expect(evictionCallback.mock.calls[0]?.[0]).toBe('cloud:r0');
       }
     });
 
@@ -373,7 +373,7 @@ describe('NodeResourceManager', () => {
       for (let i = 0; i < 5; i++) {
         nodes.push(createMockNode(`r${i}`, 10));
         geometries.push(createMockGeometry(10));
-        manager.register(`cloud:r${i}`, nodes[i], geometries[i]);
+        manager.register(`cloud:r${i}`, nodes[i]!, geometries[i]!);
       }
 
       // Order: r4 (MRU) -> r3 -> r2 -> r1 -> r0 (LRU)

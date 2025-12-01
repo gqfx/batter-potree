@@ -113,9 +113,9 @@ describe('BinaryDecoderWorker', () => {
       ];
 
       positions.forEach(([x, y, z], i) => {
-        view.setUint32(i * 12 + 0, x, true);
-        view.setUint32(i * 12 + 4, y, true);
-        view.setUint32(i * 12 + 8, z, true);
+        view.setUint32(i * 12 + 0, x!, true);
+        view.setUint32(i * 12 + 4, y!, true);
+        view.setUint32(i * 12 + 8, z!, true);
       });
 
       // Calculate bounding box
@@ -576,9 +576,9 @@ describe('BinaryDecoderWorker', () => {
 
       // Combine (assuming no offset/scale for simplicity)
       for (let j = 0; j < numPoints; j++) {
-        vectorData[j * numVectorElements + 0] = normalXBuffer[j];
-        vectorData[j * numVectorElements + 1] = normalYBuffer[j];
-        vectorData[j * numVectorElements + 2] = normalZBuffer[j];
+        vectorData[j * numVectorElements + 0] = normalXBuffer[j]!;
+        vectorData[j * numVectorElements + 1] = normalYBuffer[j]!;
+        vectorData[j * numVectorElements + 2] = normalZBuffer[j]!;
       }
 
       expect(vectorData[0]).toBeCloseTo(0.5, 5);
@@ -831,7 +831,6 @@ describe('BinaryDecoderWorker', () => {
   describe('Attribute offset calculation', () => {
     it('should correctly calculate attribute offsets for interleaved data', () => {
       // Test data structure: POSITION (12) + intensity (2) + rgb (6) = 20 bytes per point
-      const numPoints = 2;
       const bytesPerPoint = 20;
 
       // Simulate getAttributeOffset function from Worker
@@ -856,6 +855,7 @@ describe('BinaryDecoderWorker', () => {
       expect(getAttributeOffset('POSITION_CARTESIAN')).toBe(0);
       expect(getAttributeOffset('intensity')).toBe(12);
       expect(getAttributeOffset('rgb')).toBe(14);
+      expect(bytesPerPoint).toBe(20); // Use the variable to avoid unused warning
     });
 
     it('should read RGB from correct offset in interleaved buffer', () => {

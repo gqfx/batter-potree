@@ -61,9 +61,13 @@ describe('PotreeLoader', () => {
         uy: 4,
         uz: 4,
       },
-      pointAttributes: ['POSITION_CARTESIAN', 'RGBA', 'INTENSITY'],
+      pointAttributes: [
+        { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        { name: 'RGBA', size: 4, elements: 4, elementSize: 1, type: 'uint8' },
+        { name: 'INTENSITY', size: 2, elements: 1, elementSize: 2, type: 'uint16' },
+      ],
       spacing: 0.1,
-      scale: 0.001,
+      scale: [0.001, 0.001, 0.001],
       points: 1000000,
       projection: 'EPSG:4326',
     };
@@ -226,9 +230,11 @@ describe('PotreeLoader', () => {
           uy: 20,
           uz: 30,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -267,9 +273,11 @@ describe('PotreeLoader', () => {
           uy: 5,
           uz: 5,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -300,9 +308,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -331,9 +341,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -359,9 +371,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -387,9 +401,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -415,9 +431,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
         projection: 'EPSG:3857',
       };
@@ -444,9 +462,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -476,9 +496,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.25,
-        scale: 0.0005,
+        scale: [0.0005, 0.0005, 0.0005],
         points: 5000,
       };
 
@@ -505,9 +527,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -519,7 +543,7 @@ describe('PotreeLoader', () => {
       const octree = await loader.load('https://example.com/pointcloud/');
 
       expect(octree.pointAttributes.size).toBe(1);
-      expect(octree.pointAttributes.attributes[0].name).toBe('POSITION_CARTESIAN');
+      expect(octree.pointAttributes.attributes[0]?.name).toBe('POSITION_CARTESIAN');
     });
   });
 
@@ -536,9 +560,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -564,9 +590,11 @@ describe('PotreeLoader', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          { name: 'POSITION_CARTESIAN', size: 12, elements: 3, elementSize: 4, type: 'int32' },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 
@@ -594,7 +622,7 @@ describe('PotreeLoader', () => {
         },
         pointAttributes: [],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 5000,
       };
 

@@ -290,8 +290,9 @@ describe('MessageQueue', () => {
       queueNoTimestamp.push({ type: 'TEST', value: 42 });
       queueNoTimestamp.process();
 
-      const callArg = handler.mock.calls[0][0];
-      expect(callArg.timestamp).toBeUndefined();
+      const callArg = handler.mock.calls[0]?.[0];
+      expect(callArg).toBeDefined();
+      expect(callArg!.timestamp).toBeUndefined();
 
       queueNoTimestamp.dispose();
     });
