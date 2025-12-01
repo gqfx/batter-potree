@@ -32,7 +32,7 @@ function createTestSystem(
       }
     }),
     dispose: options.disposeCallback ? vi.fn(options.disposeCallback) : undefined,
-  };
+  } as ISystem;
 }
 
 describe('SystemScheduler', () => {

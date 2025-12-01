@@ -141,8 +141,10 @@ describe('TraversalSystem', () => {
 
       if (result.visibleNodes.length > 1) {
         for (let i = 1; i < result.visibleNodes.length; i++) {
-          expect(result.visibleNodes[i - 1].priority).toBeGreaterThanOrEqual(
-            result.visibleNodes[i].priority,
+          const prevNode = result.visibleNodes[i - 1];
+          const currNode = result.visibleNodes[i];
+          expect(prevNode?.priority).toBeGreaterThanOrEqual(
+            currNode?.priority ?? 0,
           );
         }
       }
@@ -195,7 +197,9 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(5, 5, 5),
         1000,
       );
-      mockOctree.root?.children[0] = child;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = child;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -222,8 +226,10 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(5, 5, -8),
         1000,
       );
-      mockOctree.root?.children[0] = nearChild;
-      mockOctree.root?.children[1] = farChild;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = nearChild;
+        mockOctree.root.children[1] = farChild;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -292,9 +298,11 @@ describe('TraversalSystem', () => {
         1500,
       );
 
-      mockOctree.root?.children[0] = child1;
-      mockOctree.root?.children[1] = child2;
-      mockOctree.root?.children[2] = child3;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = child1;
+        mockOctree.root.children[1] = child2;
+        mockOctree.root.children[2] = child3;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -324,8 +332,10 @@ describe('TraversalSystem', () => {
         3000,
       );
 
-      mockOctree.root?.children[0] = child1;
-      mockOctree.root?.children[1] = child2;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = child1;
+        mockOctree.root.children[1] = child2;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -356,8 +366,10 @@ describe('TraversalSystem', () => {
         1000,
       );
 
-      mockOctree.root?.children[0] = nearChild;
-      mockOctree.root?.children[1] = farChild;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = nearChild;
+        mockOctree.root.children[1] = farChild;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -383,7 +395,9 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(5, 5, 5),
         1000,
       );
-      mockOctree.root?.children[0] = child;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = child;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -412,7 +426,9 @@ describe('TraversalSystem', () => {
         new THREE.Vector3(1, 1, 1),
         500,
       );
-      mockOctree.root?.children[0] = smallChild;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = smallChild;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);
@@ -438,8 +454,10 @@ describe('TraversalSystem', () => {
         1000,
       );
 
-      mockOctree.root?.children[0] = child1;
-      mockOctree.root?.children[1] = child2;
+      if (mockOctree.root?.children) {
+        mockOctree.root.children[0] = child1;
+        mockOctree.root.children[1] = child2;
+      }
 
       system.addPointCloud('test', mockOctree);
       system.update(0.016);

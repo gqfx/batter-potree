@@ -20,9 +20,17 @@ describe('parseAttributes', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          {
+            name: 'POSITION_CARTESIAN',
+            size: 12,
+            elements: 3,
+            elementSize: 4,
+            type: 'float',
+          },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -30,7 +38,7 @@ describe('parseAttributes', () => {
 
       expect(attributes.size).toBe(1);
       expect(attributes.byteSize).toBe(12); // 3 floats
-      expect(attributes.attributes[0].name).toBe('POSITION_CARTESIAN');
+      expect(attributes.attributes[0]!.name).toBe('POSITION_CARTESIAN');
     });
 
     it('should parse multiple attributes', () => {
@@ -45,18 +53,40 @@ describe('parseAttributes', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN', 'COLOR_PACKED', 'INTENSITY'],
+        pointAttributes: [
+          {
+            name: 'POSITION_CARTESIAN',
+            size: 12,
+            elements: 3,
+            elementSize: 4,
+            type: 'float',
+          },
+          {
+            name: 'COLOR_PACKED',
+            size: 4,
+            elements: 4,
+            elementSize: 1,
+            type: 'uint8',
+          },
+          {
+            name: 'INTENSITY',
+            size: 2,
+            elements: 1,
+            elementSize: 2,
+            type: 'uint16',
+          },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
       const attributes = parseAttributes(metadata);
 
       expect(attributes.size).toBe(3);
-      expect(attributes.attributes[0].name).toBe('POSITION_CARTESIAN');
-      expect(attributes.attributes[1].name).toBe('rgba');
-      expect(attributes.attributes[2].name).toBe('intensity');
+      expect(attributes.attributes[0]!.name).toBe('POSITION_CARTESIAN');
+      expect(attributes.attributes[1]!.name).toBe('rgba');
+      expect(attributes.attributes[2]!.name).toBe('intensity');
     });
 
     it('should handle old attribute names with replacements', () => {
@@ -71,18 +101,33 @@ describe('parseAttributes', () => {
           uy: 10,
           uz: 10,
         },
-        // Use the actual static property names that exist in PointAttribute
-        pointAttributes: ['POSITION_CARTESIAN', 'RGBA_PACKED'],
+        // Use the actual replacement names in parseAttributes
+        pointAttributes: [
+          {
+            name: 'POSITION_CARTESIAN',
+            size: 12,
+            elements: 3,
+            elementSize: 4,
+            type: 'float',
+          },
+          {
+            name: 'COLOR_PACKED',
+            size: 4,
+            elements: 4,
+            elementSize: 1,
+            type: 'uint8',
+          },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
       const attributes = parseAttributes(metadata);
 
       expect(attributes.size).toBe(2);
-      expect(attributes.attributes[0].name).toBe('POSITION_CARTESIAN');
-      expect(attributes.attributes[1].name).toBe('rgba');
+      expect(attributes.attributes[0]!.name).toBe('POSITION_CARTESIAN');
+      expect(attributes.attributes[1]!.name).toBe('rgba');
     });
 
     it('should skip unknown attributes in 1.x format', () => {
@@ -97,18 +142,40 @@ describe('parseAttributes', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN', 'UNKNOWN_ATTRIBUTE', 'INTENSITY'],
+        pointAttributes: [
+          {
+            name: 'POSITION_CARTESIAN',
+            size: 12,
+            elements: 3,
+            elementSize: 4,
+            type: 'float',
+          },
+          {
+            name: 'unknown_attribute',
+            size: 4,
+            elements: 1,
+            elementSize: 4,
+            type: 'invalid_type', // Invalid type will be skipped
+          },
+          {
+            name: 'INTENSITY',
+            size: 2,
+            elements: 1,
+            elementSize: 2,
+            type: 'uint16',
+          },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
       const attributes = parseAttributes(metadata);
 
-      // Should skip UNKNOWN_ATTRIBUTE
+      // Should skip the attribute with invalid type
       expect(attributes.size).toBe(2);
-      expect(attributes.attributes[0].name).toBe('POSITION_CARTESIAN');
-      expect(attributes.attributes[1].name).toBe('intensity');
+      expect(attributes.attributes[0]!.name).toBe('POSITION_CARTESIAN');
+      expect(attributes.attributes[1]!.name).toBe('intensity');
     });
   });
 
@@ -146,16 +213,16 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
       const attributes = parseAttributes(metadata);
 
       expect(attributes.size).toBe(2);
-      expect(attributes.attributes[0].name).toBe('POSITION_CARTESIAN');
-      expect(attributes.attributes[1].name).toBe('rgba');
-      expect(attributes.attributes[1].numElements).toBe(4);
+      expect(attributes.attributes[0]!.name).toBe('POSITION_CARTESIAN');
+      expect(attributes.attributes[1]!.name).toBe('rgba');
+      expect(attributes.attributes[1]!.numElements).toBe(4);
     });
 
     it('should handle all data types correctly', () => {
@@ -185,23 +252,23 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
       const attributes = parseAttributes(metadata);
 
       expect(attributes.size).toBe(10);
-      expect(attributes.attributes[0].type.name).toBe('int8');
-      expect(attributes.attributes[1].type.name).toBe('uint8');
-      expect(attributes.attributes[2].type.name).toBe('int16');
-      expect(attributes.attributes[3].type.name).toBe('uint16');
-      expect(attributes.attributes[4].type.name).toBe('int32');
-      expect(attributes.attributes[5].type.name).toBe('uint32');
-      expect(attributes.attributes[6].type.name).toBe('int64');
-      expect(attributes.attributes[7].type.name).toBe('uint64');
-      expect(attributes.attributes[8].type.name).toBe('float');
-      expect(attributes.attributes[9].type.name).toBe('double');
+      expect(attributes.attributes[0]!.type.name).toBe('int8');
+      expect(attributes.attributes[1]!.type.name).toBe('uint8');
+      expect(attributes.attributes[2]!.type.name).toBe('int16');
+      expect(attributes.attributes[3]!.type.name).toBe('uint16');
+      expect(attributes.attributes[4]!.type.name).toBe('int32');
+      expect(attributes.attributes[5]!.type.name).toBe('uint32');
+      expect(attributes.attributes[6]!.type.name).toBe('int64');
+      expect(attributes.attributes[7]!.type.name).toBe('uint64');
+      expect(attributes.attributes[8]!.type.name).toBe('float');
+      expect(attributes.attributes[9]!.type.name).toBe('double');
     });
 
     it('should skip unknown data types with warning', () => {
@@ -244,7 +311,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -289,14 +356,14 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
       const attributes = parseAttributes(metadata);
 
-      expect(attributes.attributes[0].description).toBe('XYZ Position');
-      expect(attributes.attributes[1].description).toBe('Laser intensity');
+      expect(attributes.attributes[0]!.description).toBe('XYZ Position');
+      expect(attributes.attributes[1]!.description).toBe('Laser intensity');
     });
   });
 
@@ -346,7 +413,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -354,8 +421,9 @@ describe('parseAttributes', () => {
 
       expect(attributes.size).toBe(4);
       expect(attributes.vectors.length).toBe(1);
-      expect(attributes.vectors[0].name).toBe('NORMAL');
-      expect(attributes.vectors[0].attributes).toEqual(['NormalX', 'NormalY', 'NormalZ']);
+      const vector = attributes.vectors[0] as { name: string; attributes: string[] };
+      expect(vector.name).toBe('NORMAL');
+      expect(vector.attributes).toEqual(['NormalX', 'NormalY', 'NormalZ']);
     });
 
     it('should not add NORMAL vector if only partial normal attributes exist', () => {
@@ -396,7 +464,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -436,7 +504,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -461,7 +529,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: [],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -485,7 +553,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: [],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -507,9 +575,17 @@ describe('parseAttributes', () => {
           uy: 10,
           uz: 10,
         },
-        pointAttributes: ['POSITION_CARTESIAN'],
+        pointAttributes: [
+          {
+            name: 'POSITION_CARTESIAN',
+            size: 12,
+            elements: 3,
+            elementSize: 4,
+            type: 'float',
+          },
+        ],
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 
@@ -542,7 +618,7 @@ describe('parseAttributes', () => {
         },
         pointAttributes: attributeMetadata,
         spacing: 0.5,
-        scale: 0.001,
+        scale: [0.001, 0.001, 0.001],
         points: 1000,
       };
 

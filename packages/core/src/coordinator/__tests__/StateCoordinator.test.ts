@@ -38,7 +38,7 @@ class MockResourceManager {
 /**
  * Mock ECS World
  */
-class MockECSWorld {
+class MockECSWorld implements IECSWorld {
   private entityCounter = 0;
   public entities = new Map<number, Map<Function, unknown>>();
 

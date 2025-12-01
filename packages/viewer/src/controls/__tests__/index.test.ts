@@ -25,6 +25,8 @@ describe('Package Exports', () => {
       start: undefined,
       change: undefined,
       end: undefined,
+      onSceneMoved: undefined,
+      clearEffect: undefined,
     };
     expect(_events).toBeDefined();
   });

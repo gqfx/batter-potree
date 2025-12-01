@@ -107,10 +107,14 @@ describe('HQ Splat Shader Integration', () => {
         opacity: 0.9,
       });
 
-      expect(material.uniforms.size.value).toBe(3.0);
-      expect(material.uniforms.minSize.value).toBe(1.0);
-      expect(material.uniforms.maxSize.value).toBe(10.0);
-      expect(material.uniforms.uOpacity.value).toBe(0.9);
+      expect(material.uniforms.size).toBeDefined();
+      expect(material.uniforms.minSize).toBeDefined();
+      expect(material.uniforms.maxSize).toBeDefined();
+      expect(material.uniforms.uOpacity).toBeDefined();
+      expect(material.uniforms.size!.value).toBe(3.0);
+      expect(material.uniforms.minSize!.value).toBe(1.0);
+      expect(material.uniforms.maxSize!.value).toBe(10.0);
+      expect(material.uniforms.uOpacity!.value).toBe(0.9);
     });
 
     it('should work with different size types', () => {
@@ -163,10 +167,14 @@ describe('HQ Splat Shader Integration', () => {
       const camera = new THREE.PerspectiveCamera(60, 1920 / 1080, 0.1, 1000);
       material.updateCamera(camera);
 
-      expect(material.uniforms.uUseOrthographicCamera.value).toBe(false);
-      expect(material.uniforms.fov.value).toBeCloseTo((60 * Math.PI) / 180, 5);
-      expect(material.uniforms.near.value).toBe(0.1);
-      expect(material.uniforms.far.value).toBe(1000);
+      expect(material.uniforms.uUseOrthographicCamera).toBeDefined();
+      expect(material.uniforms.fov).toBeDefined();
+      expect(material.uniforms.near).toBeDefined();
+      expect(material.uniforms.far).toBeDefined();
+      expect(material.uniforms.uUseOrthographicCamera!.value).toBe(false);
+      expect(material.uniforms.fov!.value).toBeCloseTo((60 * Math.PI) / 180, 5);
+      expect(material.uniforms.near!.value).toBe(0.1);
+      expect(material.uniforms.far!.value).toBe(1000);
     });
 
     it('should update camera uniforms for orthographic camera', () => {
@@ -177,9 +185,12 @@ describe('HQ Splat Shader Integration', () => {
       const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
       material.updateCamera(camera);
 
-      expect(material.uniforms.uUseOrthographicCamera.value).toBe(true);
-      expect(material.uniforms.uOrthoWidth.value).toBe(20);
-      expect(material.uniforms.uOrthoHeight.value).toBe(20);
+      expect(material.uniforms.uUseOrthographicCamera).toBeDefined();
+      expect(material.uniforms.uOrthoWidth).toBeDefined();
+      expect(material.uniforms.uOrthoHeight).toBeDefined();
+      expect(material.uniforms.uUseOrthographicCamera!.value).toBe(true);
+      expect(material.uniforms.uOrthoWidth!.value).toBe(20);
+      expect(material.uniforms.uOrthoHeight!.value).toBe(20);
     });
   });
 
@@ -191,8 +202,10 @@ describe('HQ Splat Shader Integration', () => {
 
       material.updateScreenSize(1920, 1080);
 
-      expect(material.uniforms.uScreenWidth.value).toBe(1920);
-      expect(material.uniforms.uScreenHeight.value).toBe(1080);
+      expect(material.uniforms.uScreenWidth).toBeDefined();
+      expect(material.uniforms.uScreenHeight).toBeDefined();
+      expect(material.uniforms.uScreenWidth!.value).toBe(1920);
+      expect(material.uniforms.uScreenHeight!.value).toBe(1080);
     });
 
     it('should handle different aspect ratios', () => {
@@ -202,18 +215,20 @@ describe('HQ Splat Shader Integration', () => {
 
       // 16:9
       material.updateScreenSize(1920, 1080);
-      expect(material.uniforms.uScreenWidth.value).toBe(1920);
-      expect(material.uniforms.uScreenHeight.value).toBe(1080);
+      expect(material.uniforms.uScreenWidth).toBeDefined();
+      expect(material.uniforms.uScreenHeight).toBeDefined();
+      expect(material.uniforms.uScreenWidth!.value).toBe(1920);
+      expect(material.uniforms.uScreenHeight!.value).toBe(1080);
 
       // 4:3
       material.updateScreenSize(1024, 768);
-      expect(material.uniforms.uScreenWidth.value).toBe(1024);
-      expect(material.uniforms.uScreenHeight.value).toBe(768);
+      expect(material.uniforms.uScreenWidth!.value).toBe(1024);
+      expect(material.uniforms.uScreenHeight!.value).toBe(768);
 
       // Ultra-wide 21:9
       material.updateScreenSize(2560, 1080);
-      expect(material.uniforms.uScreenWidth.value).toBe(2560);
-      expect(material.uniforms.uScreenHeight.value).toBe(1080);
+      expect(material.uniforms.uScreenWidth!.value).toBe(2560);
+      expect(material.uniforms.uScreenHeight!.value).toBe(1080);
     });
   });
 
@@ -291,7 +306,8 @@ describe('HQ Splat Shader Integration', () => {
         opacity: 0,
       });
 
-      expect(material.uniforms.uOpacity.value).toBe(0);
+      expect(material.uniforms.uOpacity).toBeDefined();
+      expect(material.uniforms.uOpacity!.value).toBe(0);
       expect(material.transparent).toBe(true);
     });
 
@@ -301,7 +317,8 @@ describe('HQ Splat Shader Integration', () => {
         opacity: 1,
       });
 
-      expect(material.uniforms.uOpacity.value).toBe(1);
+      expect(material.uniforms.uOpacity).toBeDefined();
+      expect(material.uniforms.uOpacity!.value).toBe(1);
       expect(material.transparent).toBe(false);
     });
   });

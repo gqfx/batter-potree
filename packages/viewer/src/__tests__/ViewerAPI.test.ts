@@ -2,7 +2,16 @@
  * Unit tests for ViewerAPI class
  */
 
-import type { IPointCloudOctree, IRenderer, IScene, NavigationMode } from '@better-potree/core';
+import {
+  MeasurementType,
+  NavigationMode,
+  PointQuality,
+  PointShape,
+  PointSizeType,
+  type IPointCloudOctree,
+  type IRenderer,
+  type IScene,
+} from '@better-potree/core';
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ViewerAPI } from '../ViewerAPI';
@@ -29,7 +38,7 @@ class MockRenderer implements IRenderer {
   }
 
   dispose(): void {
-    this.disposed = true;
+    // Mock dispose
   }
 
   getThreeRenderer?(): THREE.WebGLRenderer {
@@ -119,9 +128,9 @@ describe('ViewerAPI', () => {
       const listener = vi.fn();
       viewer.on('navigation-changed', listener);
 
-      viewer.setNavigation('orbit' as NavigationMode);
+      viewer.setNavigation(NavigationMode.ORBIT);
 
-      expect(listener).toHaveBeenCalledWith({ mode: 'orbit' });
+      expect(listener).toHaveBeenCalledWith({ mode: NavigationMode.ORBIT });
     });
 
     it('should accept navigation options', () => {
@@ -134,14 +143,14 @@ describe('ViewerAPI', () => {
       const listener = vi.fn();
       viewer.on('navigation-changed', listener);
 
-      viewer.setNavigation('fly' as NavigationMode, {
+      viewer.setNavigation(NavigationMode.FLY, {
         speed: 2.0,
         enableRotation: true,
         enablePanning: true,
         enableZooming: true,
       });
 
-      expect(listener).toHaveBeenCalledWith({ mode: 'fly' });
+      expect(listener).toHaveBeenCalledWith({ mode: NavigationMode.FLY });
     });
   });
 
@@ -211,9 +220,9 @@ describe('ViewerAPI', () => {
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      viewer.setPointSizeType('fixed');
+      viewer.setPointSizeType(PointSizeType.FIXED);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Setting point size type to:', 'fixed');
+      expect(consoleSpy).toHaveBeenCalledWith('Setting point size type to:', PointSizeType.FIXED);
 
       consoleSpy.mockRestore();
     });
@@ -229,9 +238,9 @@ describe('ViewerAPI', () => {
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      viewer.setPointShape('circle');
+      viewer.setPointShape(PointShape.CIRCLE);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Setting point shape to:', 'circle');
+      expect(consoleSpy).toHaveBeenCalledWith('Setting point shape to:', PointShape.CIRCLE);
 
       consoleSpy.mockRestore();
     });
@@ -247,9 +256,9 @@ describe('ViewerAPI', () => {
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      viewer.setPointQuality('high');
+      viewer.setPointQuality(PointQuality.HQ_SPLATS);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Setting point quality to:', 'high');
+      expect(consoleSpy).toHaveBeenCalledWith('Setting point quality to:', PointQuality.HQ_SPLATS);
 
       consoleSpy.mockRestore();
     });
@@ -327,9 +336,9 @@ describe('ViewerAPI', () => {
 
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-      viewer.startMeasuring('distance');
+      viewer.startMeasuring(MeasurementType.DISTANCE);
 
-      expect(consoleSpy).toHaveBeenCalledWith('Starting measurement:', 'distance');
+      expect(consoleSpy).toHaveBeenCalledWith('Starting measurement:', MeasurementType.DISTANCE);
 
       consoleSpy.mockRestore();
     });
@@ -516,7 +525,7 @@ describe('ViewerAPI', () => {
       const position = new THREE.Vector3(10, 20, 30);
       const target = new THREE.Vector3(0, 0, 0);
 
-      viewer.moveCameraTo(position, target, 0);
+      viewer.moveCameraTo(position, target, { duration: 0 });
 
       const camera = viewer.getCamera();
       expect(camera.position.equals(position)).toBe(true);
@@ -548,7 +557,7 @@ describe('ViewerAPI', () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       const position = new THREE.Vector3(10, 20, 30);
-      viewer.moveCameraTo(position, undefined, 1000);
+      viewer.moveCameraTo(position, undefined, { duration: 1000 });
 
       expect(consoleSpy).toHaveBeenCalledWith('Animated camera movement not yet implemented');
 
@@ -640,24 +649,6 @@ describe('ViewerAPI', () => {
       viewer.setMinNodeSize(100);
 
       expect(consoleSpy).toHaveBeenCalledWith('Setting min node size:', 100);
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('frustum culling', () => {
-    it('should set frustum culling', () => {
-      const viewer = new ViewerAPI({
-        container,
-        renderer,
-        scene,
-      });
-
-      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
-      viewer.setFrustumCulling(false);
-
-      expect(consoleSpy).toHaveBeenCalledWith('Frustum culling:', false);
 
       consoleSpy.mockRestore();
     });

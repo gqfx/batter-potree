@@ -44,6 +44,7 @@ const createMockRequest = (): IWorkerDecodeRequest => {
     spacing: 0.1,
     hasChildren: 0,
     name: 'r',
+    numPoints: 100, // 添加缺失的必需属性
   };
 };
 
@@ -116,10 +117,10 @@ describe('WorkerPool', () => {
     it('should attach onmessage and onerror handlers to workers', () => {
       workerPool = createWorkerPool(workerFactory, 2);
 
-      expect(mockWorkers[0].onmessage).toBeTruthy();
-      expect(mockWorkers[0].onerror).toBeTruthy();
-      expect(mockWorkers[1].onmessage).toBeTruthy();
-      expect(mockWorkers[1].onerror).toBeTruthy();
+      expect(mockWorkers[0]!.onmessage).toBeTruthy();
+      expect(mockWorkers[0]!.onerror).toBeTruthy();
+      expect(mockWorkers[1]!.onmessage).toBeTruthy();
+      expect(mockWorkers[1]!.onerror).toBeTruthy();
     });
   });
 
@@ -130,10 +131,10 @@ describe('WorkerPool', () => {
 
       const promise = workerPool.decode(request);
 
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledWith(request, [request.buffer]);
+      expect(mockWorkers[0]!.postMessage).toHaveBeenCalledWith(request, [request.buffer]);
 
       // Simulate response
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
 
       await promise;
     });
@@ -146,7 +147,7 @@ describe('WorkerPool', () => {
       const promise = workerPool.decode(request);
 
       // Simulate response
-      mockWorkers[0].simulateMessage(response);
+      mockWorkers[0]!.simulateMessage(response);
 
       const result = await promise;
       expect(result).toEqual(response);
@@ -162,20 +163,20 @@ describe('WorkerPool', () => {
       const promise2 = workerPool.decode(request2);
 
       // First request should be assigned immediately
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledTimes(1);
+      expect(mockWorkers[0]!.postMessage).toHaveBeenCalledTimes(1);
       expect(workerPool.getBusyWorkerCount()).toBe(1);
       expect(workerPool.getQueuedTaskCount()).toBe(1);
 
       // Complete first task
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise1;
 
       // Second task should now be assigned
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledTimes(2);
+      expect(mockWorkers[0]!.postMessage).toHaveBeenCalledTimes(2);
       expect(workerPool.getQueuedTaskCount()).toBe(0);
 
       // Complete second task
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise2;
     });
 
@@ -197,7 +198,7 @@ describe('WorkerPool', () => {
 
       // Complete all tasks
       for (let i = 0; i < 4; i++) {
-        mockWorkers[i].simulateMessage(createMockResponse());
+        mockWorkers[i]!.simulateMessage(createMockResponse());
       }
 
       await Promise.all(promises);
@@ -213,7 +214,7 @@ describe('WorkerPool', () => {
       const promise = workerPool.decode(request);
 
       // Simulate error response
-      mockWorkers[0].simulateMessage({ error: 'Decode failed' } as any);
+      mockWorkers[0]!.simulateMessage({ error: 'Decode failed' } as any);
 
       await expect(promise).rejects.toThrow('Decode failed');
     });
@@ -225,7 +226,7 @@ describe('WorkerPool', () => {
       const promise = workerPool.decode(request);
 
       // Simulate error event
-      mockWorkers[0].simulateError('Worker crashed');
+      mockWorkers[0]!.simulateError('Worker crashed');
 
       await expect(promise).rejects.toThrow('Worker error: Worker crashed');
     });
@@ -240,15 +241,15 @@ describe('WorkerPool', () => {
       const promise2 = workerPool.decode(request2);
 
       // First task fails
-      mockWorkers[0].simulateError('Worker error');
+      mockWorkers[0]!.simulateError('Worker error');
       await expect(promise1).rejects.toThrow();
 
       // Second task should be processed
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledTimes(2);
+      expect(mockWorkers[0]!.postMessage).toHaveBeenCalledTimes(2);
       expect(workerPool.getQueuedTaskCount()).toBe(0);
 
       // Complete second task
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise2;
     });
 
@@ -267,9 +268,9 @@ describe('WorkerPool', () => {
 
       const promise = workerPool.decode(request);
 
-      expect(mockWorkers[0].postMessage).toHaveBeenCalledWith(request, [request.buffer]);
+      expect(mockWorkers[0]!.postMessage).toHaveBeenCalledWith(request, [request.buffer]);
 
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise;
     });
   });
@@ -293,12 +294,12 @@ describe('WorkerPool', () => {
 
       expect(workerPool.getBusyWorkerCount()).toBe(2);
 
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise1;
 
       expect(workerPool.getBusyWorkerCount()).toBe(1);
 
-      mockWorkers[1].simulateMessage(createMockResponse());
+      mockWorkers[1]!.simulateMessage(createMockResponse());
       await promise2;
 
       expect(workerPool.getBusyWorkerCount()).toBe(0);
@@ -317,15 +318,15 @@ describe('WorkerPool', () => {
       expect(workerPool.getQueuedTaskCount()).toBe(1);
 
       // Complete first task
-      mockWorkers[0].simulateMessage(createMockResponse());
-      await promises[0];
+      mockWorkers[0]!.simulateMessage(createMockResponse());
+      await promises[0]!;
 
       // Queue should be empty now
       expect(workerPool.getQueuedTaskCount()).toBe(0);
 
       // Complete remaining
-      mockWorkers[1].simulateMessage(createMockResponse());
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[1]!.simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await Promise.all(promises);
     });
 
@@ -339,7 +340,7 @@ describe('WorkerPool', () => {
 
       expect(workerPool.isBusy()).toBe(true);
 
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise;
 
       expect(workerPool.isBusy()).toBe(false);
@@ -363,9 +364,9 @@ describe('WorkerPool', () => {
       workerPool = createWorkerPool(workerFactory, 3);
       workerPool.dispose();
 
-      expect(mockWorkers[0].terminate).toHaveBeenCalled();
-      expect(mockWorkers[1].terminate).toHaveBeenCalled();
-      expect(mockWorkers[2].terminate).toHaveBeenCalled();
+      expect(mockWorkers[0]!.terminate).toHaveBeenCalled();
+      expect(mockWorkers[1]!.terminate).toHaveBeenCalled();
+      expect(mockWorkers[2]!.terminate).toHaveBeenCalled();
     });
 
     it('should reject all queued tasks', async () => {
@@ -389,8 +390,8 @@ describe('WorkerPool', () => {
       workerPool.dispose();
       workerPool.dispose();
 
-      expect(mockWorkers[0].terminate).toHaveBeenCalledTimes(1);
-      expect(mockWorkers[1].terminate).toHaveBeenCalledTimes(1);
+      expect(mockWorkers[0]!.terminate).toHaveBeenCalledTimes(1);
+      expect(mockWorkers[1]!.terminate).toHaveBeenCalledTimes(1);
     });
 
     it('should reject new tasks after disposal', async () => {
@@ -418,7 +419,7 @@ describe('WorkerPool', () => {
       await expect(promise2).rejects.toThrow();
 
       // Even if we simulate a message, it shouldn't process
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
     });
   });
 
@@ -429,7 +430,7 @@ describe('WorkerPool', () => {
       workerPool = createWorkerPool(workerFactory, 1);
 
       // Simulate a message without a task
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
 
       expect(consoleWarnSpy).toHaveBeenCalledWith(
         'Received message from worker without current task',
@@ -444,7 +445,7 @@ describe('WorkerPool', () => {
       workerPool = createWorkerPool(workerFactory, 1);
 
       // Simulate an error without a task
-      mockWorkers[0].simulateError('Random error');
+      mockWorkers[0]!.simulateError('Random error');
 
       expect(consoleErrorSpy).toHaveBeenCalled();
 
@@ -463,15 +464,15 @@ describe('WorkerPool', () => {
       const promise3 = workerPool.decode(request3);
 
       // First worker errors
-      mockWorkers[0].simulateError('Worker error');
+      mockWorkers[0]!.simulateError('Worker error');
       await expect(promise1).rejects.toThrow();
 
       // Other workers should continue
-      mockWorkers[1].simulateMessage(createMockResponse());
+      mockWorkers[1]!.simulateMessage(createMockResponse());
       await promise2;
 
       // First worker should pick up queued task
-      mockWorkers[0].simulateMessage(createMockResponse());
+      mockWorkers[0]!.simulateMessage(createMockResponse());
       await promise3;
     });
   });

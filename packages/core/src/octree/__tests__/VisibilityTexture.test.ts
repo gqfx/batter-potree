@@ -31,9 +31,11 @@ describe('VisibilityTexture', () => {
       expect(result.offsets.get(root)).toBe(0);
 
       // Root node has no children yet, so child mask should be 0
-      expect(result.data[0]).toBe(0);
+      expect(result.data[0]).toBeDefined();
+      expect(result.data[0]!).toBe(0);
       // LOD offset should be default value
-      expect(result.data[3]).toBe(100);
+      expect(result.data[3]).toBeDefined();
+      expect(result.data[3]!).toBe(100);
     });
 
     it('should encode parent-child relationships', () => {
@@ -65,12 +67,15 @@ describe('VisibilityTexture', () => {
       // Root node should have child mask for children 0, 1, 7
       // Binary: 10000011 = 131
       const childMask = result.data[rootOffset * 4 + 0];
-      expect(childMask).toBe((1 << 0) | (1 << 1) | (1 << 7));
+      expect(childMask).toBeDefined();
+      expect(childMask!).toBe((1 << 0) | (1 << 1) | (1 << 7));
 
       // Offset to first child should be 1
       const offsetHigh = result.data[rootOffset * 4 + 1];
       const offsetLow = result.data[rootOffset * 4 + 2];
-      const offsetToChild = (offsetHigh << 8) | offsetLow;
+      expect(offsetHigh).toBeDefined();
+      expect(offsetLow).toBeDefined();
+      const offsetToChild = (offsetHigh! << 8) | offsetLow!;
       expect(offsetToChild).toBe(1);
     });
 
@@ -128,9 +133,15 @@ describe('VisibilityTexture', () => {
       expect(child000Offset).toBe(3);
 
       // Each parent should have child mask bit 0 set
-      expect(result.data[rootOffset * 4 + 0] & (1 << 0)).toBeTruthy();
-      expect(result.data[child0Offset * 4 + 0] & (1 << 0)).toBeTruthy();
-      expect(result.data[child00Offset * 4 + 0] & (1 << 0)).toBeTruthy();
+      const rootData = result.data[rootOffset * 4 + 0];
+      const child0Data = result.data[child0Offset * 4 + 0];
+      const child00Data = result.data[child00Offset * 4 + 0];
+      expect(rootData).toBeDefined();
+      expect(child0Data).toBeDefined();
+      expect(child00Data).toBeDefined();
+      expect(rootData! & (1 << 0)).toBeTruthy();
+      expect(child0Data! & (1 << 0)).toBeTruthy();
+      expect(child00Data! & (1 << 0)).toBeTruthy();
     });
   });
 

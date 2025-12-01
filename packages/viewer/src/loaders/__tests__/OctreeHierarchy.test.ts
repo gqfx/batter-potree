@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 describe('Octree Hierarchy', () => {
-  let mockOctree: IPointCloudOctree;
+  let _mockOctree: IPointCloudOctree;
   let rootNode: IPointCloudOctreeNode;
 
   beforeEach(() => {
@@ -25,7 +25,7 @@ describe('Octree Hierarchy', () => {
       loading: false,
     };
 
-    mockOctree = {
+    _mockOctree = {
       url: 'test://pointcloud',
       spacing: 0.1,
       boundingBox: rootNode.boundingBox.clone(),
@@ -99,20 +99,24 @@ describe('Octree Hierarchy', () => {
       }
 
       // Verify child 0 (000 binary) is in the negative octant
-      expect(childBoxes[0].min.x).toBe(0);
-      expect(childBoxes[0].min.y).toBe(0);
-      expect(childBoxes[0].min.z).toBe(0);
-      expect(childBoxes[0].max.x).toBe(5);
-      expect(childBoxes[0].max.y).toBe(5);
-      expect(childBoxes[0].max.z).toBe(5);
+      const child0 = childBoxes[0];
+      expect(child0).toBeDefined();
+      expect(child0!.min.x).toBe(0);
+      expect(child0!.min.y).toBe(0);
+      expect(child0!.min.z).toBe(0);
+      expect(child0!.max.x).toBe(5);
+      expect(child0!.max.y).toBe(5);
+      expect(child0!.max.z).toBe(5);
 
       // Verify child 7 (111 binary) is in the positive octant
-      expect(childBoxes[7].min.x).toBe(5);
-      expect(childBoxes[7].min.y).toBe(5);
-      expect(childBoxes[7].min.z).toBe(5);
-      expect(childBoxes[7].max.x).toBe(10);
-      expect(childBoxes[7].max.y).toBe(10);
-      expect(childBoxes[7].max.z).toBe(10);
+      const child7 = childBoxes[7];
+      expect(child7).toBeDefined();
+      expect(child7!.min.x).toBe(5);
+      expect(child7!.min.y).toBe(5);
+      expect(child7!.min.z).toBe(5);
+      expect(child7!.max.x).toBe(10);
+      expect(child7!.max.y).toBe(10);
+      expect(child7!.max.z).toBe(10);
     });
   });
 
@@ -143,8 +147,13 @@ describe('Octree Hierarchy', () => {
       child0.children[0] = grandchild00;
 
       // Verify hierarchy
-      expect(rootNode.children[0]).toBe(child0);
-      expect(rootNode.children[0]?.children[0]).toBe(grandchild00);
+      const rootChild0 = rootNode.children[0];
+      expect(rootChild0).toBeDefined();
+      expect(rootChild0).toBe(child0);
+
+      const grandchild = rootChild0!.children[0];
+      expect(grandchild).toBeDefined();
+      expect(grandchild).toBe(grandchild00);
       expect(grandchild00.level).toBe(2);
       expect(grandchild00.name).toBe('r00');
     });
@@ -393,7 +402,9 @@ describe('Octree Hierarchy', () => {
       const nodeNames = ['r', 'r0', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7'];
 
       for (let i = 0; i < 8; i++) {
-        expect(nodeNames[i + 1]).toBe(`r${i}`);
+        const name = nodeNames[i + 1];
+        expect(name).toBeDefined();
+        expect(name).toBe(`r${i}`);
       }
     });
 
@@ -407,8 +418,10 @@ describe('Octree Hierarchy', () => {
       ];
 
       for (let i = 0; i < names.length; i++) {
-        expect(names[i].startsWith('r')).toBe(true);
-        expect(names[i].length).toBe(i + 1);
+        const name = names[i];
+        expect(name).toBeDefined();
+        expect(name!.startsWith('r')).toBe(true);
+        expect(name!.length).toBe(i + 1);
       }
     });
 

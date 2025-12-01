@@ -155,7 +155,7 @@ describe('EarthControls', () => {
       expect(controls.zoomSpeed).toBe(1);
       expect(controls.fadeFactor).toBe(20);
       expect(controls.enabled).toBe(true);
-      expect(controls.pivot).toBeNull();
+      expect((controls as any).pivot).toBeNull();
     });
 
     it('should attach event listeners to domElement', () => {
@@ -172,10 +172,10 @@ describe('EarthControls', () => {
       const pivot = new THREE.Vector3(5, 5, 5);
       controls.setPivot(pivot);
 
-      expect(controls.pivot).toBeInstanceOf(THREE.Vector3);
-      expect(controls.pivot?.x).toBe(5);
-      expect(controls.pivot?.y).toBe(5);
-      expect(controls.pivot?.z).toBe(5);
+      expect((controls as any).pivot).toBeInstanceOf(THREE.Vector3);
+      expect((controls as any).pivot?.x).toBe(5);
+      expect((controls as any).pivot?.y).toBe(5);
+      expect((controls as any).pivot?.z).toBe(5);
     });
 
     it('should clone the pivot point', () => {
@@ -184,9 +184,9 @@ describe('EarthControls', () => {
 
       pivot.set(9, 9, 9);
 
-      expect(controls.pivot?.x).toBe(1);
-      expect(controls.pivot?.y).toBe(2);
-      expect(controls.pivot?.z).toBe(3);
+      expect((controls as any).pivot?.x).toBe(1);
+      expect((controls as any).pivot?.y).toBe(2);
+      expect((controls as any).pivot?.z).toBe(3);
     });
   });
 
@@ -706,7 +706,7 @@ describe('EarthControls', () => {
     it('should apply zoom when wheelDelta is set', () => {
       controls.setPivot(new THREE.Vector3(0, 0, 0));
 
-      const initialDistance = camera.position.distanceTo(controls.pivot!);
+      const initialDistance = camera.position.distanceTo((controls as any).pivot!);
 
       // Simulate wheel event (zoom in)
       const wheelEvent = new WheelEvent('wheel', {
@@ -717,7 +717,7 @@ describe('EarthControls', () => {
       // Update should apply zoom
       controls.update(0.016);
 
-      const newDistance = camera.position.distanceTo(controls.pivot!);
+      const newDistance = camera.position.distanceTo((controls as any).pivot!);
       expect(newDistance).toBeLessThan(initialDistance);
     });
 
@@ -889,7 +889,7 @@ describe('EarthControls', () => {
     it('should maintain distance to pivot during rotation', () => {
       controls.setPivot(new THREE.Vector3(0, 0, 0));
 
-      const initialDistance = camera.position.distanceTo(controls.pivot!);
+      const initialDistance = camera.position.distanceTo((controls as any).pivot!);
 
       // Perform rotation
       const downEvent = new MouseEvent('mousedown', {
@@ -905,7 +905,7 @@ describe('EarthControls', () => {
       });
       mockDocument.dispatchEvent(moveEvent);
 
-      const newDistance = camera.position.distanceTo(controls.pivot!);
+      const newDistance = camera.position.distanceTo((controls as any).pivot!);
 
       // Distance should be approximately the same (within floating point tolerance)
       expect(Math.abs(newDistance - initialDistance)).toBeLessThan(0.0001);
@@ -930,7 +930,7 @@ describe('EarthControls', () => {
 
       // Camera should be looking at pivot
       const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-      const toPivot = new THREE.Vector3().subVectors(controls.pivot!, camera.position).normalize();
+      const toPivot = new THREE.Vector3().subVectors((controls as any).pivot!, camera.position).normalize();
 
       // Dot product should be close to 1 (vectors aligned)
       const dot = forward.dot(toPivot);
