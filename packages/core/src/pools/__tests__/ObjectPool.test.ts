@@ -201,7 +201,7 @@ describe('ObjectPool', () => {
       const pool = new ObjectPool(() => ({}));
 
       const obj1 = pool.acquire();
-      const _obj2 = pool.acquire();
+      pool.acquire(); // Second object in use
       pool.release(obj1);
 
       const stats = pool.getStats();

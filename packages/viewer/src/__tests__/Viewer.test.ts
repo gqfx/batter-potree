@@ -254,7 +254,7 @@ describe('Viewer', () => {
     });
 
     it('should append canvas to container', () => {
-      const _viewer = new Viewer({
+      new Viewer({
         container,
         renderer,
         scene,
@@ -264,7 +264,7 @@ describe('Viewer', () => {
     });
 
     it('should set renderer size to container size', () => {
-      const _viewer = new Viewer({
+      new Viewer({
         container,
         renderer,
         scene,
@@ -523,7 +523,6 @@ describe('Viewer', () => {
 
       // Also add to traversal system to match real behavior
       const traversalSystem = viewer.getTraversalSystem();
-      const _addSpy = vi.spyOn(traversalSystem, 'addPointCloud');
       const removeSpy = vi.spyOn(traversalSystem, 'removePointCloud');
 
       viewer.remove('test');
@@ -1124,7 +1123,7 @@ describe('Viewer', () => {
     });
 
     it('should update renderer size on resize', () => {
-      const _viewer = new Viewer({
+      new Viewer({
         container,
         renderer,
         scene,

@@ -287,7 +287,6 @@ describe('PointCloudMaterial', () => {
         colorMode: PointCloudColorMode.RGB,
       });
 
-      const _definesBefore = material.defines;
       material.colorMode = PointCloudColorMode.RGB;
 
       expect(material.colorMode).toBe(PointCloudColorMode.RGB);

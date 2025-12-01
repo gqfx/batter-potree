@@ -6,17 +6,6 @@
 import { PointAttributes } from '@better-potree/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the worker self context
-const _mockSelf = {
-  onmessage: null as ((event: MessageEvent) => void) | null,
-  postMessage: vi.fn(),
-  performance: {
-    mark: vi.fn(),
-    clearMarks: vi.fn(),
-    clearMeasures: vi.fn(),
-  },
-};
-
 // We'll test the decoder logic by extracting the core decoding function
 // For this, we'll create helper functions that simulate the worker's behavior
 
@@ -360,7 +349,6 @@ describe('BinaryDecoderWorker', () => {
   describe('Normal decoding', () => {
     it('should decode NORMAL_SPHEREMAPPED normals', () => {
       // Test sphere mapping decoding algorithm
-      const _numPoints = 1;
       const bx = 128; // Middle value
       const by = 128;
 
@@ -629,7 +617,6 @@ describe('BinaryDecoderWorker', () => {
     });
 
     it('should handle zero values', () => {
-      const _numPoints = 1;
       const buffer = new ArrayBuffer(4);
       const view = new DataView(buffer);
 
@@ -828,16 +815,16 @@ describe('BinaryDecoderWorker', () => {
       const bytesPerPoint = 37;
       const buffer = new ArrayBuffer(100); // Not divisible by 37
 
-      const numPoints = buffer.byteLength / bytesPerPoint;
-      expect(numPoints).not.toBe(Math.floor(numPoints)); // Should be fractional
+      const calculatedNumPoints = buffer.byteLength / bytesPerPoint;
+      expect(calculatedNumPoints).not.toBe(Math.floor(calculatedNumPoints)); // Should be fractional
     });
 
     it('should handle empty buffer', () => {
       const buffer = new ArrayBuffer(0);
       const bytesPerPoint = 37;
-      const numPoints = buffer.byteLength / bytesPerPoint;
+      const calculatedNumPoints = buffer.byteLength / bytesPerPoint;
 
-      expect(numPoints).toBe(0);
+      expect(calculatedNumPoints).toBe(0);
     });
   });
 

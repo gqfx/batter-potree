@@ -63,11 +63,8 @@ controls.fadeFactor = 10;
 controls.setScene(scene.getThreeScene());
 (window as any).earthControls = controls;
 
-// 创建加载器
-const _loader = new PotreeLoader();
-
 // 添加 Viewer 事件监听
-viewer.on('pointcloud-loaded', ({ pointCloud, name }) => {
+viewer.on('pointcloud-loaded', ({ pointCloud: _pointCloud, name }) => {
   console.log('点云加载完成:', name);
 });
 
