@@ -85,8 +85,13 @@ export class ObjectPool<T> {
    */
   constructor(factory: ObjectFactory<T>, options: ObjectPoolOptions<T> = {}) {
     this.factory = factory;
-    this.resetFn = options.reset;
-    this.clearFn = options.clear;
+    // 使用条件赋值避免 exactOptionalPropertyTypes 错误
+    if (options.reset !== undefined) {
+      this.resetFn = options.reset;
+    }
+    if (options.clear !== undefined) {
+      this.clearFn = options.clear;
+    }
     this.maxSize = options.maxSize ?? 1000;
 
     // 预填充池
