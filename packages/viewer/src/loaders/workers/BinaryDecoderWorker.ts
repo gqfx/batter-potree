@@ -162,11 +162,16 @@ function decodePointCloudData(event: MessageEvent<IWorkerDecodeRequest>): IWorke
 
   const view = new DataView(buffer);
   const version = new Version(event.data.version);
-  const nodeOffset = event.data.offset;
-  // ✅ 修复: scale 应该是数组 [x, y, z] 或单一值
-  const scaleArray = Array.isArray(event.data.scale)
-    ? event.data.scale
-    : [event.data.scale, event.data.scale, event.data.scale];
+
+  // ✅ 修复: offset 可能为 undefined，提供默认值 [0, 0, 0]
+  const nodeOffset = event.data.offset ?? [0, 0, 0];
+
+  // ✅ 修复: scale 应该是数组 [x, y, z] 或单一值，可能为 undefined
+  const scaleArray = event.data.scale
+    ? (Array.isArray(event.data.scale)
+        ? event.data.scale
+        : [event.data.scale, event.data.scale, event.data.scale])
+    : [1, 1, 1]; // 默认 scale 为 1
 
   const tightBoxMin: [number, number, number] = [
     Number.POSITIVE_INFINITY,

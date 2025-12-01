@@ -59,7 +59,7 @@ export function makeGlobalNodeId(sourceId: string, nodeName: string): string {
  */
 export function parseGlobalNodeId(globalId: string): { sourceId: string; nodeName: string } {
   const parts = globalId.split('::');
-  if (parts.length !== 2) {
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
     throw new Error(`Invalid global node ID: ${globalId}`);
   }
   return {
@@ -80,6 +80,7 @@ export function isValidNodeName(name: string): boolean {
 
   for (let i = 1; i < name.length; i++) {
     const char = name[i];
+    if (!char) return false; // 防止 undefined
     const index = Number.parseInt(char, 10);
     if (Number.isNaN(index) || index < 0 || index > 7) {
       return false;
